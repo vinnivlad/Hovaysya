@@ -35,8 +35,8 @@ DB_PATH = REPO_ROOT / "data" / "messages.db"
 
 DECISIONS = {"notify", "silent"}
 LEVELS = {"info", "alert"}
-ALARMS = {"alert", "ballistic", "mig", "cruise", "drone-jet", "drone", "recon",
-          "clear", "none"}
+ALARMS = {"alert", "ballistic", "mig", "cruise", "drone-jet", "drone",
+          "recon", "clear-partial", "clear", "none"}
 SILENT_REASONS = {"too-far", "already-notified", "resolved", "insufficient"}
 THREATS = {"none", "unknown", "recon", "mig", "shahed", "shahed-jet", "cruise",
            "ballistic", "kab", "aviation", "mixed"}

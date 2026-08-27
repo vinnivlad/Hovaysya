@@ -163,13 +163,17 @@ def test_every_decision_carries_the_rule_that_made_it():
 # --- partial all-clears ---------------------------------------------------
 
 
-def test_a_partial_all_clear_does_not_sound_the_all_clear():
-    """"Відбій загрози МіГ-31К" lifts one class while the alert continues.
-    The all-clear tone means "you can come out"."""
+def test_a_partial_all_clear_is_worth_hearing():
+    """The user labelled "⚪️ Відбій загрози МіГ-31К" as a wake-up — "відбій по
+    мігам" — and asked to be told when a class is lifted. It was a silent status
+    update until he said so."""
     r = play((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
              (600, "⚪️ Відбій загрози МіГ-31К."))
-    assert r[1][1].level == "info"
-    assert r[1][1].alarm != "clear"
+    assert r[1][1].level == "alert"
+    # Its own tone: "повний відбій звучить по іншому", so the two must not share
+    # one — hearing "you can come out" when only one class was lifted is worse
+    # than hearing nothing.
+    assert r[1][1].alarm == "clear-partial"
 
 
 def test_a_partial_all_clear_does_not_close_the_episode():
@@ -177,7 +181,8 @@ def test_a_partial_all_clear_does_not_close_the_episode():
     r = play((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
              (600, "⚪️По балістиці відбій."),
              (700, "🛑 ТРИВОГА"))
-    assert levels(r) == ["alert", "info", None]
+    # Heard, but the siren is not re-announced: the episode is still open.
+    assert levels(r) == ["alert", "alert", None]
 
 
 def test_a_full_all_clear_still_closes_it():
@@ -199,7 +204,8 @@ def test_the_mig_cycle_takeoff_then_nothing():
     """From 2026-08-04: took off, then "Відбій загрози МіГ-31К"."""
     r = play((0, "❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка."),
              (1020, "⚪️ Відбій загрози МіГ-31К."))
-    assert levels(r) == ["alert", "info"]
+    assert levels(r) == ["alert", "alert"]
+    assert [d.alarm for _o, d in r] == ["mig", "clear-partial"]
 
 
 # --- ballistic novelty without the word "пуск" ----------------------------
@@ -240,3 +246,65 @@ def test_the_lifted_class_is_not_read_as_the_active_one():
     from tools.nlp import hints
     t = "⚪️По балістиці відбій. / ⚠️2 шахеди на Чорноморськ/Одесу."
     assert hints.active_threat(t) == "shahed"
+
+
+# --- forecasts are not events ---------------------------------------------
+
+
+def test_a_multi_day_forecast_is_not_a_threat():
+    """The user's note: "Здавалося б що загроза балістики, але ні! Попередження
+    на наступні 2 дні просто."""
+    r = play((0, "❗️Загроза балістичного удару по Києву, та околицям протягом 48 годин"))
+    assert levels(r) == [None]
+
+
+def test_a_speculative_forecast_is_not_a_threat():
+    r = play((0, "❗️Київ може атакувати десятки балістичних ракет та гіперзвукових"))
+    assert levels(r) == [None]
+
+
+def test_a_probability_assessment_is_not_a_threat():
+    r = play((0, "🟧 Ймовірність комбінованої атаки на середньому рівні."))
+    assert levels(r) == [None]
+
+
+def test_an_actual_launch_still_is():
+    r = play((0, "❗️❗Є інформація про пуск балістичної ракети з Курської області."))
+    assert levels(r) == ["alert"]
+
+
+def test_a_full_all_clear_keeps_its_own_tone():
+    """The distinction only works if the full one is unmistakable."""
+    r = play((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+             (600, "🟢 ВІДБІЙ ТРИВОГИ"))
+    assert [d.alarm for _o, d in r] == ["alert", "clear"]
+
+
+def test_kyiv_oblast_siren_is_not_the_city_siren():
+    """"КИЇВСЬКА ОБЛАСТЬ ОГОЛОШЕНА ПОВІТРЯНА ТРИВОГА" resolved as the city
+    because "київська" starts with "київ"."""
+    r = play((0, "🚨❗️КИЇВСЬКА ОБЛАСТЬ ОГОЛОШЕНА ПОВІТРЯНА ТРИВОГА"),
+             (60, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"))
+    assert levels(r) == [None, "alert"]
+
+
+def test_a_mig_takeoff_announces_even_mid_episode():
+    """"Виліт" is a takeoff and was absent from the launch words, so a MiG
+    takeoff during a running alert was silenced as a repeat."""
+    r = play((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+             (3000, "❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка."))
+    assert levels(r) == ["alert", "alert"]
+    assert [d.alarm for _o, d in r] == ["alert", "mig"]
+
+
+def test_a_donation_round_up_is_not_a_threat():
+    """One donor wrote "Гепарди по реактивним шахедам працюють", which made the
+    whole post read as a live jet-drone threat."""
+    t = chr(10).join([
+        "Донат 1 від Артема:",
+        "Гепарди по реактивним шахедам працюють, майже ніч не спали",
+        "Донат 2: ❤️🫡",
+        "Дякую за підтримку, збір триває, картка для донатів, грн",
+    ])
+    r = play((0, t))
+    assert levels(r) == [None]

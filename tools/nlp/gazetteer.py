@@ -177,7 +177,12 @@ OBLAST = [
     _p("Гнідин", "oblast", "гнідин"),
     _p("Глеваха", "oblast", "глевах"),
     _p("Хотянівка", "oblast", "хотянівк"),
-    _p("Київщина", "oblast", "київщин"),
+    # Longer stems than the city's, so longest-match resolves them here:
+    # "КИЇВСЬКА ОБЛАСТЬ ОГОЛОШЕНА ПОВІТРЯНА ТРИВОГА" was resolving as the
+    # city and being announced as my siren.
+    _p("Київщина", "oblast", "київщин", "київська область",
+       "київській області", "київську область", "київської області",
+       "київщині", "київщину"),
 ]
 
 ELSEWHERE = [

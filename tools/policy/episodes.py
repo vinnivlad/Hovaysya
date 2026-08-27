@@ -52,7 +52,14 @@ _NOVELTY = re.compile(
 #
 # Launched *from* somewhere is an event; arriving *at* somewhere is the same
 # missiles being tracked. Keying on the verb alone re-fired four times.
-_LAUNCH = re.compile(r"\bвихід\w*|\bпуск\w*|\bспуск\w*|\bстарт\w*", re.IGNORECASE)
+# "Виліт" and "Вихід" are different words, and only the second was here —
+# so "Виліт винищувача МіГ-31К" announced nothing new and was silenced as a
+# repeat. For a MiG the takeoff is the event.
+_LAUNCH = re.compile(
+    r"\bвихід\w*|\bвиліт\w*|\bвилет\w*|\bзліт\w*|r\bпуск\w*|"
+    r"\bспуск\w*|\bстарт\w*",
+    re.IGNORECASE,
+)
 
 # ...unless the message is counting off one volley. "спуск балістики! Друга"
 # contains a launch verb but is the second missile of a wave already announced,

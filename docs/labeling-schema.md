@@ -99,7 +99,7 @@ rules in the policy:
   the correct response every time, which is only true if nothing quieter borrows
   it.
 
-**`alarm` — which sound:** `alert` · `ballistic` · `mig` · `cruise` · `drone-jet` · `drone` · `recon` · `clear` · `none`
+**`alarm` — which sound:** `alert` · `ballistic` · `mig` · `cruise` · `drone-jet` · `drone` · `recon` · `clear-partial` · `clear` · `none`
 
 The point of separating sound from loudness is that **you should know what is
 coming without opening your eyes.** Ballistic must not sound like a drone: woken
@@ -193,6 +193,24 @@ with it that complexity.
 
 The two siren messages are therefore both audible: the declaration because it
 needs a reaction, the all-clear because coming out of shelter needs one too.
+
+### `clear-partial` — one class lifted, the alert continuing
+
+`⚪️ Відбій загрози МіГ-31К` and `⚪️По балістиці відбій` say one threat is over
+while the siren still runs. The user asked to be told: "якщо відомо що відбій по
+мігам чи балістиці — висилати повідомлення". They are audible.
+
+They have **their own tone**, at his instruction — "повний відбій звучить по
+іншому". Hearing "you can come out" when only one class was lifted would be
+worse than hearing nothing, so the two cannot share a sound.
+
+They also do not close the episode, which is what makes the distinction matter:
+everything the night established stays in place.
+
+`war_monitor` is where most of these come from — 12 to 33 a month against
+almost no declarations. For the policy that makes it the more informative
+channel of the two: a general all-clear says the siren stopped, a partial one
+says *what* ended.
 
 ### `mig` — a carrier, not a missile
 

@@ -65,9 +65,13 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     #    district is not an all-clear for me, and announcing those woke the user
     #    three times.
     if obs.alert_state == "clear" and obs.partial_clear:
-        # One class lifted while the alert continues: worth showing, not worth
-        # the all-clear tone, which means "you can come out".
-        return _notify("info", "none", "partial all-clear")
+        # Audible, with the all-clear tone. I had made this a silent status
+        # update; the user labelled "⚪️ Відбій загрози МіГ-31К" as a wake-up
+        # ("відбій по мігам") and asked outright to be told when a class is
+        # lifted. It still does not close the episode.
+        # Its own tone: the user asked for the distinction outright — "повний
+        # відбій звучить по іншому" — so the two cannot share one.
+        return _notify("alert", "clear-partial", "partial all-clear")
     if obs.alert_state == "clear" and obs.scope in CITY_OR_NEARER:
         return _notify("alert", "clear", "all-clear")
     if obs.alert_state == "clear":
@@ -126,7 +130,9 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     # 7. A MiG-31K in the air alerts the country, but the launch may be an hour
     #    away or never come — loud is wrong, silence is worse.
     if threat == "mig":
-        if not tracker.is_new(obs):
+        # The mig tone not having sounded is novelty in itself, the same rule
+        # ballistic uses. Relying on the wording alone silenced a takeoff.
+        if not tracker.is_new(obs) and not tracker.is_new_class("mig"):
             return _silent("already-notified: MiG already announced")
         return _notify("alert", "mig", "MiG-31K airborne")
 

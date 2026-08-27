@@ -308,7 +308,7 @@ const FILTERS = [
 // repeats and takes the screen, the drone one rings once.
 const LEVELS = ["info", "alert"];
 const ALARMS = ["alert", "ballistic", "mig", "cruise", "drone-jet", "drone",
-                "recon", "clear", "none"];
+                "recon", "clear-partial", "clear", "none"];
 const SILENT_REASONS = ["too-far", "already-notified", "resolved", "insufficient"];
 // Five primary types, ordered by how urgently they need a reaction, one sound
 // each. The rest sit behind a secondary row so the common case stays one row.
@@ -357,7 +357,8 @@ const UA = {
   alarm: {
     ballistic: "балістика", mig: "МіГ", cruise: "ракета",
     "drone-jet": "реактивний", drone: "дрон", recon: "розвідник",
-    alert: "тривога", clear: "відбій", aviation: "—", none: "без звуку",
+    alert: "тривога", "clear-partial": "відбій частковий",
+    clear: "відбій повний", aviation: "—", none: "без звуку",
   },
   silent_reason: {
     "too-far": "далеко від мене", "already-notified": "вже будив",
@@ -387,15 +388,41 @@ let filterIx = 0;
 let selIx = -1;
 let draft = null;
 
+// The file is the durable store; localStorage is a scratch buffer for work not
+// exported yet. Preferring the buffer wholesale meant corrections made in the
+// file never reached the page — and the next export silently undid them.
+//
+// So: merge by id, the file winning where both have a label, the buffer keeping
+// anything the file has not seen. Work in progress survives, corrections
+// propagate.
 function loadLabels() {
+  const byId = new Map();
+  let cached = [];
   try {
-    const cached = localStorage.getItem(STORE_KEY);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed) && parsed.length >= DATA.labels.length) return parsed;
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) cached = parsed;
     }
-  } catch (e) { /* private mode, cleared storage — fall through */ }
-  return DATA.labels.slice();
+  } catch (e) { /* private mode, cleared storage — carry on with the file */ }
+
+  for (const l of cached) if (l && l.id) byId.set(l.id, l);
+  let overridden = 0;
+  for (const l of DATA.labels) {
+    if (l && l.id) {
+      if (byId.has(l.id)) overridden++;
+      byId.set(l.id, l);
+    }
+  }
+  const merged = [...byId.values()];
+  // A level that no longer exists would fail validation on export.
+  for (const l of merged) if (l.level === "shelter") l.level = "alert";
+
+  if (overridden || merged.length !== cached.length) {
+    console.info(`labels: ${DATA.labels.length} from file, ${cached.length} cached, ` +
+                 `${overridden} taken from the file, ${merged.length} in use`);
+  }
+  return merged;
 }
 
 function persist() {

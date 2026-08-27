@@ -58,10 +58,18 @@ _THREAT = tuple((kind, re.compile(pat, re.IGNORECASE)) for kind, pat in THREAT_R
 # Anticipation, not occurrence: a warning that something *may* be launched or
 # used. Checked before every other certainty rule because the phrase contains
 # the same words an actual event does.
+# Anticipation, not occurrence: a warning that something *may* be launched
+# or used, or a forecast covering the next hours or days. The user's note on
+# one of these: "Здавалося б що загроза балістики, але ні! Попередження на
+# наступні 2 дні просто."
 _ANTICIPATED = re.compile(
     r"загроз\w*\s+(пуск|застосув|використ|удар|атак)|"
     r"можлив\w*\s+(пуск|застосув|удар)|"
+    r"може\s+атакувати|можуть\s+атакувати|"
     r"ризик\w*\s+(пуск|застосув)|"
+    r"ймовірн\w*|"
+    r"протягом\s+\d+\s+(годин|діб|дні)|"
+    r"на\s+наступн\w*|прогноз|"
     r"загроза\s+балісти|загроза\s+застосування",
     re.IGNORECASE,
 )
@@ -481,6 +489,17 @@ def _hits(text: str, terms) -> bool:
     return any(t in low for t in terms)
 
 
+_DONATION_OPENER = re.compile(r"^\s*[^\w]{0,4}донат\s*\d", re.IGNORECASE)
+
+
+def _strongly_social(text: str) -> bool:
+    """Social content that no threat word inside it should override."""
+    low = _low(text)
+    if _DONATION_OPENER.match(text or ""):
+        return True
+    return sum(1 for t in SOCIAL_TERMS if t in low) >= 3
+
+
 def modality_hint(text: str) -> str:
     """live-threat | aftermath | summary-news | non-threat.
 
@@ -492,6 +511,12 @@ def modality_hint(text: str) -> str:
         return "summary-news"
     if _hits(text, IMPACT_TERMS):
         return "live-threat"
+    # A donation round-up quotes its donors, and one of them wrote "Гепарди по
+    # реактивним шахедам працюють" — enough to make the whole post read as a
+    # live jet-drone threat. Strong social evidence therefore wins outright:
+    # several markers, or the post opening as a donation list.
+    if _strongly_social(text):
+        return "non-threat"
     if _hits(text, SOCIAL_TERMS) and not looks_live(text):
         return "non-threat"
     if _hits(text, AFTERMATH_TERMS):
