@@ -400,7 +400,18 @@ might were each tested and each failed:
   08-04 gives 2, 2 and 1. Identical.
 - *Message form* — caps, 🚀, bare toponym: mixed on both sides.
 
-So `RING_REARM_S` stays at the 08-04 fit, which is where he was emphatic
-("прям близько, треба повідомлення"), at the cost of two false wake-ups on
-08-26, where he was mild. A third labelled night with a ballistic wave over the
-ring breaks the tie; until then this is the honest state, not a solved problem.
+**Resolved by a rule instead of a threshold.** Told the two rulings could not
+both hold, he gave the reason the parameter was missing:
+
+> якщо був пуск балістики, то на моє коло повторну нотифікацію не шли.
+> Я і так не сплю.
+
+A ballistic launch on Kyiv already has him up and in shelter, so a place name
+over his own area adds nothing to it. No threshold, no fitting — and it scores
+better than the fit did: **7 false wake-ups against 8, and 5 misses against 6.**
+Six of his own labels were brought in line with it, and `ring_rearmed`,
+`last_launch_any` and `RING_REARM_S` are gone.
+
+Worth keeping as a method note: the parameter sweep and the label-gap fit both
+pointed at a threshold, and the threshold did not exist. What was missing was not
+a better fit but a sentence from the person the app is for.

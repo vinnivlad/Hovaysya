@@ -378,52 +378,51 @@ def test_a_launch_from_a_russian_region_announces_something_new():
     assert o.says_new
 
 
-# --- a salvo arriving over the user's own area ----------------------------
+# --- a ballistic launch already has him up --------------------------------
 
 
-def test_a_ballistic_salvo_over_my_area_rings_again():
-    """Seven misses in the dense night were this: "Жуляни🚀", "БОРЩАГА",
-    "Вишневе🚀", each annotated "близько" or "прям близько, треба
-    повідомлення", each silenced as the same wave."""
+def test_a_ring_name_after_a_ballistic_alert_stays_quiet():
+    """His ruling, and the reason is the point: "якщо був пуск балістики, то на
+    моє коло повторну нотифікацію не шли. Я і так не сплю."
+
+    It also settled what no threshold could. Fitted to the dense night a ring
+    re-arm wanted to ring 78 s after the last alert; fitted to the sparse one it
+    had to stay quiet at 155 s — both his own rulings on the same shape."""
     from tools.policy.episodes import Tracker, observe
     from tools.policy.rules import decide
 
     tr = Tracker()
-    # The launch announcements matter: they are what makes each arrival a
-    # separate missile rather than the same one being re-listed.
-    seq = [(0, "‼️ Вихід балістики з Брянська"),
-           (60, "❗6-8 Цирконів на Київ, Бровари."),
-           (100, "‼️Київ / Бровари — спуск балістики! 9та"),
-           (120, "Жуляни🚀"),
-           (125, "Вишневе"),
-           (200, "‼️Київ / Бровари — спуск балістики! 10та"),
-           (205, "БОРЩАГА")]
     got = []
-    for off, text in seq:
+    for off, text in ((0, "‼️ Вихід балістики з Брянська"),
+                      (60, "❗6-8 Цирконів на Київ, Бровари."),
+                      (100, "‼️Київ / Бровари — спуск балістики! 9та"),
+                      (120, "Жуляни🚀"),
+                      (200, "‼️Київ / Бровари — спуск балістики! 10та"),
+                      (205, "БОРЩАГА")):
         o = observe(T0 + off, text)
         d = decide(o, tr)
         tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
-        got.append((text, d.audible, d.reason))
-    audible = {t: a for t, a, _r in got}
-    assert audible["Жуляни🚀"], got
-    # Five seconds later, the same missiles. He wrote "повтор" on it.
-    assert not audible["Вишневе"], got
-    # A tenth missile launched and then named overhead is its own event.
-    assert audible["БОРЩАГА"], got
+        got.append((text, d.audible))
+    assert got[0][1], got            # the launch itself wakes him
+    assert not any(a for _t, a in got[1:]), got
 
 
-def test_a_relisting_with_no_new_launch_does_not_ring():
+def test_a_new_class_still_breaks_through_a_ballistic_wave():
+    """The rule is about repeats of the same class, not about going quiet for
+    the rest of the night."""
     from tools.policy.episodes import Tracker, observe
     from tools.policy.rules import decide
 
     tr = Tracker()
-    for off, text in ((0, "‼️ Вихід балістики з Брянська"), (60, "Жуляни🚀")):
+    got = []
+    for off, text in ((0, "‼️ Вихід балістики з Брянська"),
+                      (120, "Жуляни🚀"),
+                      (300, "❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка.")):
         o = observe(T0 + off, text)
         d = decide(o, tr)
         tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
-    o = observe(T0 + 400, "Вишневе, Теремки")     # well past the re-arm gap...
-    d = decide(o, tr)
-    assert not d.audible, d.reason                # ...but nothing new was launched
+        got.append((text[:24], d.audible, d.alarm))
+    assert got[-1][1] and got[-1][2] == "mig", got
 
 
 def test_a_city_wide_drone_report_is_not_enough():

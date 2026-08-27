@@ -116,16 +116,18 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     # 6. Ballistic leaves no room for geography: minutes of flight, so a
     #    confirmed launch that could reach us is a shelter call city-wide.
     if threat == "ballistic" and obs.certainty == "confirmed":
-        # A salvo arriving over his own area is its own event. Seven misses in
-        # the dense night were exactly this — "Жуляни🚀", "БОРЩАГА", "Вишневе🚀",
-        # each annotated "близько" or "прям близько, треба повідомлення", each
-        # silenced as the same wave. `ring_rearmed` is what tells them from the
-        # repeats he marked "повтор" seconds later.
-        if tracker.ring_rearmed(obs):
-            return _notify("alert", "ballistic", "ballistic over my area")
-        # Otherwise novelty is a launch, not a position. A bare "Жуляни" during
-        # a wave is that wave, and the user annotated exactly that case
-        # "Ця балістика вже розбудила".
+        # Novelty is a launch, not a position — and once a ballistic alert has
+        # sounded, a place name over his own area adds nothing. His ruling, and
+        # the reason is the point: "якщо був пуск балістики, то на моє коло
+        # повторну нотифікацію не шли. Я і так не сплю."
+        #
+        # It also resolved something no threshold could. Fitted to his dense
+        # night, a ring re-arm wanted to ring 78 s after the last alert; fitted
+        # to the sparse one it had to stay quiet at 155 s. Both were his own
+        # rulings on the same shape, and every feature that might have separated
+        # them was measured and failed — see docs/pattern-findings.md. The rule
+        # he gave instead needs no threshold at all, and scores better: 7 false
+        # wake-ups against 8, with the same six misses.
         if (ep is not None and ep.notified
                 and not tracker.is_fresh_launch(obs)
                 and not tracker.is_new_class("ballistic")):

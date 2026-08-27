@@ -264,6 +264,31 @@ def inconsistencies(labels: list[dict], messages: dict[str, dict]) -> list[str]:
     return out
 
 
+def stale_scopes(labels: list[dict], messages: dict[str, dict]
+                 ) -> list[tuple[str, str, str]]:
+    """Labels whose stored scope no longer matches the gazetteer.
+
+    `scope` is derived, not judged — the page pre-fills it and the labeller only
+    corrects it. So improving the gazetteer leaves old labels behind, and the
+    drift is invisible: `Голос🚀` kept `city` after Holosiiv joined the near ring
+    and quietly slipped past a sweep that was keyed on scope.
+
+    Reported, never rewritten. A stored value may be his correction, and nothing
+    in the file records which ones are.
+    """
+    from ..nlp.gazetteer import resolve_scope
+
+    out = []
+    for l in labels:
+        anchor = l.get("anchor")
+        if not anchor or anchor not in messages:
+            continue
+        now = resolve_scope(messages[anchor]["text"])
+        if l.get("scope") and now != l["scope"]:
+            out.append((l.get("id", "?"), l["scope"], now))
+    return out
+
+
 def summarise(labels: list[dict]) -> list[str]:
     good = [l for l in labels if "_broken" not in l]
     if not good:
@@ -315,6 +340,34 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{title}  ({len(group)})")
         for _sev, lid, msg in group:
             print(f"  {lid:<22} {msg}")
+        print()
+
+    stale = stale_scopes(labels, messages)
+    # Two very different things, and only one is safe to touch. `unknown -> X`
+    # means the gazetteer learned a place it did not know when the label was
+    # written. `X -> unknown` means he supplied the scope from context the
+    # message does not carry — his judgement, and the more valuable half.
+    learned = [t for t in stale if t[1] == "unknown"]
+    judged = [t for t in stale if t[1] != "unknown"]
+    if learned:
+        print(f"The gazetteer has since learned the place  ({len(learned)})")
+        for lid, was, now in learned[:12]:
+            print(f"  {lid:<22} {was} -> {now}")
+        if len(learned) > 12:
+            print(f"  ... and {len(learned) - 12} more")
+        print("  Safe to refresh: nothing was judged here, the page just had no"
+              " answer.")
+        print()
+    if judged:
+        print(f"Stored scope no longer matches the gazetteer  ({len(judged)})"
+              " — leave these alone")
+        print("  (`scope` is derived, so improving the gazetteer leaves labels"
+              " behind; a stored value may equally be a correction of his,"
+              " and nothing records which)")
+        for lid, was, now in judged[:8]:
+            print(f"  {lid:<22} {was} -> {now}?")
+        if len(judged) > 8:
+            print(f"  ... and {len(judged) - 8} more")
         print()
 
     pairs = inconsistencies(labels, messages)

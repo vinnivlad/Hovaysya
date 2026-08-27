@@ -91,13 +91,6 @@ REFRACTORY_NEAR_S = 6 * 60
 # event, p90 167 s, so a window of four minutes covers it.
 LAUNCH_DEDUP_S = 4 * 60
 
-# A ballistic salvo arriving over the user's own area re-arms this fast. Fitted,
-# not guessed: across the dense night he woke for a ring name 78, 108, 448 and
-# 633 s after the previous alert, and called every one within 59 s a repeat
-# ("повтор", "близько"). The boundary is that gap, and a new launch has to have
-# been announced in it — otherwise it is the same missiles being re-listed.
-RING_REARM_S = 60
-
 NEAR_TIERS = ("my-area", "my-district")
 
 
@@ -120,12 +113,6 @@ class Episode:
     threat: str | None = None
     alert_announced: bool = False
     last_launch: int | None = None
-    # Any launch announcement at all, wherever it is aimed. `last_launch` only
-    # counts launches whose target is not named, because that is what makes a
-    # launch *new* rather than a re-report — but "‼️Київ / Бровари — спуск
-    # балістики! 14та" is the fourteenth missile leaving the tube, and for the
-    # ring re-arm below that is exactly the fact needed.
-    last_launch_any: int | None = None
     cleared: bool = False
     sent: list[Sent] = field(default_factory=list)
     # place name -> last time it was named near the user
@@ -170,7 +157,6 @@ class Observation:
     nationwide: bool
     ring_places: tuple[str, ...]
     says_new: bool
-    says_launch: bool = False
     cleared_class: str | None = None
     is_reply: bool = False
     partial_clear: bool = False
@@ -212,7 +198,6 @@ def observe(ts: int, text: str, is_reply: bool = False) -> Observation:
         nationwide=hints.nationwide(text),
         ring_places=scope_places,
         says_new=_says_new(text),
-        says_launch=bool(_LAUNCH.search(text or "")),
         is_reply=is_reply,
         partial_clear=hints.partial_clear(text),
         cleared_class=hints.cleared_class(text),
@@ -319,26 +304,6 @@ class Tracker:
             return True
         return alarm not in ep.alarms_used()
 
-    def ring_rearmed(self, obs: Observation, min_gap: int = RING_REARM_S) -> bool:
-        """Whether a threat named over the user's own area counts again.
-
-        Two conditions, both from the labels: enough time since the last alert,
-        and a launch announced inside that gap. "Жуляни🚀" after `спуск
-        балістики! Десята` is the tenth missile arriving overhead; "Вишневе" six
-        seconds later is the same one, and he wrote "повтор" on it.
-        """
-        if not obs.near:
-            return False
-        ep = self.episode
-        if ep is None or not ep.notified:
-            return True
-        last = max((s.ts for s in ep.sent if s.level != "info"), default=None)
-        if last is None:
-            return True
-        if obs.ts - last < min_gap:
-            return False
-        return ep.last_launch_any is not None and ep.last_launch_any > last
-
     def is_fresh_launch(self, obs: Observation) -> bool:
         """A launch announcement not already announced by another channel.
 
@@ -385,8 +350,6 @@ class Tracker:
             ep.cleared.discard(obs.threat)
         if obs.says_new:
             ep.last_launch = obs.ts
-        if obs.says_launch:
-            ep.last_launch_any = obs.ts
         for place in obs.ring_places:
             ep.ring_seen[place] = obs.ts
         if level is not None and alarm is not None:
