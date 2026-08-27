@@ -1,0 +1,24 @@
+# Normalize line endings regardless of each machine's core.autocrlf.
+# The ingest server runs on Linux while development happens on Windows, so LF
+# everywhere keeps diffs free of whole-file line-ending churn.
+* text=auto eol=lf
+
+# Captured HTML fixtures must stay byte-identical to what Telegram served —
+# they are the ground truth the parser tests run against. Treating them as
+# binary keeps any conversion, in either direction, away from them.
+tools/tests/fixtures/*.html -text
+
+# Databases and archives, in case one ever escapes .gitignore.
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.gz binary
+*.zip binary
+*.png binary
+*.jpg binary
+*.webp binary
+
+# Keep Windows-only helpers usable if any are ever added.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
