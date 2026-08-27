@@ -190,13 +190,38 @@ def alert_state(text: str) -> str | None:
 
 
 def nationwide(text: str) -> bool:
-    """True when the threat is country-wide however little geography is named.
+    """True when the threat is country-wide *because no target is named yet*.
 
-    Used alongside the geographic filter: dropping a MiG-31K takeoff because it
-    names only a Russian airfield would hide the one signal that puts the whole
-    country under alert.
+    A ballistic launch or a MiG-31K takeoff names a Russian airfield and no
+    Ukrainian target, and at that moment it threatens everyone — dropping it for
+    lack of local geography would hide the one signal that alerts the country.
+
+    But the moment a target is stated it stops being country-wide.
+    "Балістична ракета на Запоріжжя" is a fact about Zaporizhzhia. Treating
+    every ballistic message as nationwide put 30 other-region messages in front
+    of the user during labelling, and they were dutifully labelled — pure waste
+    caused by this function being too generous.
     """
-    return threat_hint(text) in NATIONWIDE_THREATS
+    if threat_hint(text) not in NATIONWIDE_THREATS:
+        return False
+    # A resolved Ukrainian place means the target is known. Russian launch sites
+    # resolve as `elsewhere` too, so ask specifically whether any *Ukrainian*
+    # location was named.
+    from .gazetteer import find_places
+
+    for place in find_places(text):
+        if place.tier != "elsewhere":
+            return True  # named locally: relevant, and geography handles it
+        if place.name not in _LAUNCH_ORIGINS:
+            return False  # a target in another region: not our business
+    return True
+
+
+# Places that appear as launch origins rather than targets, so naming one does
+# not mean the target is known.
+_LAUNCH_ORIGINS = frozenset({
+    "російські аеродроми", "Брянщина", "Курщина", "Крим",
+})
 
 
 def live_shapes(text: str) -> list[str]:

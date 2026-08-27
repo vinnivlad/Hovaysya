@@ -515,7 +515,12 @@ function openDraft(decision) {
     alarm: m.as === "clear" ? "clear"
          : m.as === "alert" ? "alert"
          : (m.al === "none" ? "drone" : m.al),
-    silent_reason: prev && prev.silent_reason ? prev.silent_reason : "already-notified",
+    // Sticky, except where the region says otherwise. Carrying
+    // "already-notified" onto another region's target produced ~20 mislabels
+    // in the first real night.
+    silent_reason: m.s === "elsewhere" ? "too-far"
+                 : (prev && prev.silent_reason ? prev.silent_reason
+                                               : "already-notified"),
     // A moment is judged in context, so a message stating no type or place
     // inherits the last one the feed gave. Judging posts in isolation is the
     // mistake the schema opens by warning about.
@@ -557,7 +562,8 @@ function renderForm() {
     return;
   }
 
-  const earlier = labelsForNight().filter(l => l.id !== draft.id && l.decision === "notify");
+  const earlier = labelsForNight()
+    .filter(l => l.id !== draft.id && l.decision === "notify" && l.at < draft.at);
   const weakShelter = draft.decision === "notify" && draft.level === "shelter" && m.st === "weak";
   const before = visibleMessages().slice(Math.max(0, selIx - 3), selIx);
   let html =
@@ -607,6 +613,23 @@ function renderForm() {
       pick("silent_reason", SILENT_REASONS, draft.silent_reason) + `</div>`;
   }
 
+  // The episode link belongs on silent labels too — arguably more than on
+  // notify ones, since "вже будив" is a statement *about* an episode. Hiding it
+  // here left repeat_of empty across an entire night of real labelling.
+  const episodeRelevant = draft.decision === "notify" ||
+                          draft.silent_reason === "already-notified" ||
+                          draft.silent_reason === "resolved";
+  if (episodeRelevant) {
+    html += `<div class="row"><label>${draft.decision === "notify"
+        ? "чи це повтор епізоду" : "якого епізоду це стосується"}</label><div class="pick">` +
+      `<button type="button" data-f="repeat_of" data-v="" class="${draft.repeat_of ? "" : "on"}">` +
+      `${draft.decision === "notify" ? "перший сигнал" : "не знаю"}</button>` +
+      earlier.map(l => `<button type="button" data-f="repeat_of" data-v="${esc(l.id)}" ` +
+        `class="${draft.repeat_of === l.id ? "on" : ""}">${esc(l.id.slice(11))}` +
+        `<span class="sub">${esc(UA.alarm[l.alarm] || l.alarm)}</span></button>`).join("") +
+      `</div></div>`;
+  }
+
   const showMore = THREATS_MORE.indexOf(draft.threat) >= 0;
   html += `<div class="row"><label>що летить</label>` +
     pick("threat", THREATS_MAIN, draft.threat, { subs: UA.threatHint }) +
@@ -621,13 +644,6 @@ function renderForm() {
                             : `<span class="auto manual">вручну</span>`) +
       `</label>` + pick("alarm", ALARMS, draft.alarm) + `</div>`;
 
-    html += `<div class="row"><label>чи це повтор епізоду</label><div class="pick">` +
-      `<button type="button" data-f="repeat_of" data-v="" class="${draft.repeat_of ? "" : "on"}">` +
-      `перший сигнал</button>` +
-      earlier.map(l => `<button type="button" data-f="repeat_of" data-v="${esc(l.id)}" ` +
-        `class="${draft.repeat_of === l.id ? "on" : ""}">повтор ${esc(l.id.slice(11))}` +
-        `<span class="sub">${esc(UA.level[l.level] || l.level)}</span></button>`).join("") +
-      `</div></div>`;
   }
 
   html += `<div class="row"><label>модальність</label>` +
@@ -660,6 +676,12 @@ function renderForm() {
         draft.alarm = ALARM_FOR[v] || "drone";
       }
       if (f === "alarm") draft._alarmManual = true;
+      // "вже будив" is a claim about an episode, so point it at the most
+      // recent wake-up unless one was chosen by hand.
+      if (f === "silent_reason" && v === "already-notified" && !draft.repeat_of) {
+        const last = earlier.length ? earlier[earlier.length - 1] : null;
+        if (last) draft.repeat_of = last.id;
+      }
       renderForm();
     };
   });
@@ -685,7 +707,7 @@ function save(advance) {
   const out = Object.assign({}, draft);
   delete out._alarmManual;  // UI state, not data
   if (out.decision === "notify") delete out.silent_reason;
-  else { delete out.level; delete out.alarm; delete out.repeat_of; out.repeat_of = null; }
+  else { delete out.level; delete out.alarm; }  // repeat_of is kept: see above
   if (!out.open_question) out.open_question = null;
 
   const ix = labels.findIndex(l => l.id === out.id);
