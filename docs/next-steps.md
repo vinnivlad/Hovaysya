@@ -1,6 +1,7 @@
 # Next steps
 
-Ordered by dependency. Stages 1-4 are done; stage 5 is yours.
+Ordered by dependency. Stages 1-6 are done. **Nothing runs live yet** — that is
+the whole of what stage 7 is about.
 
 Visual status board: <https://claude.ai/code/artifact/a7a19c52-e4c8-4bad-9bf8-1c480dd8434c>
 
@@ -53,11 +54,41 @@ JSONL. Every message arrives pre-filled from `tools/nlp/`, and the same module
 runs in the stage-6 baseline — so a correction made while labeling is also a
 signal about the baseline.
 
-## 5. Your labeling pass — next
+## 5. Labeling pass — done, twice
 
-Open `data/labeler.html`, work night by night, export, save over
-`labels/moments.jsonl`. Filter defaults to "near me", which is what makes a
-76-message hour scannable.
+458 labels across two nights: 2026-08-04 densely (334, every post) and
+2026-08-26 sparsely (124). Drop a fresh export into `labels/` and it counts —
+each file is a complete snapshot and the newest one per night wins, see
+`labels/README.md`.
+
+The dense night is what made the baseline arguable. It opened at 11 false
+wake-ups and 7 misses where the sparse set had shown 2 and 0.
+
+Four questions the labels raised and could not settle, all recorded with their
+measurements in [pattern-findings.md](pattern-findings.md):
+
+- a repeat ballistic alert over the ring — settled by a sentence from him, not a
+  threshold: "якщо був пуск балістики... я і так не сплю"
+- drone waves — the channels' own roll-call count is the only signal that
+  separates them, and no time threshold exists
+- Крюківщина — one wake-up against one "далеко"
+- a propeller Shahed near home never woke him, 0 of 5. Left as is on his
+  instruction.
+
+## 6. Baseline without ML — done
+
+`tools/policy/` plus `tools/eval/`. Replay a whole night, score against the
+labels, headline metric false wake-ups.
+
+    2026-08-04   4 false wake-ups, 2 misses, 15 hits   (334 labels of 465 messages)
+    2026-08-26   2 false wake-ups, 3 misses, 19 hits   (124 labels of 544)
+
+From 20 false wake-ups at the first run. `tools/policy/announce.py` turns each
+decision into a queued Ukrainian sentence — his design, see the schema doc.
+
+Two of the six remaining false wake-ups are the same thing and cannot be fixed
+from the chats: an all-clear for another district reads as ours. That is what the
+alert API token is for.
 
 ## 6. Baseline without ML, then evaluate
 
@@ -70,7 +101,24 @@ needed, and for which parts. The headline metric is not accuracy but
 **false wake-ups per night** — an app that wakes you twice for nothing gets
 deleted in a week regardless of recall.
 
-## 7. Model, by distillation
+## 7. Make it run — next
+
+Everything above is a batch tool. The next stage is the smallest thing that
+turns it into a system that is actually watching:
+
+1. a poll loop over `t.me/s/<channel>?after=<id>` — measured at ~5 KB per poll,
+   so once every 20-30 s during an alert and rarely otherwise
+2. feed each new message through `observe` -> `decide` -> `announce`
+3. print the utterance queue, and log every decision with its reason
+
+No server, no phone, no account. Run it on the laptop through one real night and
+compare what it says against what he would have wanted — which is his own test
+of the concept: "подивимося чи взагалі працює цей концепт". The log of that night
+is also the next labelling pass, already aligned to real decisions.
+
+Only after that does the Android client have anything to deliver.
+
+## 8. Model, by distillation
 
 Label a large historical sample with an LLM once, fine-tune a small multilingual
 classifier on those labels, deploy the small model. The user's own labels stay
@@ -84,4 +132,4 @@ labels judge.
 | Alert API token (`alerts.in.ua` / `api.ukrainealarm.com`) | needed for the realtime gate and for retrospective ground truth — can be requested at any time |
 | Oracle Cloud account | production deployment; see `oracle-cloud-setup.md` |
 | Phone number + MTProto | polling latency or invisible edits become a real problem |
-| Android client | after the baseline produces decisions worth pushing |
+| Android client | after stage 7 shows the decisions are worth pushing |
