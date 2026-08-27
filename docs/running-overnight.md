@@ -95,10 +95,22 @@ PY
 
 ## Undoing it
 
+**Read the current values out before changing anything**, because the defaults
+differ per machine and per scheme, and "30 minutes" is a guess:
+
 ```
-powercfg /change standby-timeout-ac 30
-powercfg /change monitor-timeout-ac 10
+powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE
+powercfg /query SCHEME_CURRENT SUB_SLEEP HIBERNATEIDLE
+powercfg /query SCHEME_CURRENT SUB_VIDEO VIDEOIDLE
 ```
+
+The number to keep is the hex one on the "AC power setting index" line, in
+seconds — `0x00000a8c` is 2700, i.e. 45 minutes. Only the `-ac` values need
+restoring if only those were changed.
+
+`data/live/power-restore.cmd` holds the ones captured on this machine, written
+before the first overnight watch. That file is gitignored on purpose: it is a
+fact about one machine, not about the project.
 
 ## What this does not solve
 
