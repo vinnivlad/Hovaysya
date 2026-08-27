@@ -362,3 +362,38 @@ def test_no_evidence_is_none():
 def test_suggest_reports_strength():
     assert hints.suggest("1х Жуляни")["strength"] == "strong"
     assert hints.suggest("🔴Київ — буде гучно.")["strength"] == "weak"
+
+
+# --- apostrophes and vowel alternation ------------------------------------
+
+
+def test_all_apostrophe_spellings_resolve_the_same():
+    """The corpus uses U+0027, U+02BC and U+2019 interchangeably, and some
+    writers use none. Matching one variant lost 37 messages, 24 of them naming
+    Solomianka — the reference location's own district."""
+    for form in ("Солом'янка", "Солом\u2019янка", "Солом\u02bcянка", "Соломянка"):
+        assert resolve_scope(form) == "my-area", repr(form)
+    for form in ("Лук'янівка", "Лук\u2019янівку", "Лукянівка"):
+        assert resolve_scope(form) == "city", repr(form)
+    for form in ("Зазим'я", "Зазимя"):
+        assert resolve_scope(form) == "oblast", repr(form)
+
+
+def test_district_form_also_resolves_without_apostrophe():
+    assert resolve_scope("соломянський район") == "my-district"
+
+
+def test_vowel_alternation_in_oblique_cases():
+    """Ukrainian shifts і to о inside the stem: Харків/Харкова. A prefix cannot
+    match through a change inside itself, so the variants are generated."""
+    assert resolve_scope("Вибух у Харкова") == "elsewhere"
+    assert resolve_scope("Вибухи в Чернігова") == "elsewhere"
+    assert resolve_scope("обстріл Борисполі") == "oblast"
+    assert resolve_scope("Фастова") == "oblast"
+    assert resolve_scope("Миколаєва") == "elsewhere"
+
+
+def test_the_one_mined_typo_is_pinned():
+    """Жушяни: Ш sits directly above Л on ЙЦУКЕН. One occurrence in 134 days,
+    so it is pinned as an alias rather than matched fuzzily at runtime."""
+    assert resolve_scope("Жушяни/Вишневе") == "my-area"

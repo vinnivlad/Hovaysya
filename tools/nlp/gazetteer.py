@@ -31,6 +31,15 @@ from dataclasses import dataclass
 TIERS = ("my-area", "my-district", "city", "oblast", "elsewhere")
 
 
+_APOSTROPHES = str.maketrans(
+    {ch: "" for ch in ("'", "ʼ", "’", "‘", "´", "`")}
+)
+
+
+def _strip_apostrophes(text: str) -> str:
+    return (text or "").translate(_APOSTROPHES)
+
+
 @dataclass(frozen=True)
 class Place:
     name: str  # canonical display form
@@ -39,14 +48,23 @@ class Place:
 
 
 def _p(name: str, tier: str, *stems: str) -> Place:
-    return Place(name, tier, tuple(s.lower() for s in stems))
+    """Declare a place. Stems are normalised the same way message text is.
+
+    Apostrophes are stripped here so an entry can be written the readable way
+    (`солом'ян`) while still matching text where the apostrophe is a different
+    character, or absent.
+    """
+    return Place(name, tier, tuple(_strip_apostrophes(s).lower() for s in stems))
 
 
 # Zhuliany plus the places that share its immediate risk: the same approach
 # corridor from the south-west, and the neighbourhoods a drone over Zhuliany is
 # seconds from. Derived from co-mention frequency in the corpus.
 MY_AREA = [
-    _p("Жуляни", "my-area", "жулян"),
+    # "Жушяни" is the one keyboard slip in the corpus (Ш sits directly above Л
+    # on ЙЦУКЕН). Mined once and pinned here rather than matched fuzzily at
+    # runtime — see tools/analysis/typos.py.
+    _p("Жуляни", "my-area", "жулян", "жушян"),
     _p("Теремки", "my-area", "теремк"),
     _p("Чоколівка", "my-area", "чоколів"),
     _p("Деміївка", "my-area", "деміїв"),
@@ -142,7 +160,7 @@ OBLAST = [
     _p("Зазим'я", "oblast", "зазим"),
     _p("Коцюбинське", "oblast", "коцюбинс"),
     _p("Мощун", "oblast", "мощун"),
-    _p("Горенка", "oblast", "горенк"),
+    _p("Горенка", "oblast", "горенк", "горенич"),
     _p("Княжичі", "oblast", "княжич"),
     _p("Гнідин", "oblast", "гнідин"),
     _p("Глеваха", "oblast", "глевах"),
@@ -152,30 +170,56 @@ OBLAST = [
 
 ELSEWHERE = [
     _p("Одещина", "elsewhere", "одес", "одещин"),
-    _p("Дніпропетровщина", "elsewhere", "дніпро", "дніпропетровщин", "дніпрі", "дніпром"),
+    _p("Дніпропетровщина", "elsewhere", "дніпр", "дніпропетровщин"),
     _p("Харківщина", "elsewhere", "харків", "харківщин"),
     _p("Полтавщина", "elsewhere", "полтав"),
     _p("Черкащина", "elsewhere", "черкас", "черкащин"),
     _p("Миколаївщина", "elsewhere", "миколаїв"),
     _p("Запоріжжя", "elsewhere", "запоріж", "запорізьк"),
     _p("Херсонщина", "elsewhere", "херсон"),
-    _p("Сумщина", "elsewhere", "сумщин", "суми", "сумах"),
+    _p("Сумщина", "elsewhere", "сумщин", "суми", "сумах", "сумам"),
     _p("Чернігівщина", "elsewhere", "чернігів"),
     _p("Житомирщина", "elsewhere", "житомир"),
     _p("Кіровоградщина", "elsewhere", "кіровоградщин", "кропивницьк"),
     _p("Вінниччина", "elsewhere", "вінниц", "вінниччин"),
-    _p("Хмельниччина", "elsewhere", "хмельниц"),
+    _p("Хмельниччина", "elsewhere", "хмельниц", "хмельнич"),
     _p("Львівщина", "elsewhere", "львів"),
     _p("Чорноморськ", "elsewhere", "чорноморськ"),
     _p("Кременчук", "elsewhere", "кременчу"),
-    _p("Кривий Ріг", "elsewhere", "кривий ріг", "кривому роз", "кривом"),
+    _p("Кривий Ріг", "elsewhere", "кривий ріг", "кривого рог", "кривим рог",
+       "кривом", "криворіж", "криворізьк"),
     _p("Крим", "elsewhere", "крим", "криму"),
     _p("Ізмаїл", "elsewhere", "ізмаїл"),
     _p("Брянщина", "elsewhere", "брянськ", "брянсько"),
     _p("Курщина", "elsewhere", "курськ", "курсько"),
 ]
 
-PLACES: tuple[Place, ...] = tuple(MY_AREA + MY_DISTRICT + CITY + OBLAST + ELSEWHERE)
+def _with_alternations(place: Place) -> Place:
+    """Add oblique-case stems produced by Ukrainian vowel alternation.
+
+    Names in -ів/-їв/-іл shift the vowel in the genitive and locative:
+    Харків/Харкова, Миколаїв/Миколаєва, Бориспіль/Борисполі. A prefix stem
+    cannot match across a change inside itself, so the variants are generated
+    once here rather than typed out for every name.
+    """
+    extra: list[str] = []
+    for stem in place.stems:
+        if stem.endswith("їв"):
+            extra.append(stem[:-2] + "єв")
+        elif stem.endswith("ів"):
+            extra.append(stem[:-2] + "ов")
+        elif stem.endswith("іл"):
+            extra.append(stem[:-2] + "ол")
+    if not extra:
+        return place
+    merged = tuple(dict.fromkeys(place.stems + tuple(extra)))
+    return Place(place.name, place.tier, merged)
+
+
+PLACES: tuple[Place, ...] = tuple(
+    _with_alternations(p)
+    for p in (MY_AREA + MY_DISTRICT + CITY + OBLAST + ELSEWHERE)
+)
 
 # Named infrastructure. Not a tier of its own: a power plant matters because of
 # where it is, and the corpus names them alongside districts.
@@ -190,9 +234,13 @@ INFRASTRUCTURE = (
 _WORDISH = re.compile(r"[^а-яіїєґёa-z0-9'\- ]+", re.IGNORECASE)
 
 
+# Apostrophes are deleted rather than unified: the channels use U+0027, U+02BC
+# and U+2019 interchangeably — matching only one lost 37 messages, 24 of them
+# naming Solomianka — and plenty of people type none at all. Deleting collapses
+# `Солом'янка`, `Солом’янка`, `Соломʼянка` and `Соломянка` into one string.
 def _flatten(text: str) -> str:
-    """Lowercase and strip punctuation so stems match across `Жуляни/Жуляни.`."""
-    return _WORDISH.sub(" ", (text or "").lower())
+    """Lowercase, drop apostrophes, and strip punctuation."""
+    return _WORDISH.sub(" ", _strip_apostrophes(text).lower())
 
 
 _WORDCHAR = re.compile(r"[а-яіїєґёa-z0-9'\-]", re.IGNORECASE)
