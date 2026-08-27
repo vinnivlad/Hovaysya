@@ -415,9 +415,18 @@ const UA = {
 
 let labels = loadLabels();
 let nightId = DATA.nights.length ? DATA.nights[0].id : null;
-let filterIx = 0;
+// Not the near filter, though that is what the app will use. The page is for
+// judging moments, and judging needs the story: on 2026-08-04 the near view
+// showed "загроза пуску" at 01:10 and "Падає" on ТЕЦ-5 at 01:19 with the nine
+// minutes of approach across the left bank missing, because the target was not
+// near him *yet*. The user put it plainly — "Ні пуску ні підльоту нема".
+// Press `f` to cycle to the near view and see what the app alone would show.
+let filterIx = 1;
 let selIx = -1;
 let draft = null;
+// Messages the filter would drop that the user has asked to see anyway, by
+// stable key so a re-render keeps them. Switching filter or night clears it.
+let revealed = new Set();
 
 // The file is the durable store; localStorage is a scratch buffer for work not
 // exported yet. Preferring the buffer wholesale meant corrections made in the
@@ -463,29 +472,61 @@ function persist() {
 function nightMessages() {
   return DATA.messages.filter(m => m.n === nightId);
 }
-function visibleMessages() {
-  const f = FILTERS[filterIx].test;
-  return nightMessages().filter(f);
+// Whatever a visible message quotes is visible too. A `↳` pointing at nothing
+// is what sent the user looking twice, and a reply is the channels' way of
+// saying "this is the same target as before" — the one link in the feed that is
+// stated rather than inferred.
+let ancMemo = { key: null, set: new Set() };
+
+function ancestors() {
+  const key = nightId + "|" + filterIx;
+  if (ancMemo.key === key) return ancMemo.set;
+  const byKey = new Map(nightMessages().map(m => [m.k, m]));
+  const out = new Set();
+  for (const m of nightMessages()) {
+    if (!FILTERS[filterIx].test(m)) continue;
+    let cur = m;
+    while (cur && cur.r) {
+      const pk = cur.ch + "/" + cur.r;
+      if (out.has(pk)) break;
+      const par = byKey.get(pk);
+      if (!par) break;
+      out.add(pk);
+      cur = par;
+    }
+  }
+  ancMemo = { key, set: out };
+  return out;
 }
 
-// How many messages the filter dropped immediately before each visible one.
+const shown = m => FILTERS[filterIx].test(m) || revealed.has(m.k)
+                   || ancestors().has(m.k);
+
+function visibleMessages() {
+  return nightMessages().filter(shown);
+}
+
+// Which messages the filter dropped immediately before each visible one.
 //
 // The user found two separate filter bugs by noticing a reply whose quoted
 // parent was nowhere on the page — twice, because a gap in the feed looks
 // exactly like a quiet minute. It should not take a dangling quotation to see
 // that something was left out.
+//
+// The run is revealed in place. Switching the whole filter instead threw him
+// back to the top of a 465-message night, which is how he put it: "розвертаю
+// приховані пости і не можу знайти неприхований за 01:10".
 function hiddenRuns() {
-  const f = FILTERS[filterIx].test;
   const runs = new Map();
-  let n = 0, vi = 0;
+  let run = [], vi = 0;
   for (const m of nightMessages()) {
-    if (f(m)) {
-      if (n) runs.set(vi, n);
-      n = 0;
+    if (shown(m)) {
+      if (run.length) runs.set(vi, run);
+      run = [];
       vi++;
-    } else n++;
+    } else run.push(m.k);
   }
-  if (n) runs.set(vi, n);   // a run at the very end of the night
+  if (run.length) runs.set(vi, run);   // a run at the very end of the night
   return runs;
 }
 function labelsForNight() {
@@ -591,12 +632,22 @@ function renderFeed() {
     `${msgs.length} з ${nightMessages().length} · ${labelsForNight().length} міток`;
 
   const runs = hiddenRuns();
-  const gapRow = n => {
+  const gapRow = keys => {
     const g = document.createElement("div");
     g.className = "gap";
-    g.textContent = `— ${n} ${n === 1 ? "повідомлення" : "повідомлень"} приховано фільтром —`;
-    g.title = "показати все";
-    g.onclick = () => { filterIx = FILTERS.length - 1; selIx = -1; draft = null; renderAll(); };
+    g.textContent = `— ${keys.length} ${keys.length === 1 ? "повідомлення" : "повідомлень"}` +
+                    ` приховано фільтром · показати —`;
+    g.title = "розкрити тут, не змінюючи фільтр";
+    g.onclick = ev => {
+      ev.stopPropagation();
+      // Keep the selection on the same message: revealing shifts every index
+      // after it, and losing the open draft mid-labelling is worse than the
+      // gap was.
+      const keep = selected();
+      keys.forEach(k => revealed.add(k));
+      selIx = keep ? visibleMessages().findIndex(m => m.k === keep.k) : -1;
+      renderAll();
+    };
     rows.appendChild(g);
   };
 
@@ -971,7 +1022,8 @@ document.addEventListener("keydown", e => {
       }
       break;
     case "x": remove(); break;
-    case "f": filterIx = (filterIx + 1) % FILTERS.length; selIx = -1; draft = null; renderAll(); break;
+    case "f": filterIx = (filterIx + 1) % FILTERS.length; selIx = -1; draft = null;
+              revealed = new Set(); renderAll(); break;
     case "[": case "]": {
       const i = DATA.nights.findIndex(n => n.id === nightId);
       const j = e.key === "]" ? i + 1 : i - 1;

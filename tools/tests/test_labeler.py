@@ -320,3 +320,25 @@ def test_the_feed_says_when_the_filter_dropped_something():
     assert "if (runs.has(ix)) gapRow(runs.get(ix));" in src
     # A run at the very end of the night has no following row to hang on.
     assert "if (runs.has(msgs.length)) gapRow(runs.get(msgs.length));" in src
+
+
+def test_the_labelling_default_is_the_kyiv_view_not_the_near_one():
+    """The near filter shows where a target already is; judging a moment needs
+    where it was. On 2026-08-04 the near view showed "загроза пуску" at 01:10
+    and "Падає" on ТЕЦ-5 at 01:19 with nine minutes of approach across the left
+    bank missing — "Ні пуску ні підльоту нема"."""
+    src = (Path(__file__).resolve().parents[1] / "labeler" / "template.html"
+           ).read_text(encoding="utf-8")
+    assert "let filterIx = 1;" in src
+    block = src[src.index("const FILTERS = ["):]
+    block = block[:block.index(chr(10) + "];")]
+    assert block.count("{ id:") == 3
+    assert block.index('id: "relevant"') > block.index('id: "near"')
+
+
+def test_whatever_a_visible_message_quotes_is_visible_too():
+    """A `↳` pointing at nothing is what sent the user looking, twice."""
+    src = (Path(__file__).resolve().parents[1] / "labeler" / "template.html"
+           ).read_text(encoding="utf-8")
+    assert "function ancestors()" in src
+    assert "|| ancestors().has(m.k)" in src

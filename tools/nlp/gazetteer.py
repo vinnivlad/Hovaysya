@@ -107,7 +107,17 @@ CITY = [
     _p("Лук'янівка", "city", "лук'янів", "лукянів"),
     _p("Виноградар", "city", "виноградар", "виноград"),
     _p("Святошин", "city", "святошин"),
-    _p("Голосіїв", "city", "голосіїв", "голосієв"),
+    # `Голос` is how kievinform_ua1 abbreviates it — "Хотів - Голос - Солома в
+    # укриття". Safe as a stem: the word-start check blocks it inside
+    # "оголосити" and "проголосували", which is where the risk would be.
+    # "голосно" and "голосування" would match, and do not occur once in 4.5
+    # months of these channels; "Голос" meaning Holosiiv occurs six times.
+    _p("Голосіїв", "city", "голосіїв", "голосієв", "голос"),
+    _p("Феофанія", "city", "феофан"),
+    _p("Звіринець", "city", "звіринец", "звіринц"),
+    _p("Рембаза", "city", "рембаз"),
+    _p("Теличка", "city", "теличк"),
+    _p("Лісники", "city", "лісник"),
     _p("Печерськ", "city", "печерс"),
     _p("Поділ", "city", "подільс", "поділ"),
     _p("Осокорки", "city", "осокорк"),
@@ -156,6 +166,9 @@ OBLAST = [
     # so the only thing at stake was whether the user gets to see them.
     # The raion, not the city district — same reason, the other direction.
     _p("Києво-Святошинський район", "oblast", "києво-святошин"),
+    _p("Требухів", "oblast", "требух"),
+    _p("Гоголів", "oblast", "гоголів", "гоголев"),
+    _p("Дударків", "oblast", "дударків", "дударков"),
     _p("Вишеньки", "oblast", "вишеньк"),        # on the approach from the south
     _p("Білогородка", "oblast", "білогородк"),
     _p("Кагарлик", "oblast", "кагарлиц", "кагарлик"),
@@ -237,6 +250,7 @@ ELSEWHERE = [
     # Kamianets-Podilskyi did exactly that nine times, as Podil.
     _p("Кам'янець-Подільський", "elsewhere", "камянець-подільськ", "камянц"),
     _p("Корсунь-Шевченківський", "elsewhere", "корсунь-шевченків"),
+    _p("Сміла", "elsewhere", "сміл"),
     _p("Лубни", "elsewhere", "лубн"),
     _p("Миргород", "elsewhere", "миргород"),
     _p("Конотоп", "elsewhere", "конотоп"),

@@ -790,3 +790,21 @@ def test_a_plant_written_with_a_space_is_the_same_plant():
     assert resolve_scope("ТЕЦ 5") == "city"
     assert resolve_scope("ТЕЦ 6✈️") == "city"
     assert resolve_scope("Черкаську ТЕЦ 5 і Сади") == "elsewhere"
+
+
+def test_the_channels_own_abbreviations_resolve():
+    """`kievinform_ua1` writes districts the way a person shouts them —
+    "Хотів - Голос - Солома в укриття"."""
+    assert resolve_scope("Голос✈️") == "city"
+    assert resolve_scope("Хотів - Голос - Солома в укриття") == "my-area"
+    assert resolve_scope("Феофанія✈️") == "city"
+    assert resolve_scope("Рембаза") == "city"
+    assert resolve_scope("Требухів✈️") == "oblast"
+    assert resolve_scope("Гоголів") == "oblast"
+
+
+def test_a_verb_that_starts_with_a_district_name_is_not_a_district():
+    """`голос` is a prefix of "оголосити". The word-start check is what keeps
+    "можуть оголосити повітряну тривогу" from resolving as Holosiiv."""
+    assert resolve_scope("можуть оголосити тривогу") == "unknown"
+    assert resolve_scope("проголосували") == "unknown"
