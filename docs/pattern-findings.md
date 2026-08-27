@@ -348,3 +348,34 @@ And a rule that had no home before: **a settlement named beside a landmark
 outranks it.** Nearly every city has a ТЕЦ-5, so "Залітає у Черкаси курсом на
 ТЕЦ-5" is about theirs. One message in 4.5 months — and exactly the shape that
 wakes somebody at 3 a.m. for another city.
+
+## Fitting the ring re-arm (334 dense labels, 2026-08-04)
+
+A ballistic salvo arriving over the user's own area: seconds since the previous
+alert, split by what he decided.
+
+| | gaps |
+| --- | --- |
+| woke him | 78, 108, 448, 633 |
+| called it a repeat | 4, 5, 6, 13, 26, 28, 34, 39, 48, 59 |
+
+The boundary is between **59 and 78 s**, and it needs a second condition — a
+launch announced inside the gap — or the same missiles being re-listed would
+re-fire. `RING_REARM_S = 60`.
+
+The same measurement for a jet Shahed near him gives a boundary between **142 and
+194 s**, and for a propeller Shahed there is no wake-up at all in the set (five
+moments, gaps up to 1346 s, all silent).
+
+But **sweeping the near refractory against the labels does not confirm 180 s**:
+
+| `REFRACTORY_NEAR_S` | false wake-ups | misses |
+| --- | --- | --- |
+| 360 (current) | 8 | 6 |
+| 240 | 9 | 6 |
+| 180 | 9 | 5 |
+| 150 | 9 | 5 |
+
+Total error is flat, and false wake-ups are the headline metric, so 360 stays.
+The label-to-label gaps and the policy's own alert timeline are not the same
+series — which is the reason to sweep rather than to trust a fit.

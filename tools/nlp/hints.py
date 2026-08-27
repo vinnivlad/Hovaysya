@@ -419,16 +419,19 @@ def nationwide(text: str) -> bool:
     for place in find_places(text):
         if place.tier != "elsewhere":
             return True  # named locally: relevant, and geography handles it
-        if place.name not in _LAUNCH_ORIGINS:
+        if place.name not in _launch_origins():
             return False  # a target in another region: not our business
     return True
 
 
-# Places that appear as launch origins rather than targets, so naming one does
-# not mean the target is known.
-_LAUNCH_ORIGINS = frozenset({
-    "російські аеродроми", "Брянщина", "Курщина", "Крим",
-})
+# Launch origins come from the gazetteer, where the fact belongs. Keeping a
+# second list here went stale the moment Voronezh and Oryol were added as
+# places: a real ballistic launch from Voronezh read as "a target in another
+# region" and was silenced as too far.
+def _launch_origins() -> frozenset[str]:
+    from .gazetteer import launch_origins
+
+    return launch_origins() | {"російські аеродроми", "Крим"}
 
 
 def live_shapes(text: str) -> list[str]:

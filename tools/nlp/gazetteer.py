@@ -50,9 +50,14 @@ class Place:
     # than stated. Nearly every city has a ТЕЦ-5; ours is the one meant unless
     # the message says otherwise. See `resolve_scope`.
     landmark: bool = False
+    # A place that appears as where a strike came *from*, not where it is going.
+    # Naming one does not mean the target is known — which is the whole test for
+    # a country-wide threat, in `hints.nationwide`.
+    origin: bool = False
 
 
-def _p(name: str, tier: str, *stems: str, landmark: bool = False) -> Place:
+def _p(name: str, tier: str, *stems: str, landmark: bool = False,
+       origin: bool = False) -> Place:
     """Declare a place. Stems are normalised the same way message text is.
 
     Apostrophes are stripped here so an entry can be written the readable way
@@ -61,7 +66,7 @@ def _p(name: str, tier: str, *stems: str, landmark: bool = False) -> Place:
     """
     return Place(name, tier,
                  tuple(_strip_apostrophes(s).lower() for s in stems),
-                 landmark)
+                 landmark, origin)
 
 
 # The near ring — the places whose trouble is the user's trouble.
@@ -235,14 +240,14 @@ ELSEWHERE = [
     # only, so "з Брянщини" resolved to nowhere — and a message resolving to
     # nowhere now inherits the night's scope, which would have made a launch
     # from Russia read as a threat over Kyiv.
-    _p("Воронежчина", "elsewhere", "вороне"),
-    _p("Орловщина", "elsewhere", "орловськ", "орловщин", "орла", "орлі"),
-    _p("Брянщина", "elsewhere", "брянщин"),
-    _p("Курщина", "elsewhere", "курщин"),
-    _p("Смоленщина", "elsewhere", "смоленськ", "смоленщин", "шаталово"),
-    _p("Ростовщина", "elsewhere", "ростов", "таганрог"),
-    _p("Білгородщина", "elsewhere", "бєлгород", "білгород"),
-    _p("Білорусь", "elsewhere", "білорус", "мазир", "мозир", "гомел"),
+    _p("Воронежчина", "elsewhere", "вороне", origin=True),
+    _p("Орловщина", "elsewhere", "орловськ", "орловщин", "орла", "орлі", origin=True),
+    _p("Брянщина", "elsewhere", "брянщин", origin=True),
+    _p("Курщина", "elsewhere", "курщин", origin=True),
+    _p("Смоленщина", "elsewhere", "смоленськ", "смоленщин", "шаталово", origin=True),
+    _p("Ростовщина", "elsewhere", "ростов", "таганрог", origin=True),
+    _p("Білгородщина", "elsewhere", "бєлгород", "білгород", origin=True),
+    _p("Білорусь", "elsewhere", "білорус", "мазир", "мозир", "гомел", origin=True),
     # Other regions the channels report on, likewise invisible before.
     # Hyphenated names whose second half is a Kyiv place. Longest match is what
     # keeps them apart: `корсунь-шевченків` claims the span before
@@ -517,3 +522,13 @@ def is_relevant(text: str) -> bool:
     roughly 62% of traffic before anything expensive runs.
     """
     return resolve_scope(text) in ("my-area", "my-district", "city", "oblast")
+
+
+def launch_origins() -> frozenset[str]:
+    """Names that mean "this came from there", not "this is going there".
+
+    Derived from the gazetteer rather than listed separately: the separate list
+    silently went stale the moment Voronezh, Oryol and Smolensk were added as
+    places, and a real ballistic launch from Voronezh stopped being country-wide.
+    """
+    return frozenset(p.name for p in PLACES if p.origin)

@@ -808,3 +808,14 @@ def test_a_verb_that_starts_with_a_district_name_is_not_a_district():
     "можуть оголосити повітряну тривогу" from resolving as Holosiiv."""
     assert resolve_scope("можуть оголосити тривогу") == "unknown"
     assert resolve_scope("проголосували") == "unknown"
+
+
+def test_launch_origins_come_from_the_gazetteer():
+    """A separate list went stale the moment Voronezh and Oryol were added as
+    places: a real ballistic launch from Voronezh read as "a target in another
+    region" and was silenced as too far."""
+    assert hints.nationwide(
+        "❗️❗Є інформація про пуск балістичної ракети з Воронезької області.")
+    assert hints.nationwide("‼️ Вихід балістики з Брянська")
+    # ...and a stated target is still not country-wide.
+    assert not hints.nationwide("❗️Балістична ракета на Запоріжжя!")
