@@ -79,8 +79,12 @@ def _p(name: str, tier: str, *stems: str, landmark: bool = False,
 #
 # Every entry below is the user's explicit ruling after labelling a full night,
 # except where marked. Do not "tidy" this into a geometric rule.
+# Home. Named once, here, because one rule is about this place specifically
+# rather than about the ring: something falling on it always rings.
+HOME = "Жуляни"
+
 MY_AREA = [
-    _p("Жуляни", "my-area", "жулян", "жушян"),   # home
+    _p("Жуляни", "my-area", "жулян", "жушян"),   # home — see HOME below
     _p("Вишневе", "my-area", "вишнев"),
     _p("Борщагівка", "my-area", "борщагів", "борщаг"),
     _p("Солом'янка", "my-area", "солом'ян", "соломян", "солома", "соломи"),

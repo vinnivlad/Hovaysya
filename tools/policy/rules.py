@@ -103,7 +103,21 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     if not obs.nationwide and obs.scope in ("elsewhere", "unknown"):
         return _silent("too-far: not near me")
 
-    # 5. Anticipation is not an event. "Загроза пуску" updates the picture; the
+    # 5. Falling on Zhuliany always rings, whatever has already been said. His
+    #    rule, in his words: "якщо є «падає» і «Жуляни» то точно казати".
+    #
+    #    Two words wide and one place wide, and that is the whole design. The
+    #    first attempt covered the near ring and the full impact vocabulary and
+    #    cost two false wake-ups on the dense night — "Вишневе, Боярка — падає!"
+    #    and a building damaged in Holosiiv. He cut it back to this himself.
+    #
+    #    Found because `⚠️Реактивний шахед падає на Жуляни` stayed silent five
+    #    and a half minutes after the same drone had woken him: defensible as a
+    #    repeat, and also the most consequential sentence of the night.
+    if obs.falling and obs.at_home and obs.live:
+        return _notify("alert", obs.alarm, "falling on Zhuliany")
+
+    # 10. Anticipation is not an event. "Загроза пуску" updates the picture; the
     #    sound belongs to the launch. Straight from the labelled sequence.
     # `mig` is excluded on purpose: a takeoff is reported as "виліт ... з
     # аеродрому", which reads as anticipation, but for a MiG-31K the takeoff *is*

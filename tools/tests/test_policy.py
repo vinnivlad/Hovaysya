@@ -534,3 +534,52 @@ def test_a_partial_all_clear_names_the_class_it_lifts():
                    "‼️ Вихід балістики з Брянська",
                    "⚪️По балістиці відбій."])
     assert said[2][1] == "Відбій по балістиці."
+
+
+# --- falling on Zhuliany --------------------------------------------------
+
+
+def test_falling_on_zhuliany_always_rings():
+    """His rule, in his words: "якщо є «падає» і «Жуляни» то точно казати".
+
+    Found live: `⚠️Реактивний шахед падає на Жуляни` stayed silent five and a
+    half minutes after the same drone had already woken him. Defensible as a
+    repeat, and also the most consequential sentence of the night."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    got = []
+    for off, text in ((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+                      (60, "На Жуляни знову коло."),
+                      (90, "⚠️Реактивний шахед на Жуляни."),
+                      (330, "⚠️Реактивний шахед падає на Жуляни.")):
+        o = observe(T0 + off, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        got.append((text[:28], d.audible, d.reason))
+    assert got[-1][1], got
+    assert got[-1][2] == "falling on Zhuliany", got
+    # ...and the message before it was still a repeat, which is the point: the
+    # rule is about the thing arriving, not about relaxing the refractory.
+    assert not got[2][1], got
+
+
+def test_it_is_two_words_wide_and_one_place_wide():
+    """The first attempt covered the near ring and the whole impact vocabulary,
+    and cost two false wake-ups on the dense night. He cut it back himself:
+    "давай поки тільки падає жуляни. інші нехай вже як вийде"."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    for text in ("Вишневе, Боярка — падає!",              # ring, not home
+                 "💥Влучання неподалік ТРЦ Республіка.",    # impact, not falling
+                 "⚠️Реактивний шахед падає на Бровари."):   # neither
+        tr = Tracker()
+        for off, warm in ((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+                          (60, "⚠️Реактивний шахед на Жуляни.")):
+            o = observe(T0 + off, warm)
+            d = decide(o, tr)
+            tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        o = observe(T0 + 400, text)
+        assert decide(o, tr).reason != "falling on Zhuliany", text

@@ -790,3 +790,20 @@ That change is also what made **long-range forecasts** matter. "Загроза
 anticipation writes a status line, a two-day forecast would sit there saying
 "Загроза: балістика" all night. Sixty-five such messages are now read as
 summaries.
+
+## The one rule about a single place
+
+Everything else in the policy is about tiers — my area, my district, the city.
+One rule names Zhuliany itself:
+
+> якщо є "падає" і "Жуляни" то точно казати
+
+Something falling on his own home rings, whatever has already been said and
+however recently. It is two words wide (`падає` and its forms) and one place
+wide, and that narrowness was measured, not chosen for elegance: the first
+attempt covered the whole near ring and the whole impact vocabulary, and cost two
+false wake-ups on the dense night — "Вишневе, Боярка — падає!" and a building
+damaged in Holosiiv. He cut it back himself, and added "інші нехай вже як вийде".
+
+It still has to be a live threat to get there, so aftermath and the
+five-minute impact round-up do not qualify.

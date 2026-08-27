@@ -145,6 +145,15 @@ AFTERMATH_TERMS = (
     "зруйнован", "знищила", "знищено склад", "вигорі", "відбудов",
 )
 
+# Coming down, right now. Narrow on purpose: only this one word, and only over
+# his own home. Widening it to the whole ring and the whole impact vocabulary
+# cost two false wake-ups on the dense night — "Вишневе, Боярка — падає!" and a
+# building damaged in Holosiiv — and he cut it back himself: "давай поки тільки
+# падає жуляни".
+#
+# `збито` is deliberately absent. Shot down is the good news.
+FALLING_TERMS = ("падає", "падають", "падаєт", "падают")
+
 # NOT aftermath. "вибух" and "влучання" sit 1.8-2.2 min from live danger, and
 # 88% of "вибух" messages arrive within ten minutes of one — an explosion report
 # usually means the wave is still in progress.
@@ -557,6 +566,11 @@ def live_strength(text: str) -> str:
     if shapes:
         return "weak"
     return "none"
+
+
+def falling(text: str) -> bool:
+    """Whether the message says something is coming down."""
+    return _hits(text, FALLING_TERMS)
 
 
 def looks_live(text: str) -> bool:

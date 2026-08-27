@@ -165,6 +165,7 @@ class Observation:
     # from `says_new`, which asks whether that launch is a *new* event.
     says_launch: bool = False
     ring_count: int = 0
+    falling: bool = False
     cleared_class: str | None = None
     is_reply: bool = False
     partial_clear: bool = False
@@ -172,6 +173,13 @@ class Observation:
     @property
     def near(self) -> bool:
         return self.scope in NEAR_TIERS
+
+    @property
+    def at_home(self) -> bool:
+        """Names his own place, not merely somewhere in the ring."""
+        from ..nlp.gazetteer import HOME
+
+        return HOME in self.ring_places
 
     @property
     def live(self) -> bool:
@@ -208,6 +216,7 @@ def observe(ts: int, text: str, is_reply: bool = False) -> Observation:
         says_new=_says_new(text),
         says_launch=bool(_LAUNCH.search(text or "")),
         ring_count=stated_count(text),
+        falling=hints.falling(text),
         is_reply=is_reply,
         partial_clear=hints.partial_clear(text),
         cleared_class=hints.cleared_class(text),
