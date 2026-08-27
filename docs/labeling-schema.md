@@ -49,6 +49,7 @@ rewriting, and so a diff shows exactly which labels changed.
 | `modality` | enum | yes | live threat, aftermath, summary, or social |
 | `scope` | enum | yes | how close it is to me |
 | `certainty` | enum | yes | how well its position is known |
+| `heading` | enum | yes | which way it is going, relative to me |
 | `repeat_of` | string \| null | yes | the earlier label whose episode this one continues or closes, or `null` |
 | `evidence` | array | yes | the messages that justify this label |
 | `why` | string | for `notify` | one line, in your own words |
@@ -340,6 +341,66 @@ report usually means the wave is still in progress.
 `lost` and `clear` must never collapse into one value. `Локаційно втрачено`
 means *we no longer know*, which is not safety; treating it as safety would
 silence the app at the worst possible time.
+
+### `heading` — position is not enough
+
+| value | meaning |
+| --- | --- |
+| `toward` | a destination in my ring is stated |
+| `away` | it was in my ring and the stated destination is not |
+| `loitering` | circling near me, no direction given |
+| `position` | named near me, nothing said about direction |
+| `unknown` | not about my area at all |
+
+This axis exists because two labels on the same place looked like a
+contradiction and were not. From the user, after a night of labelling:
+
+> якщо видно, що воно летить з Крюківщини в мою сторону — то краще б
+> зреагувати, а якщо просто літає в тій стороні, то і не обов'язково, якщо то
+> дрон
+
+```
+🅿️ 1х реактив на Крюківщину / Борщагівки.   toward     → woke him
+Крюківщина                                   position   → he marked it far
+```
+
+Same threat, same place, same certainty — different answer, because a drone
+*heading into* the ring and a drone merely *in* it are different decisions. The
+reviewer's split-decision check would have flagged that pair as an
+inconsistency; it is now part of the signature instead, which is what the
+reviewer's own note anticipated: a split means either a label is off or the
+policy needs a distinction the signature does not carry.
+
+**This is parsing, not inference.** The channels state direction outright — 146
+`з A на B` statements in the corpus — and the marker before a place name says
+which role it plays: `курсом на`, `в сторону`, `у бік`, `далі` mark a
+destination; `з`, `від`, `повз` mark an origin; `кружляє`, `намотує`,
+`довкола` mark loitering. `Жуляни далі Центр` needs one extra rule — the first
+place is the implicit origin — and that is the whole of it.
+
+Inference earns its place only where direction has to be recovered from a
+sequence of positions, and even there the reply chains supply most of it.
+
+**And it is narrow.** Measured against the first night's 124 labels, `heading`
+explains far less than expected: only 6 labels are `toward` and 16 `position`,
+against 99 `unknown` — because most of the night was ballistic traffic about
+other regions and city-wide alerts that name the ring not at all. Over the whole
+corpus, `toward` is 1.0% of messages.
+
+What the same check did reveal is the axis that actually drives the decision:
+
+- Every `toward` label that stayed silent is `already-notified`. The heading was
+  right; the episode logic is what silenced it.
+- Every `position` label that woke him says the same thing in the note —
+  "новий дрон", "ще один дрон", "виліз поруч з районом".
+
+So the decision is **proximity x novelty**, and direction only refines it. A new
+target near the ring wakes him with no stated course; a target heading toward
+him that already woke him does not wake him again. `already-notified` carries 78
+of the 101 silent labels.
+
+That is the original complaint about repeat signals, restated from data: the
+thing to build first is episode and novelty tracking, not geometry.
 
 ### `evidence`
 

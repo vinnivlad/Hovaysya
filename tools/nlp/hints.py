@@ -174,6 +174,90 @@ ALERT_ON_TERMS = ("тривог",)
 ALERT_CLEAR_TERMS = ("відбій",)
 
 
+# Direction relative to the reference location. The user's rule, after a night
+# of labelling: "якщо видно, що воно летить з Крюківщини в мою сторону — то
+# краще б зреагувати, а якщо просто літає в тій стороні, то і не обов'язково,
+# якщо то дрон."
+#
+# So position is not enough: a drone *in* the ring and a drone *heading into* it
+# are different decisions. Nothing in `scope` or `certainty` carries that, which
+# is why two labels on Kriukivshchyna looked like a contradiction when they were
+# a real distinction.
+#
+# This is parsing, not inference. The channels state direction outright — 146
+# "з A на B" statements in the corpus alone — and a parsed direction is
+# auditable in a way a guessed one is not.
+NEAR_TIERS = ("my-area", "my-district")
+
+_DEST_MARKERS = (
+    "курсом на", "в сторону", "у сторону", "в бік", "у бік", "в напрямку",
+    "у напрямку", "залітає у", "залітає в", "залітають у", "далі", "на",
+)
+_ORIGIN_MARKERS = ("з ", "із ", "від ", "повз ", "через ")
+_LOITER_MARKERS = ("кружля", "намотув", "довкола", "подовжують", "вертаються")
+
+
+def _role_of(flat: str, start: int) -> str:
+    """Whether the place at `start` is being named as a destination or origin.
+
+    Looks back a short way for the preposition that governs it. Longest marker
+    wins, so "в сторону" is not read as the bare "на" that follows it.
+    """
+    window = flat[max(0, start - 22):start]
+    best, role = 0, "position"
+    for marker in _DEST_MARKERS:
+        if window.rstrip().endswith(marker) and len(marker) > best:
+            best, role = len(marker), "dest"
+    for marker in _ORIGIN_MARKERS:
+        if window.rstrip().endswith(marker.strip()) and len(marker.strip()) > best:
+            best, role = len(marker.strip()), "origin"
+    return role
+
+
+def heading(text: str) -> str:
+    """`toward` | `away` | `loitering` | `position` | `unknown`.
+
+    Relative to the near ring, never in the abstract: "toward" means toward the
+    user, and a message about two distant places is `unknown` however clearly it
+    states a direction.
+    """
+    flat = flatten(text)
+    spans = place_spans(text)
+    if not spans:
+        return "unknown"
+
+    dests_near = origins_near = near_present = False
+    far_dest_at: int | None = None
+    near_pos_at: int | None = None
+    for start, _end, place in spans:
+        near = place.tier in NEAR_TIERS
+        near_present = near_present or near
+        role = _role_of(flat, start)
+        if role == "dest":
+            if near:
+                dests_near = True
+            elif far_dest_at is None:
+                far_dest_at = start
+        elif role == "origin" and near:
+            origins_near = True
+        elif near and near_pos_at is None:
+            near_pos_at = start
+
+    if dests_near:
+        return "toward"
+    if origins_near and far_dest_at is not None:
+        return "away"
+    # "Жуляни далі Центр" — the first place is the implicit origin, marked by
+    # nothing but its position before the destination.
+    if near_pos_at is not None and far_dest_at is not None and near_pos_at < far_dest_at:
+        return "away"
+    if near_present and any(m in flat for m in _LOITER_MARKERS):
+        return "loitering"
+    if near_present:
+        return "position"
+    return "unknown"
+
+
 def alert_state(text: str) -> str | None:
     """`clear`, `alert`, or None — whether this message is about the siren.
 
@@ -428,6 +512,7 @@ def suggest(text: str) -> dict[str, object]:
         "threat": threat,
         "strength": live_strength(text),
         "alarm": alarm,
+        "heading": heading(text),
         "modality": modality_hint(text),
         "certainty": certainty_hint(text),
         "shapes": live_shapes(text),

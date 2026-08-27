@@ -43,6 +43,7 @@ THREATS = {"none", "unknown", "recon", "mig", "shahed", "shahed-jet", "cruise",
 MODALITIES = {"live-threat", "aftermath", "summary-news", "non-threat"}
 SCOPES = {"my-area", "my-district", "city", "oblast", "elsewhere", "unknown"}
 CERTAINTIES = {"confirmed", "probable", "lost", "clear"}
+HEADINGS = {"toward", "away", "loitering", "position", "unknown"}
 
 LEVEL_RANK = {"info": 0, "alert": 1, "shelter": 2}
 
@@ -113,7 +114,7 @@ def check(labels: list[dict], messages: dict[str, dict]) -> list[tuple[str, str,
 
         for field, allowed in (("decision", DECISIONS), ("threat", THREATS),
                                ("modality", MODALITIES), ("scope", SCOPES),
-                               ("certainty", CERTAINTIES)):
+                               ("certainty", CERTAINTIES), ("heading", HEADINGS)):
             v = l.get(field)
             if v is not None and v not in allowed:
                 err(lid, f"`{field}` has unknown value {v!r}")
@@ -202,7 +203,11 @@ def inconsistencies(labels: list[dict], messages: dict[str, dict]) -> list[str]:
     for l in labels:
         if "_broken" in l:
             continue
-        sig = (l.get("threat"), l.get("scope"), l.get("certainty"), l.get("modality"))
+        # Heading is part of the signature because the decision genuinely
+        # depends on it: two labels on Kriukivshchyna looked like a
+        # contradiction until direction was separated from position.
+        sig = (l.get("threat"), l.get("scope"), l.get("certainty"),
+               l.get("modality"), l.get("heading") or "unknown")
         if all(sig):
             groups[sig].append(l)
 
@@ -216,8 +221,8 @@ def inconsistencies(labels: list[dict], messages: dict[str, dict]) -> list[str]:
         }
         if len(outcomes) < 2:
             continue
-        threat, scope, certainty, modality = sig
-        out.append(f"{threat} · {scope} · {certainty} · {modality}  "
+        threat, scope, certainty, modality, head = sig
+        out.append(f"{threat} · {scope} · {head} · {certainty} · {modality}  "
                    f"— {len(group)} moments, {len(outcomes)} different answers")
         for l in sorted(group, key=lambda x: x.get("at", "")):
             verdict = (f"{l.get('level')} · {l.get('alarm')}"

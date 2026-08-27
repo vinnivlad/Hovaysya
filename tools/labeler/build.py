@@ -122,6 +122,7 @@ def load_messages(conn: sqlite3.Connection, since: str | None) -> list[dict]:
                 "al": guess["alarm"],
                 "ce": guess["certainty"],
                 "st": guess["strength"],
+                "hd": guess["heading"],
                 "sh": guess["shapes"],
                 "p": places,
                 "inf": find_infrastructure(text),

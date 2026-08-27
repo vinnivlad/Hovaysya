@@ -593,3 +593,49 @@ def test_places_ruled_out_are_still_recognised_just_not_near():
     for name, tier in (("Мишоловка", "city"), ("Караваєві Дачі", "city"),
                        ("Віта-Поштова", "oblast"), ("Крушинка", "oblast")):
         assert resolve_scope(name) == tier, name
+
+
+# --- heading: direction relative to the ring ------------------------------
+
+
+def test_a_destination_in_the_ring_is_toward_me():
+    for t in ("🅿️ 1х реактив на Крюківщину / Борщагівки.",
+              "Реактивний БпЛА курсом на Жуляни",
+              "Через Оболонь в сторону Жулян",
+              "1х рБПЛА повз Гореничі на Борщагівку/Вишневе"):
+        assert hints.heading(t) == "toward", t
+
+
+def test_a_place_in_the_ring_with_no_direction_is_only_a_position():
+    """The distinction that resolved a apparent contradiction: a drone *in* the
+    ring and one *heading into* it are different decisions."""
+    assert hints.heading("Крюківщина") == "position"
+    assert hints.heading("Деміївка, Мишоловка") == "position"
+
+
+def test_leaving_the_ring_is_away():
+    assert hints.heading("⚠️З Теремки на Віта-Литовська.") == "away"
+    assert hints.heading("🅿️ 1х реактив Жуляни далі Центр.") == "away"
+
+
+def test_circling_nearby_is_loitering():
+    assert hints.heading("🔄 1х Довкола Крюківщини Вишневого.") == "loitering"
+
+
+def test_somewhere_else_entirely_is_unknown():
+    assert hints.heading("❗Балістична ракета на Запоріжжя!") == "unknown"
+    assert hints.heading("Дякую за підтримку") == "unknown"
+
+
+def test_separate_groups_are_not_read_as_movement():
+    """"1х Жуляни / 2х Велика Димерка" is two groups, not one trajectory."""
+    assert hints.heading("1х Жуляни / 2х Велика Димерка/Бровари (вектор)") == "position"
+
+
+def test_toward_wins_over_away_when_both_appear():
+    """If anything is heading into the ring, that is the answer."""
+    assert hints.heading("З Центру на Жуляни") == "toward"
+
+
+def test_suggest_reports_the_heading():
+    assert hints.suggest("Реактивний БпЛА курсом на Жуляни")["heading"] == "toward"

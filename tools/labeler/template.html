@@ -88,6 +88,8 @@
     border: 1px solid var(--line); color: var(--faint);
   }
   .tag.scope-my-area, .tag.scope-my-district { color: var(--near); border-color: var(--near); }
+  .tag.toward { color: var(--shelter); border-color: var(--shelter); font-weight: 600; }
+  .tag.away { color: var(--done); border-color: var(--done); }
   .tag.weak { color: var(--soft); border-style: dashed; }
   .tag.mod-aftermath { color: #c98ad6; border-color: #6a5f8a; }
   .tag.mod-non-threat { color: var(--faint); }
@@ -292,6 +294,10 @@ const THREATS_MORE = ["kab", "aviation", "mixed"];
 const MODALITIES = ["live-threat", "aftermath", "summary-news", "non-threat"];
 const SCOPES = ["my-area", "my-district", "city", "oblast", "elsewhere", "unknown"];
 const CERTAINTIES = ["confirmed", "probable", "lost", "clear"];
+// Position is not enough: a drone *in* the ring and one *heading into* it are
+// different decisions. Without this axis two labels on the same place look like
+// a contradiction when they are a real distinction.
+const HEADINGS = ["toward", "away", "loitering", "position", "unknown"];
 
 const ALARM_FOR = {
   recon: "recon", mig: "mig", shahed: "drone", "shahed-jet": "drone-jet",
@@ -340,6 +346,10 @@ const UA = {
   certainty: {
     confirmed: "підтверджено", probable: "ймовірно",
     lost: "втрачено з виду", clear: "чисто",
+  },
+  heading: {
+    toward: "в мою сторону", away: "від мене", loitering: "кружляє поруч",
+    position: "просто поруч", unknown: "не про мене",
   },
 };
 
@@ -433,6 +443,8 @@ function renderFeed() {
     tags += tag(m.s, "scope-" + m.s);
     if (m.m !== "live-threat") tags += tag(m.m, "mod-" + m.m);
     if (m.th !== "none") tags += tag(m.th);
+    if (m.hd === "toward") tags += tag("в мою сторону", "toward");
+    else if (m.hd === "away") tags += tag("від мене", "away");
     if (m.st === "weak") tags += tag("weak", "weak");
     if (m.ce !== "confirmed") tags += tag(m.ce);
     if (m.inf.length) tags += tag(m.inf.join("/"));
@@ -529,6 +541,7 @@ function openDraft(decision) {
     modality: m.m,
     scope: m.s === "unknown" && m.isc ? m.isc : m.s,
     certainty: m.ce,
+    heading: m.hd,
     repeat_of: null,
     evidence: [{ channel: m.ch, message_id: m.id }],
     why: "",
@@ -651,6 +664,8 @@ function renderForm() {
          { tone: v => v === "aftermath" ? "muted" : "" }) + `</div>`;
   html += `<div class="row"><label>наскільки близько</label>` +
     pick("scope", SCOPES, draft.scope) + `</div>`;
+  html += `<div class="row"><label>куди рухається</label>` +
+    pick("heading", HEADINGS, draft.heading) + `</div>`;
   html += `<div class="row"><label>певність</label>` +
     pick("certainty", CERTAINTIES, draft.certainty) + `</div>`;
 
