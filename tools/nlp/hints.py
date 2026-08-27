@@ -189,6 +189,38 @@ def has_marker_emoji(text: str) -> bool:
     return any(e in (text or "") for e in MARKER_EMOJI)
 
 
+# Shapes that stand on their own. `emoji-with-place` is deliberately absent:
+# measured over the corpus, ⚠️ appears on 26.0% of all messages and 93% of those
+# already match another shape, so it discriminates almost nothing. Where it is
+# the sole evidence (593 messages, 5.1%) it is right about 95% of the time —
+# useful for recall, not trustworthy enough to act on alone. A fundraising post
+# ("🚨Терміновий збір для ГУР МОУ на далекобійні FPV дрони🚨") clears it.
+STRONG_SHAPES = frozenset({
+    "count-marker",
+    "threat-toward-place",
+    "place-with-threat",
+    "movement",
+    "place-to-place",
+    "phase-word",
+    "bare-place-list",
+})
+
+
+def live_strength(text: str) -> str:
+    """`strong` | `weak` | `none` — how much the live-threat reading is worth.
+
+    The policy consequence, enforced in the baseline rather than here: weak-only
+    evidence may raise `info` or `alert`, never `shelter`. Waking someone at
+    full volume on an emoji is not acceptable at 3 a.m.
+    """
+    shapes = set(live_shapes(text))
+    if shapes & STRONG_SHAPES:
+        return "strong"
+    if shapes:
+        return "weak"
+    return "none"
+
+
 def looks_live(text: str) -> bool:
     return bool(live_shapes(text)) or is_bare_place_list(text)
 
@@ -248,6 +280,7 @@ def suggest(text: str) -> dict[str, object]:
         threat = "unknown"
     return {
         "threat": threat,
+        "strength": live_strength(text),
         "alarm": alarm_for(threat),
         "modality": modality_hint(text),
         "certainty": certainty_hint(text),

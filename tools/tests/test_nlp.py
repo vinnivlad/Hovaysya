@@ -335,3 +335,30 @@ def test_emoji_shape_does_not_override_aftermath():
     t = ("❗️У Броварському районі під час ворожої атаки постраждав чоловік — "
          "він отримав уламкові поранення")
     assert hints.modality_hint(t) == "aftermath"
+
+
+# --- signal strength ------------------------------------------------------
+
+
+def test_text_evidence_is_strong():
+    for t in ("1х Жуляни", "⚠️Реактивний шахед курсом на Жуляни.",
+              "Дарниця, Чоколівка", "⚠️З Теремки на Віта-Литовська."):
+        assert hints.live_strength(t) == "strong", t
+
+
+def test_emoji_alone_is_only_weak():
+    """⚠️ is on 26% of all messages and 93% of those already match another
+    shape, so on its own it must not carry a full-volume notification."""
+    t = "🔴Київ — найближчі 3 хвилини будуть дуже гучні."
+    assert hints.live_shapes(t) == ["emoji-with-place"]
+    assert hints.live_strength(t) == "weak"
+
+
+def test_no_evidence_is_none():
+    assert hints.live_strength("Дякую за підтримку") == "none"
+    assert hints.live_strength("") == "none"
+
+
+def test_suggest_reports_strength():
+    assert hints.suggest("1х Жуляни")["strength"] == "strong"
+    assert hints.suggest("🔴Київ — буде гучно.")["strength"] == "weak"

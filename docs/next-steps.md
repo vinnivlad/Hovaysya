@@ -55,7 +55,7 @@ that it would not get done.
 
 Gazetteer + phase rules + the episode state machine, measured against the labels
 from step 4. Build order follows the findings: geographic pre-filter (removes
-~62% of traffic), then the structural templates from §3, then the two-tier veto,
+55.7% of traffic, measured), then the structural templates from §3, then the two-tier veto,
 then episode closure. Adjacency can start from co-mention statistics rather than
 polygons. This produces the number that decides how much model is actually
 needed, and for which parts. The headline metric is not accuracy but

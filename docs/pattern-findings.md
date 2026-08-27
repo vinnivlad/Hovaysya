@@ -42,8 +42,13 @@ This is the value of the project stated in data.
 | No geography at all | 4 667 | 40.2% |
 
 These channels cover all of Ukraine. **A dictionary-only geographic filter
-discards ~62% of traffic before any model runs** — the highest-leverage
+discards 55.7% of traffic before any model runs** — the highest-leverage
 component in the pipeline, and it costs nothing.
+
+The table above was produced by a crude stem list and implied ~62%. The real
+gazetteer (`tools/nlp/gazetteer.py`) resolves more places, so fewer messages
+land in the undroppable `unknown` bucket: **55.7% is the measured figure and
+the one to quote.**
 
 The 40% with no geography is not all noise: much of it continues a prior
 message ("Збито", "Продовжує рух на Центр") whose location came earlier. That
@@ -103,11 +108,35 @@ bucket. The productive templates:
 | `з <A> на <B>` | 146 | movement, direction stated by the channel |
 | `🅿️ Київ / …` | — | war_monitor section header, a useful parse anchor |
 
-**Emoji are semantic, not decoration.** `✈️` marks aviation activity (289
-messages; in war_monitor usually "Активність тактичної авіації"), and per the
-user, `Жуляни ✈️` refers to the airport specifically — an ambiguity only he can
-resolve during labeling. Normalization must keep emoji in the message text; only
-the dedup fingerprint strips them.
+**Emoji carry meaning, but they are not reliable evidence.** An earlier draft of
+this document claimed they are the predicate of a bare report. Measured, the
+claim is too strong:
+
+| marker | messages | share of corpus | already matched another shape |
+| --- | --- | --- | --- |
+| ⚠️ | 3 024 | 26.0% | 93% |
+| ❗ | 2 290 | 19.7% | 83% |
+| 🔴 | 707 | 6.1% | 93% |
+| 💥 | 425 | 3.7% | 40% |
+| 🅿️ | 366 | 3.2% | 98% |
+| ✈️ | 289 | 2.5% | 52% |
+
+⚠️ sits on one message in four and nearly always duplicates what the text
+already says, so as a feature it discriminates almost nothing. Where an emoji
+plus a place name is the *only* live evidence — 593 messages, 5.1% — it is right
+about 95% of the time: 563 live threats, but also 24 aftermath posts and 6
+summaries, including a fundraising drive (`🚨Терміновий збір для ГУР МОУ на
+далекобійні FPV дрони🚨`).
+
+So emoji are kept as a **weak** signal (`hints.live_strength` returns `weak`),
+useful for recall in the labeler's pre-fill, and the baseline must never let
+weak-only evidence raise a `shelter`. Waking someone at full volume on an emoji
+is not acceptable at 3 a.m.
+
+`✈️` specifically marks aviation activity (in war_monitor usually "Активність
+тактичної авіації"), and per the user `Жуляни ✈️` refers to the airport — an
+ambiguity only he can settle during labeling. Normalization keeps emoji in the
+message text; only the dedup fingerprint strips them.
 
 ## 4. The outcome-word anti-filter works — but only for the right tier
 
@@ -258,7 +287,7 @@ nearly all the traffic happens.
 
 ## What this changes
 
-1. **Geographic pre-filter first.** Removes ~62% of traffic with a dictionary.
+1. **Geographic pre-filter first.** Removes 55.7% of traffic with a dictionary.
 2. **Classify on structure, not vocabulary.** The templates in §3 carry the
    threat report; alarm words are optional and often absent.
 3. **Two-tier veto.** Hard-suppress on the consequence tier (§4); never on
