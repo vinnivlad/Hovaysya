@@ -20,7 +20,9 @@ This has two consequences worth stating plainly:
    The moment carries the context, the message does not.
 2. **Negative labels matter as much as positive ones.** The headline metric is
    false wake-ups per night, so moments where the app must stay silent are
-   first-class data — especially aftermath posts that name your district.
+   first-class data. But only the ones needing judgement are labeled by hand —
+   "was I glad to be woken", "would a second alert have annoyed me". Mechanical
+   negatives are generated instead; see the negative set below.
 
 ## Storage
 
@@ -40,7 +42,8 @@ rewriting, and so a diff shows exactly which labels changed.
 | `id` | string | yes | Stable id, `YYYY-MM-DDTHH:MM-nn`. Never reused. |
 | `at` | ISO 8601 UTC | yes | The decision moment. |
 | `decision` | enum | yes | `notify` \| `silent` |
-| `level` | enum | if `notify` | `info` \| `alert` \| `shelter` |
+| `level` | enum | if `notify` | `info` \| `alert` \| `shelter` — how insistent |
+| `alarm` | enum | if `notify` | `ballistic` \| `cruise` \| `drone` \| `aviation` — which sound |
 | `silent_reason` | enum | if `silent` | why no notification was warranted |
 | `threat` | enum | yes | what is flying |
 | `modality` | enum | yes | live threat, aftermath, summary, or social |
@@ -51,33 +54,62 @@ rewriting, and so a diff shows exactly which labels changed.
 | `why` | string | yes | one line, in your own words |
 | `open_question` | string \| null | no | anything you were unsure about |
 
-### `level` — the notification ladder
+### `level` and `alarm` — two independent axes
 
-Three levels, mapped to what the phone actually does. Deliberately few: more
-levels sound precise but produce inconsistent labeling.
+Nine levels (3 loudness x 3 threat types) would be unlabelable: they blur into
+each other and get applied inconsistently. So insistence and sound are separate.
+
+**`level` — how insistent:**
 
 | level | phone behaviour | use when |
 | --- | --- | --- |
-| `info` | silent; the persistent status notification updates only | something changed worth knowing, nothing to act on — alert declared, all-clear, threat far away |
-| `alert` | sound, wakes you, does not repeat | a real threat to the city that is not near you yet — the signal the official app collapses into one city-wide "increased danger" |
-| `shelter` | loud, repeating, full-screen | act now — threat near you, or ballistic launched at Kyiv regardless of where in the city you are |
+| `info` | silent; the persistent status notification updates only | something changed worth knowing, nothing to act on |
+| `alert` | sound, wakes you, does not repeat | a real threat to the city that is not near you yet |
+| `shelter` | loud, repeating, full-screen | act now — near you, or ballistic anywhere over Kyiv |
+
+**`alarm` — which sound:** `ballistic` · `cruise` · `drone` · `aviation` · `none`
+
+The point of separating sound from loudness is that **you should know what is
+coming without opening your eyes.** Ballistic must not sound like a drone: woken
+by the first, you get up immediately; by the second, you can look at the screen
+first. That is the real difference in response, and it is not a difference of
+volume.
+
+On Android this is 3 sounds x 2 audible levels = 6 notification channels, plus
+one silent channel for the persistent status. Volume is adjustable per channel,
+so a quieter drone tone and a maximum-volume ballistic tone are one setting each.
+
+Mapping from `threat` to `alarm`:
+
+| threat | alarm |
+| --- | --- |
+| `ballistic` | `ballistic` |
+| `cruise`, `kab` | `cruise` |
+| `shahed`, `shahed-jet` | `drone` |
+| `aviation`, `recon` | `aviation` |
+| `mixed` | the most severe class present |
 
 Ballistic is always at least `shelter` city-wide: flight time is minutes, so
 there is no room for geography.
 
 ### `silent_reason`
 
+Only reasons that require **your judgement** are labeled by hand:
+
 | value | meaning |
 | --- | --- |
-| `aftermath` | describes consequences of a strike that already happened |
 | `too-far` | real live threat, but not near enough to matter to me |
 | `already-notified` | same episode, nothing escalated, no new wave |
-| `not-a-threat` | news, summary, auction, thanks, politics |
 | `resolved` | episode closed, area clear |
 | `insufficient` | something is happening but the feed does not yet say enough |
 
-`insufficient` is important: it distinguishes "the app was right to wait" from
-"the app missed it", and those must not be scored the same way.
+`insufficient` distinguishes "the app was right to wait" from "the app missed
+it", and those must not be scored the same way.
+
+`aftermath` and `not-a-threat` are **not** hand-labeled — see the negative set
+below. Whether a post describes consequences is a mechanical property of its
+text, not a judgement about your situation, so spending your evenings on it
+would be waste.
 
 ### `threat`
 
@@ -96,8 +128,9 @@ the ballistic case.
 `live-threat` · `aftermath` · `summary-news` · `non-threat`
 
 Aftermath posts are the trap: they name districts and use alarming words
-(`пожежа`, `постраждалі`, `уламки`) while carrying no live threat. They must be
-labelable as such so the veto can be measured.
+(`пожежа`, `постраждалі`, `уламки`) while carrying no live threat. `modality` is
+assigned automatically for the negative set and is only set by hand when you are
+labeling a moment for another reason and the classification looks wrong.
 
 Note the boundary that measurement established: `вибух` and `влучання` are
 **not** aftermath. They arrive a median of 1.8–2.2 minutes from live danger, and
@@ -148,6 +181,42 @@ running — the second ballistic wave, a new group after a lull. This is the fie
 that encodes the original complaint that repeat signals either never arrive or
 arrive unpredictably. `null` for the first notification of an episode.
 
+## The negative set — built, not labeled
+
+The headline metric is false wake-ups, so inputs that must produce **no**
+notification are as important as the ones that must. But most of them do not
+need human judgement:
+
+| class | how it is built | size |
+| --- | --- | --- |
+| `aftermath` | consequence-management vocabulary — `пожеж`, `рятувальн`, `ДСНС`, `постраждал`, `загинул`, `пошкодж`, `уламк`, `наслідк`, `ліквідовано`, official quotes | 56 district-naming messages |
+| `other-region` | gazetteer resolves the location outside Kyiv and its oblast | ~2 515 messages |
+| `not-a-threat` | auctions, donation links, thanks, politics, channel commentary | several hundred |
+
+These are generated from the corpus and checked into `labels/negative.jsonl`
+with the rule that produced each one, so any disagreement is inspectable.
+
+The aftermath class is the dangerous one and the reason it is scored at all:
+
+```
+У Голосіївському районі фіксується загоряння автомобіля
+внаслідок ворожої атаки. Пожежу ліквідовано.
+```
+
+A district name, "ворожої атаки", and "пожежа" — a geographic filter plus
+keywords fires on this every time, and nothing is flying. It is a negative test
+case in the ordinary sense: an input that looks like it should produce output and
+must not.
+
+**What you do contribute:** five aftermath moments, once, to confirm the
+automatic classification agrees with your judgement. Not fifty-six, and never
+again after that.
+
+The boundary this rests on was measured, not assumed: consequence vocabulary
+sits 20-56 minutes from the nearest live threat, while `вибух` and `влучання`
+sit 1.8-2.2 minutes from it, and 88% of `вибух` messages arrive within ten
+minutes of one. **Impact reports are not aftermath** and must never be vetoed.
+
 ## Worked examples
 
 Real messages, from the night of 2026-08-27, at the reference location.
@@ -160,6 +229,7 @@ Real messages, from the night of 2026-08-27, at the reference location.
   "at": "2026-08-27T07:36:00Z",
   "decision": "notify",
   "level": "shelter",
+  "alarm": "drone",
   "threat": "shahed-jet",
   "modality": "live-threat",
   "scope": "my-area",
@@ -174,21 +244,21 @@ Real messages, from the night of 2026-08-27, at the reference location.
 }
 ```
 
-**A `silent` label — aftermath naming a district:**
+**A `silent` label — a threat that stayed on the far side of the city:**
 
 ```json
 {
-  "id": "2026-08-27T09:14-01",
-  "at": "2026-08-27T09:14:00Z",
+  "id": "2026-08-27T10:24-01",
+  "at": "2026-08-27T10:24:00Z",
   "decision": "silent",
-  "silent_reason": "aftermath",
-  "threat": "shahed",
-  "modality": "aftermath",
-  "scope": "my-district",
-  "certainty": "clear",
+  "silent_reason": "too-far",
+  "threat": "shahed-jet",
+  "modality": "live-threat",
+  "scope": "city",
+  "certainty": "confirmed",
   "repeat_of": null,
-  "evidence": [{"channel": "kievinform_ua1", "message_id": 22994}],
-  "why": "Debris removal and damage assessment in Holosiiv. Names a district and reads alarming, but nothing is flying. This is the false-wake-up case."
+  "evidence": [{"channel": "mon1tor_ua", "message_id": 71204}],
+  "why": "Academmistechko and Holosiiv — real and live, but the other side of the city from me. Status update at most."
 }
 ```
 
@@ -214,16 +284,19 @@ Real messages, from the night of 2026-08-27, at the reference location.
 
 Work night by night, not message by message.
 
-For each night with an alert, place roughly **three to six** labels:
+For each night with an alert, place roughly **four to six** labels (a heavy
+night like 2026-08-27 warrants more; a quiet one, one or two):
 
 1. The first moment you would have wanted waking — and at what level.
 2. Each subsequent wave or escalation, with `repeat_of` set.
 3. The moment the episode closed for you.
-4. **At least one `silent` label per night**, ideally an aftermath post or a
-   threat that stayed on the far side of the city.
+4. **At least one `silent` label per night** — a threat that stayed on the far
+   side of the city, a second report of an episode you were already woken for,
+   or a moment where waiting was right. Aftermath posts are handled by the
+   negative set; do not spend labels on them.
 
-Around 25–30 alert nights in a month gives 150–200 labels: two evenings of
-work, not weeks.
+Around 25-30 alert nights in a month gives 120-180 labels: two evenings of
+work, not weeks. Plus the one-off five aftermath checks.
 
 Two rules that keep the data honest:
 
