@@ -365,6 +365,11 @@ def suggest(text: str) -> dict[str, object]:
     # as `none` before this.
     if threat == "none" and (looks_live(text) or _hits(text, IMPACT_TERMS)):
         threat = "unknown"
+    # An all-clear says the opposite: nothing is flying any more. Only when no
+    # type was actually named — "По балістиці відбій. 2 шахеди на Одесу" keeps
+    # its shaheds.
+    if threat == "unknown" and alert_state(text) == "clear":
+        threat = "none"
     return {
         "threat": threat,
         "strength": live_strength(text),

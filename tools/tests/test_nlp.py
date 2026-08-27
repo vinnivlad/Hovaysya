@@ -537,3 +537,28 @@ def test_the_remaining_oblasts_resolve_as_elsewhere():
     for t in ("На Закарпатті тривога превентивна", "Тривога на Рівненщині",
               "Відбій у Чернівцях", "тривога на Волині", "Івано-Франківщина"):
         assert resolve_scope(t) == "elsewhere", t
+
+
+# --- nothing vs not-yet-known ---------------------------------------------
+
+
+def test_a_bare_alert_declaration_is_unknown_not_nothing():
+    """"Тривога" says something is coming without saying what. `none` would
+    claim the sky is empty."""
+    for t in ("🛑 ТРИВОГА", "🔴Оголошено повітряну тривогу у місті."):
+        assert hints.suggest(t)["threat"] == "unknown", t
+
+
+def test_an_all_clear_means_nothing_is_flying():
+    for t in ("🛑 Відбій тривоги", "Відбій, усім солодких снів 💕"):
+        assert hints.suggest(t)["threat"] == "none", t
+
+
+def test_a_partial_all_clear_keeps_what_is_still_named():
+    """"По балістиці відбій" closes one class while another still flies."""
+    t = "⚪️По балістиці відбій. / ⚠️2 шахеди на Чорноморськ/Одесу."
+    assert hints.suggest(t)["threat"] == "shahed"
+
+
+def test_informational_text_is_nothing_not_unknown():
+    assert hints.suggest("Дякую за підтримку")["threat"] == "none"
