@@ -1,0 +1,12 @@
+# Data & secrets — never commit
+data/
+*.session
+*.session-journal
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
