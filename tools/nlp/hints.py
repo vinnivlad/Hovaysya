@@ -38,14 +38,19 @@ THREAT_RULES: tuple[tuple[str, str], ...] = (
 
 _THREAT = tuple((kind, re.compile(pat, re.IGNORECASE)) for kind, pat in THREAT_RULES)
 
-# A MiG-31K in the air is its own class: the whole country is alerted because it
-# can launch a Kinzhal anywhere, and it sometimes lands without launching.
+# A MiG-31K has two states, and the transition between them is the point.
 #
-# It cannot be a plain rule in the list above, because the channels' takeoff
-# boilerplate reads "МіГ-31К — носій аеробалістичної ракети", which any
-# ballistic pattern matches even though nothing has been launched. So the
-# carrier wins only when no launch is mentioned; once it is, the missile is
-# flying and the class is ballistic.
+#   carrier up  ->  mig        the whole country is alerted, because it can
+#                              release a Kinzhal anywhere along its route; it
+#                              also sometimes lands without launching
+#   launched    ->  ballistic  the missile is flying, and nothing about the
+#                              aircraft matters any more
+#
+# This is intended behaviour, not a workaround for a pattern collision, so it
+# lives outside the ordered rule list rather than being folded into it. The
+# takeoff boilerplate reads "МіГ-31К — носій аеробалістичної ракети", which any
+# ballistic pattern matches even though nothing is flying — so the carrier
+# state must win until a launch is actually mentioned.
 _MIG = re.compile(r"м[іi]г-?\s?31", re.IGNORECASE)
 _LAUNCHED = re.compile(r"пуск|запуск|стартув|випустив|відпрац", re.IGNORECASE)
 
