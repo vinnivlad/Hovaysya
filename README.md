@@ -44,9 +44,9 @@ Three principles worth stating up front:
   — there is time, so precision is what matters.
 - **The gazetteer comes before the model.** These channels write in terse local
   shorthand (`1х Борщагівки`, `Солома/Центр`, `2х над Києвом - Оболонь`).
-  A closed dictionary of ~500 toponyms and their slang variants resolves most of
-  it deterministically and explainably; the model handles what is genuinely
-  ambiguous.
+  A closed dictionary — currently ~150 places and ~230 stems, mined from the
+  corpus — resolves most of it deterministically and explainably; the model
+  handles what is genuinely ambiguous.
 
 ## Repository layout
 
