@@ -262,3 +262,35 @@ def test_the_reason_is_shown_so_a_split_can_be_judged():
     out = "\n".join(inconsistencies([a, b], {}))
     assert "йшло прямо на Жуляни" in out
     assert "ще далеко" in out
+
+
+# --- what is NOT a finding ------------------------------------------------
+
+
+def test_an_all_clear_is_not_flagged_for_reporting_nothing_in_the_air():
+    """An all-clear is audible by design and reports nothing flying by
+    definition, so two of the checks would fire on every single one. A check
+    that flags the correct answer teaches the eye to skip the report."""
+    for alarm in ("clear", "clear-partial"):
+        l = label(alarm=alarm, threat="none", modality="non-threat",
+                  certainty="clear", why="відбій")
+        assert check([l], {}) == []
+
+
+def test_a_launch_origin_abroad_is_not_a_threat_resolved_elsewhere():
+    """Savaslejka and Kursk oblast are where the things come from. The policy
+    checks `not nationwide and scope elsewhere`; the warning was missing the
+    first half and flagged every correct MiG and ballistic wake-up."""
+    text = "❗️❗Є інформація про пуск балістичної ракети з Курської області."
+    messages = {"mon1tor_ua/1": {"text": text}}
+    l = label(scope="elsewhere", threat="ballistic", alarm="ballistic",
+              why="реальний пуск")
+    assert check([l], messages) == []
+
+
+def test_a_target_abroad_is_still_flagged():
+    text = "☄ Балістика на Кременчук"
+    messages = {"mon1tor_ua/1": {"text": text}}
+    l = label(scope="elsewhere", threat="ballistic", alarm="ballistic")
+    assert ids(check([l], messages)) == [
+        "notify on a threat resolved to another region"]

@@ -328,6 +328,20 @@ Only reasons that require **your judgement** are labeled by hand:
 `insufficient` distinguishes "the app was right to wait" from "the app missed
 it", and those must not be scored the same way.
 
+**When two of them are both true, the one that needs no state wins.** A message
+about another city is often *also* a continuation of the wave that already woke
+you — "☄ Балістика на Кременчук" during a Kyiv alert is both `too-far` and
+`already-notified`. Pick `too-far`: it is decided by the message alone, it is the
+order the policy actually decides in (geography is rule 4, novelty is rule 6),
+and labelling it `already-notified` would credit the episode state for silence
+that the geographic filter produces on its own — hiding the fact that a filter
+dropping 55.7% of all traffic is doing the work.
+
+Near you the precedence reverses, because geography no longer decides anything.
+A drone announced over your district and then reported drifting away is
+`already-notified`: the first message woke you and nothing new happened. That is
+the case where `already-notified` is the whole answer.
+
 `aftermath` and `not-a-threat` are **not** hand-labeled — see the negative set
 below. Whether a post describes consequences is a mechanical property of its
 text, not a judgement about your situation, so spending your evenings on it

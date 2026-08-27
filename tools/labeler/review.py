@@ -146,8 +146,20 @@ def check(labels: list[dict], messages: dict[str, dict]) -> list[tuple[str, str,
             err(lid, f"anchor {anchor!r} is not a message in the database")
 
         # --- consistency, not validity ---
-        if decision == "notify":
-            if l.get("scope") == "elsewhere":
+        # An all-clear is audible by design and reports nothing flying by
+        # definition, so two of the checks below would fire on every single
+        # one of them. A check that flags the correct answer teaches the eye
+        # to skip the report, which is worse than not having the check.
+        is_all_clear = l.get("alarm") in ("clear", "clear-partial")
+        if decision == "notify" and not is_all_clear:
+            # A launch origin is elsewhere by definition: Savaslejka and Kursk
+            # oblast are where the things come from. The policy's rule 4 checks
+            # `not nationwide and scope elsewhere`; the warning was missing the
+            # first half and so flagged every correct MiG and ballistic wake-up.
+            elsewhere = (l.get("scope") == "elsewhere"
+                         and not (anchor in messages
+                                  and hints.nationwide(messages[anchor]["text"])))
+            if elsewhere:
                 warn(lid, "notify on a threat resolved to another region")
             if l.get("threat") == "none" and l.get("level") != "info":
                 warn(lid, "audible notify while nothing is flying — `info`?")

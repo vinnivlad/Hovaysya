@@ -357,3 +357,22 @@ def test_a_full_all_clear_ends_the_episode_and_its_state():
         d = decide(o, tr)
         tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
     assert tr.episode is None
+
+
+# --- the commonest launch word of all -------------------------------------
+
+
+def test_puskh_is_a_launch_word():
+    """A stray `r` in the alternation disabled it: the pattern demanded a
+    literal "r" immediately followed by a word boundary, which cannot happen.
+    So the single most common launch report in the corpus was never a launch."""
+    from tools.policy.episodes import _LAUNCH
+
+    assert _LAUNCH.search("Є інформація про пуск балістичної ракети з Курської області.")
+    assert _LAUNCH.search("Вихід балістики з Брянська")
+    assert _LAUNCH.search("Виліт винищувача МіГ-31К")
+
+
+def test_a_launch_from_a_russian_region_announces_something_new():
+    o = observe(T0, "❗️❗Є інформація про пуск балістичної ракети з Курської області.")
+    assert o.says_new

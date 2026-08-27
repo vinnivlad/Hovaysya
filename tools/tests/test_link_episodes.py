@@ -145,3 +145,37 @@ def test_an_empty_note_is_not_reported():
 
 def test_notify_labels_are_not_checked_for_reason_clashes():
     assert contradictions([notify("2026-08-26T20:00:00Z", "a", why="далеко")]) == []
+
+
+# --- reasons that were never the labeller's to get wrong -------------------
+
+
+def test_geography_outranks_the_note():
+    """"Балістика на Кременчук" is silenced by the message alone, with no state
+    at all — rule 4 fires before any novelty rule. So "не в мою сторону" is a
+    restatement of `too-far`, not a disagreement with it."""
+    labels = [silent("2026-08-26T23:30:00Z", "a", reason="too-far",
+                     scope="elsewhere", modality="live-threat",
+                     why="не в мою сторону летить")]
+    assert contradictions(labels) == []
+
+
+def test_the_same_note_on_a_nearby_threat_is_still_a_disagreement():
+    """Near me, geography does not decide — only the episode does, so the note
+    and the reason really do point at different rules."""
+    labels = [silent("2026-08-26T23:30:00Z", "a", reason="already-notified",
+                     scope="my-area", modality="live-threat",
+                     why="не в мою сторону летить")]
+    assert [c[0] for c in contradictions(labels)] == ["a"]
+
+
+def test_a_mechanically_silent_modality_needs_no_reason_at_all():
+    """"Тривога триватиме ще 2 години" is commentary. It was filed as
+    `already-notified` because none of the four fit, and asking which episode it
+    repeats has no answer."""
+    labels = [notify("2026-08-26T20:00:00Z", "wake"),
+              silent("2026-08-26T22:07:00Z", "a", modality="summary-news",
+                     why="роздуми на тему скільки триватиме тривога")]
+    assert contradictions(labels) == []
+    filled, _distant = link(labels)
+    assert filled == []

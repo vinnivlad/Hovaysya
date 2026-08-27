@@ -692,3 +692,20 @@ def test_a_partial_clear_naming_another_class_reports_that_one():
     s = hints.suggest("⚪️По балістиці відбій. / ⚠️2 шахеди на Чорноморськ/Одесу.")
     assert s["threat"] == "shahed"
     assert s["cleared"] == "ballistic"
+
+
+# --- a takeoff report is not an emoji -------------------------------------
+
+
+def test_a_takeoff_is_structural_evidence_not_a_decoration():
+    """Before the `launch` shape existed this matched only `emoji-with-place`
+    and came out weak — as if the evidence were the ⚠️ rather than "Виліт"."""
+    text = ('❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка.\n'
+            'МіГ-31К⚠️ — носій аеробалістичної ракети Х-47М2 "Кинджал"')
+    assert "launch" in hints.live_shapes(text)
+    assert hints.live_strength(text) == "strong"
+
+
+def test_an_ordinary_bare_place_report_is_still_weak_on_its_emoji():
+    """The launch shape must not quietly promote everything else."""
+    assert hints.live_strength("Жуляни ⚠️") != "none"

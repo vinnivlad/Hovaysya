@@ -55,8 +55,13 @@ _NOVELTY = re.compile(
 # "Виліт" and "Вихід" are different words, and only the second was here —
 # so "Виліт винищувача МіГ-31К" announced nothing new and was silenced as a
 # repeat. For a MiG the takeoff is the event.
+#
+# A stray `r` in front of the commonest launch word of all disabled it outright:
+# `|r\bпуск\w*|` needs a literal "r" immediately followed by a word
+# boundary, which cannot happen. So "про пуск балістичної ракети" was never a
+# launch, and only `спуск`/`вихід` carried the rule.
 _LAUNCH = re.compile(
-    r"\bвихід\w*|\bвиліт\w*|\bвилет\w*|\bзліт\w*|r\bпуск\w*|"
+    r"\bвихід\w*|\bвиліт\w*|\bвилет\w*|\bзліт\w*|\bпуск\w*|"
     r"\bспуск\w*|\bстарт\w*",
     re.IGNORECASE,
 )

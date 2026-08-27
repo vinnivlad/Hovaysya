@@ -76,6 +76,28 @@ def by_night(labels: list[dict]) -> dict[str, list[dict]]:
     return groups
 
 
+# Where the reason is not the labeller's to get wrong, the note cannot contradict
+# it. Two such cases, both matching the order the policy actually decides in:
+#
+# - Geography outranks episode reasoning. `too-far` on a message about another
+#   region is decided by the message alone, with no state at all — rule 4 fires
+#   before any novelty rule. "не в мою сторону" is then a restatement of the
+#   reason, not a disagreement with it.
+# - A mechanically silent modality decides before any reason is consulted, so
+#   whichever of the four was picked is moot. Flagging those trains the eye to
+#   ignore the report.
+GEOGRAPHY_DECIDES = {"elsewhere", "oblast"}
+MECHANICALLY_SILENT = {"aftermath", "summary-news", "non-threat"}
+
+
+def reason_is_moot(label: dict) -> bool:
+    """Whether the chosen reason is not a judgement the note could contradict."""
+    if label.get("modality") in MECHANICALLY_SILENT:
+        return True
+    return (label.get("silent_reason") == "too-far"
+            and label.get("scope") in GEOGRAPHY_DECIDES)
+
+
 def link(labels: list[dict]) -> tuple[list[tuple[str, str]], list[tuple[str, str, int]]]:
     """Fill episode links in place.
 
@@ -92,7 +114,11 @@ def link(labels: list[dict]) -> tuple[list[tuple[str, str]], list[tuple[str, str
                 last_notify = None if l.get("alarm") == "clear" else l
                 continue
             if l.get("silent_reason") in EPISODE_REASONS and not l.get("repeat_of"):
-                if not last_notify:
+                if not last_notify or reason_is_moot(l):
+                    # Nothing to link when the reason is not what silenced it.
+                    # "Тривога триватиме ще 2 години" is commentary; it was
+                    # filed as `already-notified` because none of the four fit,
+                    # and asking which episode it repeats has no answer.
                     continue
                 gap = int(_ts(l) - _ts(last_notify))
                 if gap > MAX_EPISODE_GAP_S:
@@ -119,6 +145,8 @@ def contradictions(labels: list[dict]) -> list[tuple[str, str, str, str]]:
     out = []
     for l in labels:
         if l.get("decision") != "silent":
+            continue
+        if reason_is_moot(l):
             continue
         why = (l.get("why") or "").strip().lower()
         if not why:

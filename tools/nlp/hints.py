@@ -122,6 +122,11 @@ LIVE_SHAPES: tuple[tuple[str, str], ...] = (
     # Place-to-place movement carries no threat word at all:
     # "З Теремки на Віта-Литовська." — 146 such statements in the corpus.
     ("place-to-place", r"\bз\s+[А-ЯЇІЄҐ][^,.]{1,28}?\s+на\s+[А-ЯЇІЄҐ]"),
+    # A takeoff or launch report is structural evidence in its own right.
+    # Without this, "Виліт винищувача МіГ-31К з аеродрому Саваслейка" matched
+    # only `emoji-with-place` and counted as weak — as if the evidence were
+    # the ⚠️ rather than the word "Виліт".
+    ("launch", r"\bвиліт|\bвилет|\bвихід|\bзліт|\bстарт"),
     ("phase-word", r"курсом|на підльоті|підліт|пуск|швидкісн|в укрит|уважно|"
                    r"уважн|загроза|тривог"),
 )
@@ -490,6 +495,7 @@ def has_marker_emoji(text: str) -> bool:
 # ("🚨Терміновий збір для ГУР МОУ на далекобійні FPV дрони🚨") clears it.
 STRONG_SHAPES = frozenset({
     "count-marker",
+    "launch",
     "threat-toward-place",
     "place-with-threat",
     "movement",
