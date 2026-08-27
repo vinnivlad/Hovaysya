@@ -91,15 +91,6 @@
   .tag.weak { color: var(--soft); border-style: dashed; }
   .tag.mod-aftermath { color: #c98ad6; border-color: #6a5f8a; }
   .tag.mod-non-threat { color: var(--faint); }
-  .lbl {
-    font-family: var(--mono); font-size: 10.5px; padding: 2px 7px; border-radius: 2px;
-    align-self: flex-start; font-weight: 600;
-  }
-  .lbl.shelter { background: #3b1c1e; color: var(--shelter); border: 1px solid var(--shelter); }
-  .lbl.alert   { background: #2c2317; color: var(--alert);   border: 1px solid var(--alert); }
-  .lbl.info    { background: #17242f; color: var(--info);    border: 1px solid var(--info); }
-  .lbl.silent  { background: #21262b; color: var(--silent);  border: 1px solid var(--silent); }
-
   /* form */
   #form { grid-area: form; overflow-y: auto; border-left: 1px solid var(--line);
           background: var(--panel); padding: 14px; }
@@ -152,6 +143,44 @@
     padding: 8px 9px; font-size: 12.5px; margin-bottom: 12px; line-height: 1.4;
   }
   .ctx .t { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .moment {
+    display: flex; align-items: baseline; gap: 10px; cursor: pointer;
+    margin: 0 0 0 14px; padding: 5px 10px 5px 8px;
+    border-left: 3px solid var(--line); background: #191e24;
+    font-size: 12px;
+  }
+  .moment:hover { background: #1f262e; }
+  .moment .mt { font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
+  .moment .mk { font-family: var(--mono); font-size: 10.5px; font-weight: 600; }
+  .moment .mr {
+    font-family: var(--mono); font-size: 9px; text-transform: uppercase;
+    letter-spacing: .06em; border: 1px solid currentColor; border-radius: 2px;
+    padding: 0 4px;
+  }
+  .moment .mw { color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .moment.shelter { border-left-color: var(--shelter); } .moment.shelter .mk, .moment.shelter .mr { color: var(--shelter); }
+  .moment.alert   { border-left-color: var(--alert); }   .moment.alert .mk, .moment.alert .mr { color: var(--alert); }
+  .moment.info    { border-left-color: var(--info); }    .moment.info .mk, .moment.info .mr { color: var(--info); }
+  .moment.silent  { border-left-color: var(--silent); }  .moment.silent .mk { color: var(--silent); }
+
+  .moment-head {
+    display: flex; align-items: baseline; gap: 9px; margin-bottom: 10px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--line);
+    font-size: 11.5px; color: var(--faint);
+  }
+  .moment-head .mt {
+    font-family: var(--mono); font-size: 16px; font-weight: 600; color: var(--now);
+  }
+  .prev { margin-bottom: 10px; }
+  .prev .plabel {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--faint); margin-bottom: 4px;
+  }
+  .prev .pmsg {
+    font-size: 11.5px; color: var(--faint); line-height: 1.35;
+    display: flex; gap: 7px; padding: 1px 0;
+  }
+  .prev .pmsg span { font-family: var(--mono); font-size: 10px; flex: 0 0 auto; }
   .inh {
     background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--info);
     border-radius: 3px; padding: 7px 9px; font-size: 12px; margin-bottom: 11px;
@@ -193,7 +222,7 @@
 </div>
 
 <div id="form">
-  <h2>Мітка</h2>
+  <h2>Момент</h2>
   <div id="formBody"></div>
   <div class="keys">
     <b>j / k</b> — рух по фіду<br>
@@ -382,13 +411,29 @@ function renderFeed() {
         (m.q ? `<div class="qt">↳ ${esc(m.q)}</div>` : "") +
         `<div class="tx">${esc(m.x)}</div>` +
         `<div class="tags">${tags}</div>` +
-        (lab ? `<span class="lbl ${lab.decision === "silent" ? "silent" : lab.level}">` +
-               `${lab.decision === "silent" ? "молчи · " + esc(lab.silent_reason)
-                                           : esc(lab.level) + " · " + esc(lab.alarm)}` +
-               `</span>` : "") +
       `</div>`;
     div.onclick = () => { selIx = ix; openDraft(); renderAll(); };
     rows.appendChild(div);
+
+    // The label is a mark on the timeline placed just after this message
+    // arrived — not a property of the message. Rendering it as a full-width
+    // bar between rows is the whole point: a badge inside the row reads as
+    // "this post is judged", which is the misreading to avoid.
+    if (lab) {
+      const bar = document.createElement("div");
+      const kind = lab.decision === "silent" ? "silent" : lab.level;
+      bar.className = "moment " + kind;
+      bar.innerHTML =
+        `<span class="mt">${esc(m.hm)}</span>` +
+        `<span class="mk">${lab.decision === "silent"
+            ? "молчати · " + esc(UA.silent_reason[lab.silent_reason] || lab.silent_reason)
+            : esc(UA.level[lab.level] || lab.level) + " · " + esc(UA.alarm[lab.alarm] || lab.alarm)}` +
+        `</span>` +
+        (lab.repeat_of ? `<span class="mr">повтор</span>` : "") +
+        `<span class="mw">${esc(lab.why)}</span>`;
+      bar.onclick = () => { selIx = ix; openDraft(); renderAll(); };
+      rows.appendChild(bar);
+    }
   });
 }
 
@@ -445,14 +490,25 @@ function renderForm() {
   const m = selected();
   if (!m || !draft) {
     body.innerHTML = `<div class="empty">Клікни повідомлення у фіді.<br><br>
-      Мітка вішається на <b>момент часу</b>, а не на текст: питання завжди
-      «чи мусив застосунок розбудити мене саме тут».</div>`;
+      Ти оцінюєш не текст поста, а <b>мить, коли він прийшов</b>: чи мусив
+      застосунок розбудити тебе саме тоді, знаючи все, що фід сказав до
+      цього.<br><br>
+      Тому повідомлення тут — тригер і контекст, а не предмет оцінки.</div>`;
     return;
   }
 
   const earlier = labelsForNight().filter(l => l.id !== draft.id && l.decision === "notify");
   const weakShelter = draft.decision === "notify" && draft.level === "shelter" && m.st === "weak";
-  let html = `<div class="ctx"><span class="t">${esc(m.hm)} · ${esc(m.c)} · #${m.id}</span><br>${esc(m.x)}</div>`;
+  const before = visibleMessages().slice(Math.max(0, selIx - 3), selIx);
+  let html =
+    `<div class="moment-head"><span class="mt">${esc(m.hm)}</span>` +
+    `<span>момент одразу після цього повідомлення</span></div>`;
+  if (before.length) {
+    html += `<div class="prev"><div class="plabel">що було видно до цього</div>` +
+      before.map(b => `<div class="pmsg"><span>${esc(b.hm)}</span>` +
+        `${esc(b.x.replace(/\n/g, " / ").slice(0, 90))}</div>`).join("") + `</div>`;
+  }
+  html += `<div class="ctx"><span class="t">${esc(m.hm)} · ${esc(m.c)} · #${m.id}</span><br>${esc(m.x)}</div>`;
 
   if ((m.ith || m.isc) && m.ifrom) {
     const parts = [];

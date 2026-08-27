@@ -295,6 +295,30 @@ running — the second ballistic wave, a new group after a lull. This is the fie
 that encodes the original complaint that repeat signals either never arrive or
 arrive unpredictably. `null` for the first notification of an episode.
 
+## Why a moment is picked by clicking a message
+
+Labels are moments, so it is fair to ask why the labeler makes you click a
+message rather than a point on a clock.
+
+Because the app never decides at an arbitrary instant — it has nothing to decide
+from. It wakes when new data arrives, so the set of possible decision moments
+*is* the set of message arrival times. Clicking a message means "at the instant
+this arrived, the app should have…", and `anchor` records which arrival, not
+which post is being judged.
+
+Allowing a free-floating time would invent a coordinate no system could ever
+satisfy, because at that instant the feed held nothing new. The one meaningful
+case — "I should have been woken at 02:30 and the channels only said it at
+02:34" — is a finding about the data source rather than a label; put it in
+`open_question`.
+
+The interface has to carry that distinction, because the opposite reading
+produces bad labels: it is what makes a bare `Вибухи` look like `threat: none`.
+So a saved label draws as a bar **between** rows rather than a badge inside one,
+the form is headed by the moment's time, and it lists the messages visible
+before it under "що було видно до цього". The message is the trigger and the
+context, not the subject.
+
 ## Judging a moment, not a post
 
 The schema opens by saying a label attaches to a moment, and that has a
