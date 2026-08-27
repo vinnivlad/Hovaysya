@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ховайся — розмітка</title>
+<style>
+  :root {
+    --bg: #14181d; --panel: #1c2127; --panel2: #232931; --line: #2f373f;
+    --ink: #e8ecef; --soft: #a3aeb9; --faint: #6f7c88;
+    --now: #f0a83c; --done: #4fbfae; --near: #f0a83c; --dist: #6f7c88;
+    --shelter: #e5484d; --alert: #f0a83c; --info: #5b9dd9; --silent: #6f7c88;
+    --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    --sans: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--sans);
+    font-size: 14px; display: grid;
+    grid-template-columns: 210px minmax(0,1fr) 330px; grid-template-rows: 46px 1fr;
+    grid-template-areas: "head head head" "nights feed form";
+  }
+
+  header {
+    grid-area: head; display: flex; align-items: center; gap: 18px;
+    padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header h1 { font-size: 14px; font-weight: 600; margin: 0; letter-spacing: .01em; }
+  header .ref { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  header .grow { flex: 1; }
+  header .stat { font-family: var(--mono); font-size: 11.5px; color: var(--soft); }
+  header .stat b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  button {
+    font-family: var(--sans); font-size: 12px; padding: 5px 11px; cursor: pointer;
+    background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+  button:hover { border-color: var(--faint); }
+  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--now); outline-offset: 1px;
+  }
+  button.primary { background: var(--now); color: #14181d; border-color: var(--now); font-weight: 600; }
+
+  /* nights */
+  #nights { grid-area: nights; overflow-y: auto; border-right: 1px solid var(--line);
+            background: var(--panel); }
+  .night {
+    padding: 8px 12px; border-bottom: 1px solid var(--line); cursor: pointer;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .night:hover { background: var(--panel2); }
+  .night.sel { background: var(--panel2); box-shadow: inset 3px 0 0 var(--now); }
+  .night .d { font-family: var(--mono); font-size: 12.5px; }
+  .night .c { font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
+  .night .c .near { color: var(--near); }
+  .night .c .lab { color: var(--done); }
+
+  /* feed */
+  #feed { grid-area: feed; overflow-y: auto; padding: 0 0 200px; }
+  .bar {
+    position: sticky; top: 0; z-index: 2; background: var(--bg);
+    border-bottom: 1px solid var(--line); padding: 7px 14px;
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--mono); font-size: 11px; color: var(--faint);
+  }
+  .msg {
+    display: grid; grid-template-columns: 46px 62px 1fr; gap: 0 10px;
+    padding: 7px 14px; border-bottom: 1px solid #1f252b; cursor: pointer;
+    border-left: 3px solid transparent;
+  }
+  .msg:hover { background: #191e24; }
+  .msg.sel { background: #1f262e; border-left-color: var(--now); }
+  .msg.near { border-left-color: var(--near); }
+  .msg.sel.near { border-left-color: var(--now); }
+  .msg .tm { font-family: var(--mono); font-size: 11.5px; color: var(--faint); padding-top: 2px; }
+  .msg .cn { font-family: var(--mono); font-size: 10.5px; color: var(--faint); padding-top: 3px; }
+  .msg .bd { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .msg .tx { white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
+  .msg .qt {
+    font-size: 12px; color: var(--faint); border-left: 2px solid var(--line);
+    padding-left: 7px; white-space: pre-wrap;
+  }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em;
+    text-transform: uppercase; padding: 1px 5px; border-radius: 2px;
+    border: 1px solid var(--line); color: var(--faint);
+  }
+  .tag.scope-my-area, .tag.scope-my-district { color: var(--near); border-color: var(--near); }
+  .tag.weak { color: var(--soft); border-style: dashed; }
+  .tag.mod-aftermath { color: #c98ad6; border-color: #6a5f8a; }
+  .tag.mod-non-threat { color: var(--faint); }
+  .lbl {
+    font-family: var(--mono); font-size: 10.5px; padding: 2px 7px; border-radius: 2px;
+    align-self: flex-start; font-weight: 600;
+  }
+  .lbl.shelter { background: #3b1c1e; color: var(--shelter); border: 1px solid var(--shelter); }
+  .lbl.alert   { background: #2c2317; color: var(--alert);   border: 1px solid var(--alert); }
+  .lbl.info    { background: #17242f; color: var(--info);    border: 1px solid var(--info); }
+  .lbl.silent  { background: #21262b; color: var(--silent);  border: 1px solid var(--silent); }
+
+  /* form */
+  #form { grid-area: form; overflow-y: auto; border-left: 1px solid var(--line);
+          background: var(--panel); padding: 14px; }
+  #form h2 { font-size: 12px; margin: 0 0 12px; letter-spacing: .07em;
+             text-transform: uppercase; color: var(--soft); }
+  .empty { color: var(--faint); font-size: 13px; line-height: 1.6; }
+  .row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 11px; }
+  .row > label { font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+                 text-transform: uppercase; color: var(--faint); }
+  select, input[type=text], textarea {
+    background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 3px; padding: 6px 7px; font-family: var(--sans); font-size: 13px;
+    width: 100%;
+  }
+  textarea { resize: vertical; min-height: 52px; line-height: 1.4; }
+  .seg { display: flex; gap: 0; }
+  .seg button { flex: 1; border-radius: 0; font-size: 11.5px; padding: 6px 4px; }
+  .seg button:first-child { border-radius: 3px 0 0 3px; }
+  .seg button:last-child { border-radius: 0 3px 3px 0; }
+  .seg button.on { background: var(--now); color: #14181d; border-color: var(--now); font-weight: 600; }
+  .seg button.on.shelter { background: var(--shelter); border-color: var(--shelter); color: #fff; }
+  .seg button.on.info { background: var(--info); border-color: var(--info); color: #14181d; }
+  .ctx {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 3px;
+    padding: 8px 9px; font-size: 12.5px; margin-bottom: 12px; line-height: 1.4;
+  }
+  .ctx .t { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .warn {
+    background: #3b1c1e; border: 1px solid var(--shelter); color: #ffb3b5;
+    border-radius: 3px; padding: 7px 9px; font-size: 12px; margin-bottom: 11px;
+    line-height: 1.4;
+  }
+  .actions { display: flex; gap: 7px; margin-top: 4px; }
+  .keys {
+    margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 10.5px; color: var(--faint); line-height: 1.9;
+  }
+  .keys b { color: var(--soft); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Ховайся — розмітка</h1>
+  <span class="ref" id="ref"></span>
+  <span class="grow"></span>
+  <span class="stat" id="stat"></span>
+  <button id="exportBtn" class="primary">Експорт JSONL</button>
+</header>
+
+<div id="nights"></div>
+
+<div id="feed">
+  <div class="bar">
+    <span id="filterLabel"></span>
+    <span class="grow" style="flex:1"></span>
+    <span id="nightStat"></span>
+  </div>
+  <div id="rows"></div>
+</div>
+
+<div id="form">
+  <h2>Мітка</h2>
+  <div id="formBody"></div>
+  <div class="keys">
+    <b>j / k</b> — рух по фіду<br>
+    <b>n</b> — буди &nbsp; <b>s</b> — молчи<br>
+    <b>1 2 3</b> — info / alert / shelter<br>
+    <b>Enter</b> — зберегти &nbsp; <b>Esc</b> — скасувати<br>
+    <b>x</b> — видалити мітку<br>
+    <b>f</b> — фільтр &nbsp; <b>[ ]</b> — ніч
+  </div>
+</div>
+
+<script id="payload" type="application/json">__PAYLOAD__</script>
+<script>
+"use strict";
+
+const DATA = JSON.parse(document.getElementById("payload").textContent);
+const STORE_KEY = "hovaysya-labels-v1";
+
+const FILTERS = [
+  { id: "near",     name: "поруч зі мною", test: m => m.s === "my-area" || m.s === "my-district" },
+  { id: "relevant", name: "Київ і область", test: m => ["my-area","my-district","city","oblast"].includes(m.s) },
+  { id: "all",      name: "усе",            test: () => true },
+];
+
+const LEVELS = ["info", "alert", "shelter"];
+const ALARMS = ["ballistic", "cruise", "drone", "aviation"];
+const SILENT_REASONS = ["too-far", "already-notified", "resolved", "insufficient"];
+const THREATS = ["shahed","shahed-jet","cruise","ballistic","kab","aviation","recon","mixed","unknown","none"];
+const MODALITIES = ["live-threat","aftermath","summary-news","non-threat"];
+const SCOPES = ["my-area","my-district","city","oblast","elsewhere","unknown"];
+const CERTAINTIES = ["confirmed","probable","lost","clear"];
+
+let labels = loadLabels();
+let nightId = DATA.nights.length ? DATA.nights[0].id : null;
+let filterIx = 0;
+let selIx = -1;
+let draft = null;
+
+function loadLabels() {
+  try {
+    const cached = localStorage.getItem(STORE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length >= DATA.labels.length) return parsed;
+    }
+  } catch (e) { /* private mode, cleared storage — fall through */ }
+  return DATA.labels.slice();
+}
+
+function persist() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(labels)); } catch (e) {}
+}
+
+function nightMessages() {
+  return DATA.messages.filter(m => m.n === nightId);
+}
+function visibleMessages() {
+  const f = FILTERS[filterIx].test;
+  return nightMessages().filter(f);
+}
+function labelsForNight() {
+  return labels.filter(l => l.night === nightId)
+               .sort((a, b) => a.at.localeCompare(b.at));
+}
+function labelForMessage(m) {
+  return labels.find(l => l.anchor === m.k);
+}
+
+function nextLabelId(m) {
+  const stamp = m.hm.replace(":", "");
+  const base = `${nightId}T${m.hm}`;
+  let n = 1;
+  while (labels.some(l => l.id === `${base}-${String(n).padStart(2, "0")}`)) n++;
+  return `${base}-${String(n).padStart(2, "0")}`;
+}
+
+/* ---------- rendering ---------- */
+
+function renderNights() {
+  const el = document.getElementById("nights");
+  el.innerHTML = "";
+  for (const n of DATA.nights) {
+    const count = labels.filter(l => l.night === n.id).length;
+    const d = document.createElement("div");
+    d.className = "night" + (n.id === nightId ? " sel" : "");
+    d.innerHTML =
+      `<span class="d">${n.id}</span>` +
+      `<span class="c">${n.count} · <span class="near">${n.near} поруч</span>` +
+      (count ? ` · <span class="lab">${count} мітк.</span>` : "") + `</span>`;
+    d.onclick = () => { nightId = n.id; selIx = -1; draft = null; renderAll(); };
+    el.appendChild(d);
+  }
+}
+
+function tag(text, cls) {
+  return `<span class="tag ${cls || ""}">${esc(text)}</span>`;
+}
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function renderFeed() {
+  const rows = document.getElementById("rows");
+  rows.innerHTML = "";
+  const msgs = visibleMessages();
+  document.getElementById("filterLabel").textContent = "фільтр: " + FILTERS[filterIx].name;
+  document.getElementById("nightStat").textContent =
+    `${msgs.length} з ${nightMessages().length} · ${labelsForNight().length} міток`;
+
+  msgs.forEach((m, ix) => {
+    const near = m.s === "my-area" || m.s === "my-district";
+    const lab = labelForMessage(m);
+    const div = document.createElement("div");
+    div.className = "msg" + (near ? " near" : "") + (ix === selIx ? " sel" : "");
+    div.dataset.ix = ix;
+
+    let tags = tag(m.s, "scope-" + m.s);
+    if (m.m !== "live-threat") tags += tag(m.m, "mod-" + m.m);
+    if (m.th !== "none") tags += tag(m.th);
+    if (m.st === "weak") tags += tag("weak", "weak");
+    if (m.ce !== "confirmed") tags += tag(m.ce);
+    if (m.inf.length) tags += tag(m.inf.join("/"));
+
+    div.innerHTML =
+      `<div class="tm">${esc(m.hm)}</div><div class="cn">${esc(m.c)}</div>` +
+      `<div class="bd">` +
+        (m.q ? `<div class="qt">↳ ${esc(m.q)}</div>` : "") +
+        `<div class="tx">${esc(m.x)}</div>` +
+        `<div class="tags">${tags}</div>` +
+        (lab ? `<span class="lbl ${lab.decision === "silent" ? "silent" : lab.level}">` +
+               `${lab.decision === "silent" ? "молчи · " + esc(lab.silent_reason)
+                                           : esc(lab.level) + " · " + esc(lab.alarm)}` +
+               `</span>` : "") +
+      `</div>`;
+    div.onclick = () => { selIx = ix; openDraft(); renderAll(); };
+    rows.appendChild(div);
+  });
+}
+
+function selected() {
+  const msgs = visibleMessages();
+  return selIx >= 0 && selIx < msgs.length ? msgs[selIx] : null;
+}
+
+function openDraft(decision) {
+  const m = selected();
+  if (!m) return;
+  const existing = labelForMessage(m);
+  if (existing && !decision) { draft = Object.assign({}, existing); return; }
+  draft = existing ? Object.assign({}, existing) : {
+    id: nextLabelId(m),
+    night: nightId,
+    anchor: m.k,
+    at: new Date(m.t * 1000).toISOString().replace(/\.\d+Z$/, "Z"),
+    decision: "notify",
+    level: "alert",
+    alarm: m.al === "none" ? "drone" : m.al,
+    silent_reason: "too-far",
+    threat: m.th === "none" ? "unknown" : m.th,
+    modality: m.m,
+    scope: m.s,
+    certainty: m.ce,
+    repeat_of: null,
+    evidence: [{ channel: m.ch, message_id: m.id }],
+    why: "",
+    open_question: "",
+  };
+  if (decision) draft.decision = decision;
+}
+
+function seg(field, values, cur, classFor) {
+  return `<div class="seg">` + values.map(v =>
+    `<button data-f="${field}" data-v="${v}" class="${v === cur ? "on " + (classFor ? classFor(v) : "") : ""}">${esc(v)}</button>`
+  ).join("") + `</div>`;
+}
+function sel(field, values, cur) {
+  return `<select data-f="${field}">` + values.map(v =>
+    `<option value="${v}"${v === cur ? " selected" : ""}>${esc(v)}</option>`).join("") + `</select>`;
+}
+
+function renderForm() {
+  const body = document.getElementById("formBody");
+  const m = selected();
+  if (!m || !draft) {
+    body.innerHTML = `<div class="empty">Вибери повідомлення у фіді — кліком або <b>j</b>/<b>k</b>.<br><br>
+      Мітка вішається на <b>момент часу</b>, а не на текст: питання завжди «чи мусив застосунок
+      розбудити мене саме тут».</div>`;
+    return;
+  }
+
+  const earlier = labelsForNight().filter(l => l.id !== draft.id && l.decision === "notify");
+  const weakShelter = draft.decision === "notify" && draft.level === "shelter" && m.st === "weak";
+
+  let html = `<div class="ctx"><span class="t">${esc(m.hm)} · ${esc(m.c)} · #${m.id}</span><br>${esc(m.x)}</div>`;
+
+  if (weakShelter) {
+    html += `<div class="warn">Єдина ознака тут — емодзі, а це слабкий сигнал (⚠️ стоїть на 26%
+      усіх повідомлень). <b>shelter</b> на такому — це майбутнє хибне пробудження. Перевір, чи є
+      в тексті щось конкретніше.</div>`;
+  }
+
+  html += `<div class="row"><label>рішення</label>${seg("decision", ["notify","silent"], draft.decision)}</div>`;
+
+  if (draft.decision === "notify") {
+    html += `<div class="row"><label>рівень — наскільки настійливо</label>
+      ${seg("level", LEVELS, draft.level, v => v)}</div>`;
+    html += `<div class="row"><label>звук</label>${sel("alarm", ALARMS, draft.alarm)}</div>`;
+    html += `<div class="row"><label>повтор епізоду</label>
+      <select data-f="repeat_of"><option value="">— перший сигнал —</option>` +
+      earlier.map(l => `<option value="${esc(l.id)}"${draft.repeat_of === l.id ? " selected" : ""}>` +
+        `${esc(l.id.slice(11))} · ${esc(l.level)}</option>`).join("") + `</select></div>`;
+  } else {
+    html += `<div class="row"><label>чому молчимо</label>${sel("silent_reason", SILENT_REASONS, draft.silent_reason)}</div>`;
+  }
+
+  html += `<div class="row"><label>що летить</label>${sel("threat", THREATS, draft.threat)}</div>`;
+  html += `<div class="row"><label>модальність</label>${sel("modality", MODALITIES, draft.modality)}</div>`;
+  html += `<div class="row"><label>наскільки близько</label>${sel("scope", SCOPES, draft.scope)}</div>`;
+  html += `<div class="row"><label>певність</label>${sel("certainty", CERTAINTIES, draft.certainty)}</div>`;
+  html += `<div class="row"><label>чому — своїми словами</label>
+    <textarea data-f="why" placeholder="одна фраза">${esc(draft.why)}</textarea></div>`;
+  html += `<div class="row"><label>сумнів (не обов'язково)</label>
+    <input type="text" data-f="open_question" value="${esc(draft.open_question)}"></div>`;
+  html += `<div class="actions"><button class="primary" id="saveBtn">Зберегти</button>
+    <button id="cancelBtn">Скасувати</button>` +
+    (labelForMessage(m) ? `<button id="delBtn">Видалити</button>` : "") + `</div>`;
+
+  body.innerHTML = html;
+
+  body.querySelectorAll("button[data-f]").forEach(b => {
+    b.onclick = () => { draft[b.dataset.f] = b.dataset.v; renderForm(); };
+  });
+  body.querySelectorAll("select[data-f], textarea[data-f], input[data-f]").forEach(el => {
+    el.oninput = () => {
+      const v = el.value;
+      draft[el.dataset.f] = (el.dataset.f === "repeat_of" && v === "") ? null : v;
+      if (el.tagName === "SELECT") renderForm();
+    };
+  });
+  const saveBtn = document.getElementById("saveBtn");
+  if (saveBtn) saveBtn.onclick = save;
+  const cancelBtn = document.getElementById("cancelBtn");
+  if (cancelBtn) cancelBtn.onclick = () => { draft = null; renderAll(); };
+  const delBtn = document.getElementById("delBtn");
+  if (delBtn) delBtn.onclick = remove;
+}
+
+function save() {
+  if (!draft) return;
+  if (!draft.why.trim()) {
+    const ta = document.querySelector("textarea[data-f=why]");
+    if (ta) { ta.focus(); ta.style.borderColor = "var(--shelter)"; }
+    return;
+  }
+  const out = Object.assign({}, draft);
+  if (out.decision === "notify") delete out.silent_reason;
+  else { delete out.level; delete out.alarm; delete out.repeat_of; out.repeat_of = null; }
+  if (!out.open_question) out.open_question = null;
+
+  const ix = labels.findIndex(l => l.id === out.id);
+  if (ix >= 0) labels[ix] = out; else labels.push(out);
+  persist();
+  draft = null;
+  const msgs = visibleMessages();
+  if (selIx < msgs.length - 1) selIx++;
+  openDraft();
+  renderAll();
+}
+
+function remove() {
+  const m = selected();
+  if (!m) return;
+  const lab = labelForMessage(m);
+  if (!lab) return;
+  labels = labels.filter(l => l.id !== lab.id);
+  persist();
+  draft = null;
+  renderAll();
+}
+
+function renderAll() {
+  renderNights();
+  renderFeed();
+  renderForm();
+  document.getElementById("stat").innerHTML =
+    `<b>${labels.length}</b> міток · <b>${labels.filter(l => l.decision === "notify").length}</b> буди · ` +
+    `<b>${labels.filter(l => l.decision === "silent").length}</b> молчи`;
+  const row = document.querySelector(".msg.sel");
+  if (row) row.scrollIntoView({ block: "nearest" });
+}
+
+/* ---------- export ---------- */
+
+document.getElementById("exportBtn").onclick = () => {
+  const ordered = labels.slice().sort((a, b) => a.at.localeCompare(b.at));
+  const body = ordered.map(l => JSON.stringify(l)).join("\n") + "\n";
+  const url = URL.createObjectURL(new Blob([body], { type: "application/x-ndjson" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "moments.jsonl";
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+/* ---------- keyboard ---------- */
+
+document.addEventListener("keydown", e => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  if (typing && e.key !== "Escape" && !(e.key === "Enter" && e.ctrlKey)) return;
+
+  const msgs = visibleMessages();
+  switch (e.key) {
+    case "j": case "ArrowDown":
+      selIx = Math.min(msgs.length - 1, selIx + 1); openDraft(); renderAll(); e.preventDefault(); break;
+    case "k": case "ArrowUp":
+      selIx = Math.max(0, selIx - 1); openDraft(); renderAll(); e.preventDefault(); break;
+    case "n": if (selected()) { openDraft("notify"); renderForm(); } break;
+    case "s": if (selected()) { openDraft("silent"); renderForm(); } break;
+    case "1": case "2": case "3":
+      if (draft && draft.decision === "notify") {
+        draft.level = LEVELS[Number(e.key) - 1]; renderForm();
+      }
+      break;
+    case "x": remove(); break;
+    case "f": filterIx = (filterIx + 1) % FILTERS.length; selIx = -1; draft = null; renderAll(); break;
+    case "[": case "]": {
+      const i = DATA.nights.findIndex(n => n.id === nightId);
+      const j = e.key === "]" ? i + 1 : i - 1;
+      if (j >= 0 && j < DATA.nights.length) {
+        nightId = DATA.nights[j].id; selIx = -1; draft = null; renderAll();
+      }
+      break;
+    }
+    case "Enter": if (draft) { save(); e.preventDefault(); } break;
+    case "Escape": draft = null; document.activeElement.blur(); renderAll(); break;
+  }
+});
+
+document.getElementById("ref").textContent =
+  `точка відліку: ${DATA.reference} · ${DATA.messages.length} повідомлень · ${DATA.nights.length} ночей`;
+renderAll();
+</script>
+</body>
+</html>

@@ -53,6 +53,15 @@ rewriting, and so a diff shows exactly which labels changed.
 | `evidence` | array | yes | the messages that justify this label |
 | `why` | string | yes | one line, in your own words |
 | `open_question` | string \| null | no | anything you were unsure about |
+| `night` | string | yes | the night this belongs to, `YYYY-MM-DD` of the evening |
+| `anchor` | string | yes | `channel/message_id` of the message the label was placed on |
+
+`night` and `anchor` are written by the labeler. A night runs 15:00 to 15:00
+Kyiv time so an attack spanning midnight stays in one night — peak traffic is
+00:00-04:00 Kyiv, and splitting it would break the flow exactly where the work
+is. `anchor` is a channel and id rather than a row index on purpose: indices
+shift when the page is rebuilt over a different date range, which would silently
+detach every stored label.
 
 ### `level` and `alarm` — two independent axes
 

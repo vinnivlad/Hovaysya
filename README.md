@@ -58,6 +58,10 @@ Three principles worth stating up front:
 | `tools/export/normalize.py` | Text normalization, promo-footer stripping |
 | `tools/export/export.py` | Export CLI |
 | `tools/export/mtproto.py` | Deferred MTProto path (unwired, see below) |
+| `tools/nlp/` | Gazetteer with morphology, and threat/modality hints |
+| `tools/analysis/` | Pattern mining and typo mining over the corpus |
+| `tools/labeler/` | Builds the self-contained labeling page |
+| `labels/` | Ground truth — **committed**, unlike `data/` |
 | `tools/tests/` | Tests, with real captured HTML fixtures |
 | `docs/` | Setup and design documentation |
 | `data/` | Database and logs — **git-ignored** |
@@ -154,6 +158,27 @@ to track one target through its life:
 identity across messages for free.
 
 Reactions are deliberately not parsed.
+
+## Labeling
+
+```bash
+python -m tools.labeler.build --since 2026-07-27
+```
+
+Writes `data/labeler.html` — a self-contained page, no server and no
+dependencies. Open it, work a night, press **Експорт JSONL**, and save the
+download over `labels/moments.jsonl`.
+
+Keys: `j`/`k` move, `n` notify, `s` silent, `1`/`2`/`3` level, `Enter` save,
+`x` delete, `f` cycle filter, `[`/`]` change night.
+
+Each message is pre-filled by `tools/nlp/` — scope, threat, alarm sound,
+modality, certainty, and whether the live-threat evidence is strong or only an
+emoji. The same module runs in the baseline, so correcting a pre-fill while
+labeling is also feedback on the baseline.
+
+See [docs/labeling-schema.md](docs/labeling-schema.md) for what the fields mean
+and how the harness scores them.
 
 ## Tests
 

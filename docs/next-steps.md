@@ -1,6 +1,6 @@
 # Next steps
 
-Ordered by dependency. Stages 1-3 are done; stage 4 is next.
+Ordered by dependency. Stages 1-4 are done; stage 5 is yours.
 
 Visual status board: <https://claude.ai/code/artifact/a7a19c52-e4c8-4bad-9bf8-1c480dd8434c>
 
@@ -45,13 +45,21 @@ The findings add required dimensions the first draft lacked:
   overhead is something only the user can settle, so the schema needs a place
   to record it.
 
-## 4. Timeline labeler
+## 4. Timeline labeler — done
 
-A local page showing the merged feed as a scrollable timeline, click to insert a
-label, export to JSON. Labeling a timeline in a spreadsheet is painful enough
-that it would not get done.
+`python -m tools.labeler.build` writes a self-contained page: the merged feed as
+a scrollable timeline, keyboard navigation, click a moment to label it, export
+JSONL. Every message arrives pre-filled from `tools/nlp/`, and the same module
+runs in the stage-6 baseline — so a correction made while labeling is also a
+signal about the baseline.
 
-## 5. Baseline without ML, then evaluate
+## 5. Your labeling pass — next
+
+Open `data/labeler.html`, work night by night, export, save over
+`labels/moments.jsonl`. Filter defaults to "near me", which is what makes a
+76-message hour scannable.
+
+## 6. Baseline without ML, then evaluate
 
 Gazetteer + phase rules + the episode state machine, measured against the labels
 from step 4. Build order follows the findings: geographic pre-filter (removes
@@ -62,7 +70,7 @@ needed, and for which parts. The headline metric is not accuracy but
 **false wake-ups per night** — an app that wakes you twice for nothing gets
 deleted in a week regardless of recall.
 
-## 6. Model, by distillation
+## 7. Model, by distillation
 
 Label a large historical sample with an LLM once, fine-tune a small multilingual
 classifier on those labels, deploy the small model. The user's own labels stay
