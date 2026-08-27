@@ -13,7 +13,8 @@ verified against every inflection family in the corpus.
 
 Tiers are relative to the reference location, Zhuliany:
 
-    my-area    Zhuliany and the ring that shares its risk
+    my-area    the approach corridor, curated from the user's rulings — not a
+               radius, see MY_AREA
     my-district Solomianskyi district generally
     city       elsewhere in Kyiv
     oblast     Kyiv oblast outside the city
@@ -57,29 +58,28 @@ def _p(name: str, tier: str, *stems: str) -> Place:
     return Place(name, tier, tuple(_strip_apostrophes(s).lower() for s in stems))
 
 
-# Zhuliany plus the places that share its immediate risk: the same approach
-# corridor from the south-west, and the neighbourhoods a drone over Zhuliany is
-# seconds from. Derived from co-mention frequency in the corpus.
+# The near ring — the places whose trouble is the user's trouble.
+#
+# This is NOT a radius, and deriving it from distance would be wrong. In the
+# user's words: "не завжди питання в відстані, а також якою дорогою найчастіше
+# воно летить і які топоніми мелькають в чаті" — it is the approach corridor
+# plus the names that actually recur in the channels. Gatne is in and
+# neighbouring Chabany is out; Solomianka is in and Chokolivka is not.
+#
+# Every entry below is the user's explicit ruling after labelling a full night,
+# except where marked. Do not "tidy" this into a geometric rule.
 MY_AREA = [
-    # "Жушяни" is the one keyboard slip in the corpus (Ш sits directly above Л
-    # on ЙЦУКЕН). Mined once and pinned here rather than matched fuzzily at
-    # runtime — see tools/analysis/typos.py.
-    _p("Жуляни", "my-area", "жулян", "жушян"),
-    _p("Теремки", "my-area", "теремк"),
-    _p("Чоколівка", "my-area", "чоколів"),
-    _p("Деміївка", "my-area", "деміїв"),
-    _p("Солом'янка", "my-area", "солом'ян", "соломян", "солома", "соломи"),
-    _p("Мишоловка", "my-area", "мишолов"),
-    _p("Совки", "my-area", "совки"),
-    _p("Іподром", "my-area", "іподром"),
-    _p("Караваєві Дачі", "my-area", "караваєв"),
+    _p("Жуляни", "my-area", "жулян", "жушян"),   # home
     _p("Вишневе", "my-area", "вишнев"),
-    _p("Крюківщина", "my-area", "крюківщ"),
+    _p("Борщагівка", "my-area", "борщагів", "борщаг"),
+    _p("Солом'янка", "my-area", "солом'ян", "соломян", "солома", "соломи"),
+    _p("Деміївка", "my-area", "деміїв"),
+    _p("Іподром", "my-area", "іподром"),
     _p("Гатне", "my-area", "гатне"),
-    _p("Віта-Поштова", "my-area", "віта-поштов", "віту-поштов"),
-    _p("Віта-Литовська", "my-area", "віта-литовськ"),
-    _p("Крушинка", "my-area", "крушинк"),
-    _p("Чабани", "my-area", "чабани"),
+    _p("Теремки", "my-area", "теремк"),
+    # Inferred, not ruled: woken for once ("реактив на Крюківщину/Борщагівки"),
+    # marked far once. Left in pending a decision.
+    _p("Крюківщина", "my-area", "крюківщ"),
 ]
 
 MY_DISTRICT = [
@@ -88,11 +88,16 @@ MY_DISTRICT = [
 
 # The rest of Kyiv, including the informal "масив" areas the channels use.
 CITY = [
+    # Ruled out of the near ring by the user after the first night: in Kyiv,
+    # but not on the corridor that matters to them.
+    _p("Чоколівка", "city", "чоколів"),
+    _p("Мишоловка", "city", "мишолов"),
+    _p("Караваєві Дачі", "city", "караваєв"),
+    _p("Совки", "city", "совки"),
     _p("Троєщина", "city", "троєщ", "троєща", "троя", "трою"),
     _p("Оболонь", "city", "оболон"),
     _p("Дарниця", "city", "дарниц"),
     _p("Позняки", "city", "позняк"),
-    _p("Борщагівка", "city", "борщагів", "борщаг"),
     _p("Лук'янівка", "city", "лук'янів", "лукянів"),
     _p("Виноградар", "city", "виноградар", "виноград"),
     _p("Святошин", "city", "святошин"),
@@ -136,6 +141,11 @@ CITY = [
 ]
 
 OBLAST = [
+    # Also ruled out of the near ring — "Віта Поштова: зовсім далеко".
+    _p("Чабани", "oblast", "чабани"),
+    _p("Віта-Поштова", "oblast", "віта-поштов", "віту-поштов"),
+    _p("Віта-Литовська", "oblast", "віта-литовськ"),
+    _p("Крушинка", "oblast", "крушинк"),
     _p("Бровари", "oblast", "бровар"),
     _p("Вишгород", "oblast", "вишгород"),
     _p("Бориспіль", "oblast", "бориспіл", "борисполь", "борисполя"),

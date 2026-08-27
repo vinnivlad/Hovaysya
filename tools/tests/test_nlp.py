@@ -28,14 +28,14 @@ def test_matches_across_capitalisation():
 
 
 def test_matches_slang_forms():
-    assert resolve_scope("1х Борщаги") == "city"
+    assert resolve_scope("1х Борщаги") == "my-area"
     assert resolve_scope("1х Солома/Центр") == "my-area"
     assert resolve_scope("Через Трою на Труханів") == "city"
 
 
 def test_matches_through_trailing_punctuation():
     assert resolve_scope("1х Жуляни.") == "my-area"
-    assert resolve_scope("Дарниця, Чоколівка") == "my-area"
+    assert resolve_scope("Дарниця, Чоколівка") == "city"
 
 
 def test_informal_masyv_areas_resolve():
@@ -562,3 +562,34 @@ def test_a_partial_all_clear_keeps_what_is_still_named():
 
 def test_informational_text_is_nothing_not_unknown():
     assert hints.suggest("Дякую за підтримку")["threat"] == "none"
+
+
+# --- the near ring is a ruling, not a radius ------------------------------
+
+
+def test_the_near_ring_follows_the_approach_corridor_not_distance():
+    """The user's rule: "не завжди питання в відстані, а також якою дорогою
+    найчастіше воно летить". Gatne is in and its neighbour Chabany is out;
+    Solomianka is in and Chokolivka is not. Deriving this from geometry would
+    get both pairs wrong."""
+    assert resolve_scope("Гатне") == "my-area"
+    assert resolve_scope("Чабани") == "oblast"
+    assert resolve_scope("Солом'янка") == "my-area"
+    assert resolve_scope("Чоколівка") == "city"
+
+
+def test_the_ring_holds_exactly_what_was_ruled_in():
+    from tools.nlp.gazetteer import MY_AREA
+
+    assert {p.name for p in MY_AREA} == {
+        "Жуляни", "Вишневе", "Борщагівка", "Солом'янка", "Деміївка",
+        "Іподром", "Гатне", "Теремки", "Крюківщина",
+    }
+
+
+def test_places_ruled_out_are_still_recognised_just_not_near():
+    """Ruled out of the ring, not out of the gazetteer — they still resolve, so
+    a message naming them is still Kyiv-relevant."""
+    for name, tier in (("Мишоловка", "city"), ("Караваєві Дачі", "city"),
+                       ("Віта-Поштова", "oblast"), ("Крушинка", "oblast")):
+        assert resolve_scope(name) == tier, name
