@@ -101,7 +101,10 @@ needed, and for which parts. The headline metric is not accuracy but
 **false wake-ups per night** — an app that wakes you twice for nothing gets
 deleted in a week regardless of recall.
 
-## 7. Make it run — next
+## 7. Make it run — in progress
+
+`python -m tools.live.run` — see [running-overnight.md](running-overnight.md) for
+the Windows settings that stop the machine sleeping.
 
 Everything above is a batch tool. The next stage is the smallest thing that
 turns it into a system that is actually watching:
