@@ -339,9 +339,12 @@ def _with_alternations(place: Place) -> Place:
 LANDMARKS = [
     _p("Конча-Заспа", "city", "конча-заспа", "кончі-заспі", "заспа", "заспі"),
     _p("Нижні Сади", "city", "нижні сади", "нижних сад", "нижні сад"),
-    _p("ТЕЦ-5", "city", "тец-5", "тец5", landmark=True),          # Голосіїв
-    _p("ТЕЦ-6", "city", "тец-6", "тец6", landmark=True),          # Троєщина
-    _p("ТЕЦ-2", "city", "тец-2", "тец2", landmark=True),          # Дарниця
+    # `kievinform_ua1` writes "ТЕЦ 5" with a space, `mon1tor_ua` writes "ТЕЦ-5".
+    # Six occurrences went missing on the space form alone — including the one
+    # sixteen seconds before the message the user came looking for.
+    _p("ТЕЦ-5", "city", "тец-5", "тец 5", "тец5", landmark=True),   # Голосіїв
+    _p("ТЕЦ-6", "city", "тец-6", "тец 6", "тец6", landmark=True),   # Троєщина
+    _p("ТЕЦ-2", "city", "тец-2", "тец 2", "тец2", landmark=True),   # Дарниця
     _p("ТЦ Проспект", "city", "тц проспект", landmark=True),
     _p("Видубичі", "city", "видубич"),
     _p("Залісся", "oblast", "залісся"),

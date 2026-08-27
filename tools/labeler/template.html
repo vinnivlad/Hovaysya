@@ -118,6 +118,11 @@
   /* Inherited from the feed, not stated in the message. Dashed, so a guess
      never looks like something the channel actually said. */
   .tag.inherited { border-style: dashed; opacity: .75; }
+  .gap {
+    text-align: center; font-size: 11px; color: var(--faint);
+    padding: 3px 0; cursor: pointer; letter-spacing: .3px;
+  }
+  .gap:hover { color: var(--soft); }
   .tag.mod-aftermath { color: #c98ad6; border-color: #6a5f8a; }
   .tag.mod-non-threat { color: var(--faint); }
   /* form */
@@ -462,6 +467,27 @@ function visibleMessages() {
   const f = FILTERS[filterIx].test;
   return nightMessages().filter(f);
 }
+
+// How many messages the filter dropped immediately before each visible one.
+//
+// The user found two separate filter bugs by noticing a reply whose quoted
+// parent was nowhere on the page — twice, because a gap in the feed looks
+// exactly like a quiet minute. It should not take a dangling quotation to see
+// that something was left out.
+function hiddenRuns() {
+  const f = FILTERS[filterIx].test;
+  const runs = new Map();
+  let n = 0, vi = 0;
+  for (const m of nightMessages()) {
+    if (f(m)) {
+      if (n) runs.set(vi, n);
+      n = 0;
+      vi++;
+    } else n++;
+  }
+  if (n) runs.set(vi, n);   // a run at the very end of the night
+  return runs;
+}
 function labelsForNight() {
   return labels.filter(l => l.night === nightId)
                .sort((a, b) => a.at.localeCompare(b.at));
@@ -564,7 +590,18 @@ function renderFeed() {
   document.getElementById("nightStat").textContent =
     `${msgs.length} з ${nightMessages().length} · ${labelsForNight().length} міток`;
 
+  const runs = hiddenRuns();
+  const gapRow = n => {
+    const g = document.createElement("div");
+    g.className = "gap";
+    g.textContent = `— ${n} ${n === 1 ? "повідомлення" : "повідомлень"} приховано фільтром —`;
+    g.title = "показати все";
+    g.onclick = () => { filterIx = FILTERS.length - 1; selIx = -1; draft = null; renderAll(); };
+    rows.appendChild(g);
+  };
+
   msgs.forEach((m, ix) => {
+    if (runs.has(ix)) gapRow(runs.get(ix));
     const near = eff(m) === "my-area" || eff(m) === "my-district";
     const lab = labelForMessage(m);
     const div = document.createElement("div");
@@ -632,6 +669,7 @@ function renderFeed() {
       rows.appendChild(bar);
     }
   });
+  if (runs.has(msgs.length)) gapRow(runs.get(msgs.length));
 }
 
 function selected() {

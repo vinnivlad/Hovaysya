@@ -781,3 +781,12 @@ def test_chabanka_is_not_chabany():
     user's."""
     assert resolve_scope("3х реактива у напрямку Південний порт / Чабанка") == "elsewhere"
     assert resolve_scope("На Чабани, Гатне") == "my-area"
+
+
+def test_a_plant_written_with_a_space_is_the_same_plant():
+    """`kievinform_ua1` writes "ТЕЦ 5", `mon1tor_ua` writes "ТЕЦ-5". Six
+    occurrences went missing on the space form — one of them sixteen seconds
+    before the message the user came looking for."""
+    assert resolve_scope("ТЕЦ 5") == "city"
+    assert resolve_scope("ТЕЦ 6✈️") == "city"
+    assert resolve_scope("Черкаську ТЕЦ 5 і Сади") == "elsewhere"

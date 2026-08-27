@@ -307,3 +307,16 @@ def test_a_stated_scope_is_never_overridden_by_an_inherited_one():
     src = (Path(__file__).resolve().parents[1] / "labeler" / "template.html"
            ).read_text(encoding="utf-8")
     assert 'const eff = m => (m.s === "unknown" && m.isc) ? m.isc : m.s;' in src
+
+
+def test_the_feed_says_when_the_filter_dropped_something():
+    """Twice the user found a filter bug by noticing a reply whose quoted parent
+    was nowhere on the page, because a gap in the feed looks exactly like a quiet
+    minute. Between 01:10 and 01:19 on 2026-08-04 the near view drops 34
+    messages in a row."""
+    src = (Path(__file__).resolve().parents[1] / "labeler" / "template.html"
+           ).read_text(encoding="utf-8")
+    assert "function hiddenRuns()" in src
+    assert "if (runs.has(ix)) gapRow(runs.get(ix));" in src
+    # A run at the very end of the night has no following row to hang on.
+    assert "if (runs.has(msgs.length)) gapRow(runs.get(msgs.length));" in src
