@@ -379,3 +379,28 @@ But **sweeping the near refractory against the labels does not confirm 180 s**:
 Total error is flat, and false wake-ups are the headline metric, so 360 stays.
 The label-to-label gaps and the policy's own alert timeline are not the same
 series — which is the reason to sweep rather than to trust a fit.
+
+### The ring re-arm is not decidable from two nights
+
+Two rulings the user gave outright, on the same shape:
+
+| night | gap since the last alert | his ruling |
+| --- | --- | --- |
+| 2026-08-04 00:31, 00:32 | 78 s, 108 s | «близько», wake me |
+| 2026-08-26 03:03, 03:27 | 178 s, 155 s | "все одно не треба повідомляти" |
+
+**No time threshold satisfies both**, and the features that looked like they
+might were each tested and each failed:
+
+- *Was the previous alert itself about the ring?* Backwards — the 08-04 wakes
+  followed a ring alert, the 08-26 silences followed a city-level one.
+- *Was a launch announced inside the gap?* True in all four.
+- *Is the ring name part of a path sweep across the city?* Measured as "distinct
+  non-ring Kyiv districts named in the previous 60 s": 08-26 gives 2 and 2, but
+  08-04 gives 2, 2 and 1. Identical.
+- *Message form* — caps, 🚀, bare toponym: mixed on both sides.
+
+So `RING_REARM_S` stays at the 08-04 fit, which is where he was emphatic
+("прям близько, треба повідомлення"), at the cost of two false wake-ups on
+08-26, where he was mild. A third labelled night with a ballistic wave over the
+ring breaks the tie; until then this is the honest state, not a solved problem.

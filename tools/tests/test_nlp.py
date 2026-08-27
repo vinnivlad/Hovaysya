@@ -592,6 +592,9 @@ def test_the_ring_holds_exactly_what_was_ruled_in():
     assert {p.name for p in MY_AREA} == {
         "Жуляни", "Вишневе", "Борщагівка", "Солом'янка", "Деміївка",
         "Іподром", "Гатне", "Теремки", "Крюківщина",
+        # Ruled in later, on his instruction: it contains Демiївка, and two
+        # misses in the dense night were `Голос🚀` and `Голос✈️`.
+        "Голосіїв",
     }
 
 
@@ -795,7 +798,7 @@ def test_a_plant_written_with_a_space_is_the_same_plant():
 def test_the_channels_own_abbreviations_resolve():
     """`kievinform_ua1` writes districts the way a person shouts them —
     "Хотів - Голос - Солома в укриття"."""
-    assert resolve_scope("Голос✈️") == "city"
+    assert resolve_scope("Голос✈️") == "my-area"
     assert resolve_scope("Хотів - Голос - Солома в укриття") == "my-area"
     assert resolve_scope("Феофанія✈️") == "city"
     assert resolve_scope("Рембаза") == "city"
@@ -819,3 +822,28 @@ def test_launch_origins_come_from_the_gazetteer():
     assert hints.nationwide("‼️ Вихід балістики з Брянська")
     # ...and a stated target is still not country-wide.
     assert not hints.nationwide("❗️Балістична ракета на Запоріжжя!")
+
+
+def test_every_place_appears_once():
+    """Two entries sharing a name is worse than a missing stem: `find_places`
+    keeps the first it resolves and the duplicate's flags are silently dropped.
+    That is why a launch "з Курська" was not a launch origin — the marked entry
+    lost to an older unmarked one with the same name."""
+    from collections import Counter
+
+    from tools.nlp.gazetteer import PLACES
+
+    dupes = {n: c for n, c in Counter(p.name for p in PLACES).items() if c > 1}
+    assert not dupes, dupes
+
+
+def test_kursk_and_bryansk_are_launch_origins_in_every_form():
+    """The channels write both the oblast and the city: "з Курської області",
+    "☄ Вихід Курськ", "Пуски балістичних ракет з Брянської області"."""
+    from tools.nlp.gazetteer import launch_origins
+
+    assert {"Курщина", "Брянщина", "Крим", "російські аеродроми"} <= launch_origins()
+    for text in ("❗️❗️❗️Пуски балістичних ракет з Брянської області.",
+                 "‼️ Вихід балістики з Брянська. Уважно",
+                 "❗️❗Загроза пуску балістичних ракет з Курської області."):
+        assert hints.nationwide(text), text

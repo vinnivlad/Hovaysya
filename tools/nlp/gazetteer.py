@@ -87,6 +87,14 @@ MY_AREA = [
     _p("Деміївка", "my-area", "деміїв"),
     _p("Іподром", "my-area", "іподром"),
     _p("Гатне", "my-area", "гатне"),
+    # Moved up from `city` on his instruction — "переведи Голосіїв у близьке,
+    # нехай буде". Deміївка was already in the ring and Holosiiv contains it,
+    # and two misses in the dense night were `Голос🚀` and `Голос✈️`.
+    # `Голос` is how kievinform_ua1 writes it: "Хотів - Голос - Солома в
+    # укриття". Safe as a stem — the word-start check blocks it inside
+    # "оголосити" and "проголосували", and "голосно"/"голосування" do not occur
+    # once in 4.5 months of these channels.
+    _p("Голосіїв", "my-area", "голосіїв", "голосієв", "голос"),
     _p("Теремки", "my-area", "теремк"),
     # Inferred, not ruled: woken for once ("реактив на Крюківщину/Борщагівки"),
     # marked far once. Left in pending a decision.
@@ -117,7 +125,6 @@ CITY = [
     # "оголосити" and "проголосували", which is where the risk would be.
     # "голосно" and "голосування" would match, and do not occur once in 4.5
     # months of these channels; "Голос" meaning Holosiiv occurs six times.
-    _p("Голосіїв", "city", "голосіїв", "голосієв", "голос"),
     _p("Феофанія", "city", "феофан"),
     _p("Звіринець", "city", "звіринец", "звіринц"),
     _p("Рембаза", "city", "рембаз"),
@@ -242,8 +249,6 @@ ELSEWHERE = [
     # from Russia read as a threat over Kyiv.
     _p("Воронежчина", "elsewhere", "вороне", origin=True),
     _p("Орловщина", "elsewhere", "орловськ", "орловщин", "орла", "орлі", origin=True),
-    _p("Брянщина", "elsewhere", "брянщин", origin=True),
-    _p("Курщина", "elsewhere", "курщин", origin=True),
     _p("Смоленщина", "elsewhere", "смоленськ", "смоленщин", "шаталово", origin=True),
     _p("Ростовщина", "elsewhere", "ростов", "таганрог", origin=True),
     _p("Білгородщина", "elsewhere", "бєлгород", "білгород", origin=True),
@@ -306,10 +311,10 @@ ELSEWHERE = [
     _p("Синельникове", "elsewhere", "синельников"),
     _p("Кривий Ріг", "elsewhere", "кривий ріг", "кривого рог", "кривим рог",
        "кривом", "криворіж", "криворізьк"),
-    _p("Крим", "elsewhere", "крим", "криму"),
     _p("Ізмаїл", "elsewhere", "ізмаїл"),
-    _p("Брянщина", "elsewhere", "брянськ", "брянсько"),
-    _p("Курщина", "elsewhere", "курськ", "курсько"),
+    _p("Брянщина", "elsewhere", "брянськ", "брянсько", "брянщин", origin=True),
+    _p("Курщина", "elsewhere", "курськ", "курсько", "курщин", origin=True),
+    _p("Крим", "elsewhere", "крим", "криму", origin=True),
     # Russian airfields, named in launch-origin and takeoff reports. Listed so
     # they resolve as elsewhere instead of being mistaken for Ukrainian places:
     # `аеродрому "Українка"` is in Amur oblast, and without the longer stem it
@@ -319,7 +324,7 @@ ELSEWHERE = [
        "саваслейк", "оленья", "оленя", "енгельс", "дягілев", "дягілєв",
        "шайковк", "міллеров", "ахтубінськ", "ахтубинськ", "таганрог",
        "приморсько-ахтарськ", "приморсько ахтарськ", "гвардійськ",
-       "балбасов", "мозир", "рязан", "морозовськ", "мілитопол"),
+       "балбасов", "мозир", "рязан", "морозовськ", "мілитопол", origin=True),
 ]
 
 def _with_alternations(place: Place) -> Place:
