@@ -43,13 +43,13 @@ rewriting, and so a diff shows exactly which labels changed.
 | `at` | ISO 8601 UTC | yes | The decision moment. |
 | `decision` | enum | yes | `notify` \| `silent` |
 | `level` | enum | if `notify` | `info` \| `alert` \| `shelter` — how insistent |
-| `alarm` | enum | if `notify` | `ballistic` \| `mig` \| `cruise` \| `drone-jet` \| `drone` \| `recon` \| `none` — which sound |
+| `alarm` | enum | if `notify` | `ballistic` \| `mig` \| `cruise` \| `drone-jet` \| `drone` \| `recon` \| `clear` \| `none` — which sound |
 | `silent_reason` | enum | if `silent` | why no notification was warranted |
 | `threat` | enum | yes | what is flying |
 | `modality` | enum | yes | live threat, aftermath, summary, or social |
 | `scope` | enum | yes | how close it is to me |
 | `certainty` | enum | yes | how well its position is known |
-| `repeat_of` | string \| null | yes | id of the earlier label this repeats, or `null` |
+| `repeat_of` | string \| null | yes | the earlier label whose episode this one continues or closes, or `null` |
 | `evidence` | array | yes | the messages that justify this label |
 | `why` | string | for `notify` | one line, in your own words |
 | `open_question` | string \| null | no | anything you were unsure about |
@@ -76,7 +76,7 @@ each other and get applied inconsistently. So insistence and sound are separate.
 | `alert` | sound, wakes you, does not repeat | a real threat to the city that is not near you yet |
 | `shelter` | loud, repeating, full-screen | act now — near you, or ballistic anywhere over Kyiv |
 
-**`alarm` — which sound:** `ballistic` · `mig` · `cruise` · `drone-jet` · `drone` · `recon` · `none`
+**`alarm` — which sound:** `ballistic` · `mig` · `cruise` · `drone-jet` · `drone` · `recon` · `clear` · `none`
 
 The point of separating sound from loudness is that **you should know what is
 coming without opening your eyes.** Ballistic must not sound like a drone: woken
@@ -113,6 +113,26 @@ launch may be an hour away, or may never come; a propeller Shahed leaves
 minutes; a jet Shahed far less; ballistic none. Sharing a tone across those
 would defeat the point of separate sounds, which is knowing what is coming
 before opening your eyes.
+
+### `clear` — the all-clear is a notification too
+
+Knowing the alert ended matters as much as knowing it began: after taking
+shelter you need to be told you can come out. The all-clear has its own sound —
+calm and unmistakable, nothing like a threat tone — and the labeler pre-fills a
+`clear` alert-state message as `notify / alert / clear`.
+
+**It is unconditional, and that follows from a policy rule worth stating
+outright: an alert declaration always notifies.** So by the time an all-clear
+arrives, the user has already been woken by the declaration; there is no case
+where the all-clear is the thing that disturbs them.
+
+An earlier draft of this section made the all-clear's level conditional on
+whether the episode had produced a notification, which would have required the
+labeler to track episode state. The premise above removes the case entirely, and
+with it that complexity.
+
+The two siren messages are therefore both audible: the declaration because it
+needs a reaction, the all-clear because coming out of shelter needs one too.
 
 ### `mig` — a carrier, not a missile
 

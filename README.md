@@ -19,6 +19,8 @@ lives in unstructured Telegram text. The gap this project closes:
 2. No repeat signal for a second ballistic wave during an ongoing alert.
 3. Drone danger scoped to the whole city rather than a neighborhood.
 4. Several channels to watch manually instead of one merged feed.
+5. No signal that the alert has ended — after taking shelter, knowing you can
+   come out matters as much as knowing you had to go.
 
 ## Design in one picture
 
