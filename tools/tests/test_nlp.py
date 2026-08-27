@@ -124,13 +124,21 @@ def test_no_threat_words_means_none():
     assert hints.threat_hint("Дякую вам за підтримку") == "none"
 
 
-def test_alarm_mapping_separates_the_three_sounds():
+def test_alarm_mapping_gives_each_reaction_class_its_own_sound():
     assert hints.alarm_for("ballistic") == "ballistic"
+    assert hints.alarm_for("mig") == "mig"
     assert hints.alarm_for("cruise") == "cruise"
     assert hints.alarm_for("kab") == "cruise"
-    assert hints.alarm_for("shahed") == "drone"
     assert hints.alarm_for("shahed-jet") == "drone-jet"
-    assert hints.alarm_for("aviation") == "aviation"
+    assert hints.alarm_for("shahed") == "drone"
+    assert hints.alarm_for("recon") == "recon"
+
+
+def test_other_aviation_has_no_sound():
+    """A bomber takeoff needs no reaction — the alert comes with the cruise
+    missiles it launches, and those are their own class. An audible channel for
+    it would only train the user to ignore the app."""
+    assert hints.alarm_for("aviation") == "none"
 
 
 # --- live shape -----------------------------------------------------------
@@ -397,3 +405,72 @@ def test_the_one_mined_typo_is_pinned():
     """Жушяни: Ш sits directly above Л on ЙЦУКЕН. One occurrence in 134 days,
     so it is pinned as an alias rather than matched fuzzily at runtime."""
     assert resolve_scope("Жушяни/Вишневе") == "my-area"
+
+
+# --- MiG-31K, and why other aviation is not a threat class ----------------
+
+
+def test_mig_takeoff_is_its_own_class():
+    """A MiG-31K in the air puts the whole country under alert because it can
+    launch a Kinzhal anywhere — and it sometimes lands without launching."""
+    for t in ("❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка. "
+              "МіГ-31К — носій аеробалістичної ракети",
+              "🛫Виліт другого винищувача МіГ-31К з аеродрому \"Саваслейка\".",
+              "⚪️Борти МіГ-31К розвернулись на аеродром базування."):
+        assert hints.threat_hint(t) == "mig", t
+        assert hints.alarm_for("mig") == "mig"
+
+
+def test_the_takeoff_boilerplate_does_not_read_as_ballistic():
+    """The channels' takeoff text says "носій аеробалістичної ракети" — a
+    ballistic pattern matches it even though nothing has been launched."""
+    t = "Виліт МіГ-31К. МіГ-31К⚠️ — носій аеробалістичної ракети Кинжал"
+    assert hints.threat_hint(t) == "mig"
+
+
+def test_a_launch_from_the_mig_is_ballistic_not_the_carrier():
+    t = "❗️⚠️❗Пуск аеробалістичної ракети \"Кинджал\" з винищувача МіГ-31К."
+    assert hints.threat_hint(t) == "ballistic"
+
+
+def test_mig_is_nationwide_even_with_no_local_geography():
+    """The takeoff names a Russian airfield and no Ukrainian target, so a purely
+    geographic filter would hide the one signal that alerts the whole country."""
+    t = "Виліт винищувача МіГ-31К з аеродрому Саваслейка."
+    assert not is_relevant(t)
+    assert hints.nationwide(t)
+
+
+def test_bomber_takeoff_is_not_a_threat_class():
+    """It happens long before any alert and the airfield is far away. The alert
+    arrives with the cruise missiles it launches, which are their own class."""
+    for t in ("⚠️Виліт бомбардувальника Ту-95МС з аеродрому \"Оленья\", курс поки не відомий.",
+              "🔴Очікуємо на вильоти бомбардувальників Ту-95МС/Ту-160/Ту-22М3 протягом ночі.",
+              "В повітрі є 2 бомбардувальники Ту-22М3, зараз прямої загрози немає"):
+        assert hints.threat_hint(t) == "aviation", t
+        assert hints.alarm_for("aviation") == "none"
+        assert not hints.nationwide(t)
+
+
+def test_russian_airfield_is_not_a_ukrainian_town():
+    """`аеродрому "Українка"` is in Amur oblast. It resolved as Ukrainka in Kyiv
+    oblast and passed the relevance filter until multi-word stems could match
+    across collapsed whitespace."""
+    t = "Виліт бомбардувальників Ту-160 з аеродрому \"Українка\"."
+    assert resolve_scope(t) == "elsewhere"
+    assert not is_relevant(t)
+
+
+def test_the_town_of_ukrainka_still_resolves():
+    assert resolve_scope("⚠️1 шахед на Українку") == "oblast"
+
+
+def test_whitespace_between_multiword_stems_is_collapsed():
+    """Punctuation becomes a space, so two spaces could appear mid-stem."""
+    assert resolve_scope("курсом на Велика   Димерка") == "oblast"
+    assert resolve_scope("на  Білу   Церкву") == "oblast"
+
+
+def test_takeoff_is_probable_not_confirmed():
+    t = "⚠️Виліт бомбардувальника Ту-95МС з аеродрому \"Оленья\", курс поки не відомий."
+    assert hints.certainty_hint(t) == "probable"

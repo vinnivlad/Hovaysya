@@ -170,9 +170,9 @@ dependencies. Open it, work a night, press **Експорт JSONL**, and save th
 download over `labels/moments.jsonl`.
 
 Every field is a row of clickable options — nothing is a dropdown, and nothing
-requires the keyboard. Threat type is five buttons ordered by urgency
-(розвідник / дрон / реактивний дрон / ракета / балістика), and the notification
-sound follows the type automatically unless you override it.
+requires the keyboard. Threat type is six buttons ordered by how little time each leaves
+(розвідник / МіГ-31К / дрон / реактивний дрон / ракета / балістика), and the
+notification sound follows the type automatically unless you override it.
 
 Keyboard shortcuts exist as a bonus, not a requirement: `j`/`k` move, `n` notify,
 `s` silent, `1`/`2`/`3` level, `Enter` save, `x` delete, `f` cycle filter,

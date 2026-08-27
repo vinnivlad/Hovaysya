@@ -26,7 +26,11 @@ THREAT_RULES: tuple[tuple[str, str], ...] = (
     ("cruise", r"крилат|калібр|х-?101|х-?59|х-?55|бандерол|\bкр\b|\bкрів\b"),
     ("shahed-jet", r"реактивн"),
     ("kab", r"\bкаб\b|\bкар\b|керован(а|их|ої)\s+авіабомб"),
-    ("aviation", r"тактичн\w*\s+авіаці|міг-?31|су-?34|ту-?95|ворожий борт|\bборт(и|ів)\b"),
+    # Any other aviation is not a threat class. A bomber taking off triggers no
+    # alert — the alert arrives with the cruise missiles it launches, and those
+    # have their own class. Kept only so such a message can still be typed.
+    ("aviation", r"тактичн\w*\s+авіаці|су-?34|ту-?\s?(95|160|22)|бомбардувальник|"
+                 r"стратегічн\w*\s+авіаці|ворожий борт|\bборт(и|ів)\b"),
     ("recon", r"розвідувальн|розвідник|гербер"),
     ("shahed", r"шахед|герань|мопед|\bбпла\b|дрон"),
     ("cruise", r"\bракет"),  # a bare "ракета" after the specific names failed
@@ -34,22 +38,43 @@ THREAT_RULES: tuple[tuple[str, str], ...] = (
 
 _THREAT = tuple((kind, re.compile(pat, re.IGNORECASE)) for kind, pat in THREAT_RULES)
 
+# A MiG-31K in the air is its own class: the whole country is alerted because it
+# can launch a Kinzhal anywhere, and it sometimes lands without launching.
+#
+# It cannot be a plain rule in the list above, because the channels' takeoff
+# boilerplate reads "МіГ-31К — носій аеробалістичної ракети", which any
+# ballistic pattern matches even though nothing has been launched. So the
+# carrier wins only when no launch is mentioned; once it is, the missile is
+# flying and the class is ballistic.
+_MIG = re.compile(r"м[іi]г-?\s?31", re.IGNORECASE)
+_LAUNCHED = re.compile(r"пуск|запуск|стартув|випустив|відпрац", re.IGNORECASE)
+
 # Four sounds, one per reaction class. A jet Shahed is several times faster than
 # a propeller one and leaves far less time, so it gets its own tone rather than
 # sharing the drone one — the point of separate sounds is knowing what is coming
 # before you open your eyes.
+# Six sounds, one per reaction class, ordered by how little time each leaves.
+# `aviation` deliberately has none: a bomber takeoff needs no reaction, so an
+# audible channel for it would only train the user to ignore the app.
 ALARM_FOR_THREAT = {
     "ballistic": "ballistic",
+    "mig": "mig",
     "cruise": "cruise",
     "kab": "cruise",
-    "shahed": "drone",
     "shahed-jet": "drone-jet",
-    "aviation": "aviation",
+    "shahed": "drone",
     "recon": "recon",
+    "aviation": "none",
     "mixed": "ballistic",
     "unknown": "drone",
     "none": "none",
 }
+
+# Threats whose alert is country-wide regardless of any place named. A MiG-31K
+# takeoff mentions a Russian airfield and no Ukrainian target, so a purely
+# geographic filter would drop it — yet it is exactly when the whole country is
+# put under alert.
+NATIONWIDE_THREATS = frozenset({"mig", "ballistic"})
 
 # Live threat is recognised by SHAPE, not by alarm words: these channels write
 # telegraphically ("1х Центр.", "Жуляни ✈️") with no "загроза" anywhere. Keying
@@ -113,6 +138,8 @@ def _low(text: str) -> str:
 
 def threat_hint(text: str) -> str:
     """Best guess at what is flying. `none` when nothing suggests a threat."""
+    if _MIG.search(text or "") and not _LAUNCHED.search(text or ""):
+        return "mig"
     for kind, rx in _THREAT:
         if rx.search(text or ""):
             return kind
@@ -121,6 +148,16 @@ def threat_hint(text: str) -> str:
 
 def alarm_for(threat: str) -> str:
     return ALARM_FOR_THREAT.get(threat, "drone")
+
+
+def nationwide(text: str) -> bool:
+    """True when the threat is country-wide however little geography is named.
+
+    Used alongside the geographic filter: dropping a MiG-31K takeoff because it
+    names only a Russian airfield would hide the one signal that puts the whole
+    country under alert.
+    """
+    return threat_hint(text) in NATIONWIDE_THREATS
 
 
 def live_shapes(text: str) -> list[str]:
@@ -267,7 +304,12 @@ def certainty_hint(text: str) -> str:
         return "lost"
     if any(t in low for t in RESOLUTION_CLOSING):
         return "clear"
-    if any(t in low for t in ("ймовірн", "попередньо", "уточнюємо", "вектор")):
+    # A takeoff is a possibility, not a fact: the corpus has
+    # "Борти МіГ-31К розвернулись на аеродром базування" as often as it has a
+    # launch, and "курс поки не відомий" says so outright.
+    if any(t in low for t in ("виліт", "вильот", "аеродром", "курс поки",
+                              "очікуємо", "готує", "ймовірн", "попередньо",
+                              "уточнюємо", "вектор")):
         return "probable"
     return "confirmed"
 

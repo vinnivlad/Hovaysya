@@ -43,7 +43,7 @@ rewriting, and so a diff shows exactly which labels changed.
 | `at` | ISO 8601 UTC | yes | The decision moment. |
 | `decision` | enum | yes | `notify` \| `silent` |
 | `level` | enum | if `notify` | `info` \| `alert` \| `shelter` — how insistent |
-| `alarm` | enum | if `notify` | `ballistic` \| `cruise` \| `drone-jet` \| `drone` \| `recon` \| `aviation` — which sound |
+| `alarm` | enum | if `notify` | `ballistic` \| `mig` \| `cruise` \| `drone-jet` \| `drone` \| `recon` \| `none` — which sound |
 | `silent_reason` | enum | if `silent` | why no notification was warranted |
 | `threat` | enum | yes | what is flying |
 | `modality` | enum | yes | live threat, aftermath, summary, or social |
@@ -76,7 +76,7 @@ each other and get applied inconsistently. So insistence and sound are separate.
 | `alert` | sound, wakes you, does not repeat | a real threat to the city that is not near you yet |
 | `shelter` | loud, repeating, full-screen | act now — near you, or ballistic anywhere over Kyiv |
 
-**`alarm` — which sound:** `ballistic` · `cruise` · `drone-jet` · `drone` · `recon` · `aviation`
+**`alarm` — which sound:** `ballistic` · `mig` · `cruise` · `drone-jet` · `drone` · `recon` · `none`
 
 The point of separating sound from loudness is that **you should know what is
 coming without opening your eyes.** Ballistic must not sound like a drone: woken
@@ -84,7 +84,7 @@ by the first, you get up immediately; by the second, you can look at the screen
 first. That is the real difference in response, and it is not a difference of
 volume.
 
-On Android this is 5 sounds x 2 audible levels = 10 notification channels, plus
+On Android this is 6 sounds x 2 audible levels = 12 notification channels, plus
 one silent channel for the persistent status. Volume is adjustable per channel,
 so a barely-there recon tone and a maximum-volume ballistic tone are one setting
 each.
@@ -94,24 +94,58 @@ Mapping from `threat` to `alarm`:
 | threat | alarm |
 | --- | --- |
 | `ballistic` | `ballistic` |
+| `mig` | `mig` |
 | `cruise`, `kab` | `cruise` |
 | `shahed-jet` | `drone-jet` |
 | `shahed` | `drone` |
 | `recon` | `recon` |
-| `aviation` | `aviation` |
+| `aviation` | `none` |
 | `mixed` | the most severe class present |
 
-The five sounds map one-to-one onto the five reaction classes, which is how the
-labeler presents them, ordered by urgency:
+Six sounds map one-to-one onto the six reaction classes, which is how the
+labeler presents them, ordered by how little time each leaves:
 
-**розвідник → дрон → реактивний дрон → ракета → балістика**
+**розвідник → МіГ-31К → дрон → реактивний дрон → ракета → балістика**
 
 Each gets its own tone because each implies a different response. A recon drone
-is information, a propeller Shahed leaves minutes, a jet Shahed leaves far less,
-and ballistic leaves none. Sharing a tone across those would defeat the point of
-separate sounds, which is knowing what is coming before opening your eyes. The
-rarer types (`kab`, `aviation`, `mixed`, `unknown`) sit behind a secondary row in
-the labeler and fold into the nearest sound.
+is information; a MiG-31K in the air means the whole country is alerted but the
+launch may be an hour away, or may never come; a propeller Shahed leaves
+minutes; a jet Shahed far less; ballistic none. Sharing a tone across those
+would defeat the point of separate sounds, which is knowing what is coming
+before opening your eyes.
+
+### `mig` — a carrier, not a missile
+
+A MiG-31K carries the Kinzhal, an aeroballistic missile it can release anywhere
+along its route, so its takeoff alone triggers a country-wide alert. It also
+sometimes lands without launching — the corpus has
+`Борти МіГ-31К розвернулись на аеродром базування` about as often as it has a
+launch. That combination — nationwide, uncertain, potentially ballistic — is
+unlike anything else, which is why it is a class of its own.
+
+Two consequences the implementation has to respect:
+
+- **The takeoff boilerplate is not a launch.** The channels write
+  `МіГ-31К — носій аеробалістичної ракети`, which any ballistic pattern matches
+  even though nothing is flying. The carrier class wins only while no launch is
+  mentioned; `Пуск Кинджалу з МіГ-31К` is `ballistic`.
+- **It is nationwide with no local geography.** A takeoff names a Russian
+  airfield and no Ukrainian target, so the geographic filter alone would hide
+  it. `hints.nationwide()` keeps `mig` and `ballistic` visible regardless of
+  scope.
+
+### `aviation` — deliberately no sound
+
+Bombers taking off (Ту-95, Ту-160, Ту-22М3) trigger no alert. It happens long
+before one, from airfields thousands of kilometres away, and the channels say so
+themselves: `В повітрі є 2 бомбардувальники Ту-22М3, зараз прямої загрози немає`.
+The alert arrives with the cruise missiles they launch, and those are already
+their own class.
+
+So `aviation` exists only so such a message can be typed while labeling the
+moment `silent / insufficient` — "the app was right to wait". It maps to no
+sound, because an audible channel for it would only train the user to ignore the
+app.
 
 Ballistic is always at least `shelter` city-wide: flight time is minutes, so
 there is no room for geography.
@@ -137,8 +171,11 @@ would be waste.
 
 ### `threat`
 
-`shahed` · `shahed-jet` · `cruise` · `ballistic` · `kab` · `aviation` ·
-`recon` · `mixed` · `unknown` · `none`
+`recon` · `mig` · `shahed` · `shahed-jet` · `cruise` · `ballistic` · `kab` ·
+`aviation` · `mixed` · `unknown` · `none`
+
+The first six are the labeler's primary row, ordered by how little time each
+leaves. The rest sit behind a secondary row.
 
 `shahed` and `shahed-jet` are separate on purpose. A jet-powered Shahed
 (`реактивний`) is several times faster than a propeller one and appears in 1 511

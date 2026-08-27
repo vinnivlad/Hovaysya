@@ -153,7 +153,9 @@ OBLAST = [
     _p("Баришівка", "oblast", "баришівк"),
     _p("Макарів", "oblast", "макарів"),
     _p("Боярка", "oblast", "боярк"),
-    _p("Українка", "oblast", "українка", "українці"),
+    # Prefix, not full forms: the accusative is Українку. Dropping "українц"
+    # on purpose — it would match "українців" in ordinary prose.
+    _p("Українка", "oblast", "українк"),
     _p("Димер", "oblast", "димер"),
     _p("Велика Димерка", "oblast", "велика димерк", "великої димерк"),
     _p("Погреби", "oblast", "погреб"),
@@ -192,6 +194,16 @@ ELSEWHERE = [
     _p("Ізмаїл", "elsewhere", "ізмаїл"),
     _p("Брянщина", "elsewhere", "брянськ", "брянсько"),
     _p("Курщина", "elsewhere", "курськ", "курсько"),
+    # Russian airfields, named in launch-origin and takeoff reports. Listed so
+    # they resolve as elsewhere instead of being mistaken for Ukrainian places:
+    # `аеродрому "Українка"` is in Amur oblast, and without the longer stem it
+    # matched Ukrainka in Kyiv oblast and passed the relevance filter.
+    _p("російські аеродроми", "elsewhere",
+       "аеродрому українка", "аеродром українка",
+       "саваслейк", "оленья", "оленя", "енгельс", "дягілев", "дягілєв",
+       "шайковк", "міллеров", "ахтубінськ", "ахтубинськ", "таганрог",
+       "приморсько-ахтарськ", "приморсько ахтарськ", "гвардійськ",
+       "балбасов", "мозир", "рязан", "морозовськ", "мілитопол"),
 ]
 
 def _with_alternations(place: Place) -> Place:
@@ -239,8 +251,15 @@ _WORDISH = re.compile(r"[^а-яіїєґёa-z0-9'\- ]+", re.IGNORECASE)
 # naming Solomianka — and plenty of people type none at all. Deleting collapses
 # `Солом'янка`, `Солом’янка`, `Соломʼянка` and `Соломянка` into one string.
 def _flatten(text: str) -> str:
-    """Lowercase, drop apostrophes, and strip punctuation."""
-    return _WORDISH.sub(" ", _strip_apostrophes(text).lower())
+    """Lowercase, drop apostrophes, strip punctuation, collapse whitespace.
+
+    Collapsing matters for every multi-word stem: punctuation becomes a space,
+    so `з аеродрому "Українка"` flattened to two spaces between the words and
+    the stem `аеродрому українка` could never match — leaving a Russian
+    airfield resolving as Ukrainka in Kyiv oblast, which then passed the
+    relevance filter.
+    """
+    return re.sub(r"\s+", " ", _WORDISH.sub(" ", _strip_apostrophes(text).lower()))
 
 
 _WORDCHAR = re.compile(r"[а-яіїєґёa-z0-9'\-]", re.IGNORECASE)

@@ -111,6 +111,9 @@ def load_messages(conn: sqlite3.Connection, since: str | None) -> list[dict]:
                 "q": row["reply_text"] or "",
                 "r": row["reply_to"],
                 "s": resolve_scope(text),
+                # A MiG-31K takeoff names a Russian airfield and no Ukrainian
+                # target, so the geographic filter alone would hide it.
+                "nw": hints.nationwide(text),
                 "m": guess["modality"],
                 "th": guess["threat"],
                 "al": guess["alarm"],

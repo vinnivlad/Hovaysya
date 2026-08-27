@@ -206,27 +206,31 @@
 const DATA = JSON.parse(document.getElementById("payload").textContent);
 const STORE_KEY = "hovaysya-labels-v1";
 
+// `nw` keeps country-wide threats visible: a MiG-31K takeoff names a Russian
+// airfield and no local target, yet it is when the whole country is alerted.
 const FILTERS = [
-  { id: "near",     name: "поруч зі мною", test: m => m.s === "my-area" || m.s === "my-district" },
-  { id: "relevant", name: "Київ і область", test: m => ["my-area","my-district","city","oblast"].includes(m.s) },
-  { id: "all",      name: "усе",            test: () => true },
+  { id: "near",     name: "поруч зі мною + вся країна",
+    test: m => m.nw || m.s === "my-area" || m.s === "my-district" },
+  { id: "relevant", name: "Київ, область + вся країна",
+    test: m => m.nw || ["my-area","my-district","city","oblast"].includes(m.s) },
+  { id: "all",      name: "усе", test: () => true },
 ];
 
 const LEVELS = ["info", "alert", "shelter"];
-const ALARMS = ["ballistic", "cruise", "drone-jet", "drone", "recon", "aviation"];
+const ALARMS = ["ballistic", "mig", "cruise", "drone-jet", "drone", "recon", "none"];
 const SILENT_REASONS = ["too-far", "already-notified", "resolved", "insufficient"];
 // Five primary types, ordered by how urgently they need a reaction, one sound
 // each. The rest sit behind a secondary row so the common case stays one row.
-const THREATS_MAIN = ["recon", "shahed", "shahed-jet", "cruise", "ballistic"];
+const THREATS_MAIN = ["recon", "mig", "shahed", "shahed-jet", "cruise", "ballistic"];
 const THREATS_MORE = ["kab", "aviation", "mixed", "unknown", "none"];
 const MODALITIES = ["live-threat", "aftermath", "summary-news", "non-threat"];
 const SCOPES = ["my-area", "my-district", "city", "oblast", "elsewhere", "unknown"];
 const CERTAINTIES = ["confirmed", "probable", "lost", "clear"];
 
 const ALARM_FOR = {
-  recon: "recon", shahed: "drone", "shahed-jet": "drone-jet",
+  recon: "recon", mig: "mig", shahed: "drone", "shahed-jet": "drone-jet",
   cruise: "cruise", ballistic: "ballistic", kab: "cruise",
-  aviation: "aviation", mixed: "ballistic", unknown: "drone", none: "none",
+  aviation: "none", mixed: "ballistic", unknown: "drone", none: "none",
 };
 
 // Ukrainian labels for clicking; stored values stay the schema's enums.
@@ -238,13 +242,20 @@ const UA = {
     shelter: "повторно, весь екран",
   },
   threat: {
-    recon: "розвідник", shahed: "дрон", "shahed-jet": "реактивний дрон",
-    cruise: "ракета", ballistic: "балістика", kab: "КАБ",
-    aviation: "авіація", mixed: "змішано", unknown: "невідомо", none: "нічого",
+    recon: "розвідник", mig: "МіГ-31К", shahed: "дрон",
+    "shahed-jet": "реактивний дрон", cruise: "ракета", ballistic: "балістика",
+    kab: "КАБ", aviation: "інша авіація", mixed: "змішано",
+    unknown: "невідомо", none: "нічого",
+  },
+  threatHint: {
+    recon: "не шкодить", mig: "тривога на всю країну", shahed: "хвилини",
+    "shahed-jet": "мало хвилин", cruise: "хвилини", ballistic: "часу немає",
+    aviation: "задовго до тривоги",
   },
   alarm: {
-    ballistic: "балістика", cruise: "ракета", "drone-jet": "реактивний",
-    drone: "дрон", recon: "розвідник", aviation: "авіація", none: "—",
+    ballistic: "балістика", mig: "МіГ", cruise: "ракета",
+    "drone-jet": "реактивний", drone: "дрон", recon: "розвідник",
+    aviation: "—", none: "без звуку",
   },
   silent_reason: {
     "too-far": "далеко від мене", "already-notified": "вже будив",
@@ -450,7 +461,7 @@ function renderForm() {
 
   const showMore = THREATS_MORE.indexOf(draft.threat) >= 0;
   html += `<div class="row"><label>що летить</label>` +
-    pick("threat", THREATS_MAIN, draft.threat) +
+    pick("threat", THREATS_MAIN, draft.threat, { subs: UA.threatHint }) +
     `<details class="more"${showMore ? " open" : ""}><summary>інше</summary>` +
     pick("threat", THREATS_MORE, draft.threat) + `</details></div>`;
 
