@@ -125,10 +125,13 @@ unlike anything else, which is why it is a class of its own.
 
 Two consequences the implementation has to respect:
 
-- **The takeoff boilerplate is not a launch.** The channels write
+- **The carrier and the missile are two states, and that is deliberate.**
+  `mig` while the aircraft is up, `ballistic` the moment a launch is mentioned —
+  after which nothing about the aircraft matters. The takeoff boilerplate reads
   `МіГ-31К — носій аеробалістичної ракети`, which any ballistic pattern matches
-  even though nothing is flying. The carrier class wins only while no launch is
-  mentioned; `Пуск Кинджалу з МіГ-31К` is `ballistic`.
+  even though nothing is flying, so the carrier state has to win until a launch
+  actually appears. Do not fold this into the ordered rule list to "simplify"
+  it; the two-state transition is the behaviour that is wanted.
 - **It is nationwide with no local geography.** A takeoff names a Russian
   airfield and no Ukrainian target, so the geographic filter alone would hide
   it. `hints.nationwide()` keeps `mig` and `ballistic` visible regardless of
