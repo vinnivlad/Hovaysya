@@ -153,6 +153,41 @@ app.
 Ballistic is always at least `shelter` city-wide: flight time is minutes, so
 there is no room for geography.
 
+### Impact reports — the question is not "is it about a hit"
+
+`threat` means **what is flying at this moment**, so an impact report is labeled
+by whether the wave is still running, not by the fact that something landed.
+Two cases that read alike and mean the opposite:
+
+**During a wave — the peak-danger moment, not `none`:**
+
+```
+💥Вибухи у Дніпрі, над містом чисто. / ⚠️Але на місто летить ще 1 реактивний шахед.
+```
+
+`вибух` messages sit a median of **1.8 minutes** from a live threat and 88% of
+them arrive within ten minutes of one. The wave is usually still in progress,
+often stated in the same message. `threat` is whatever is flying, and the
+decision is frequently `notify` — this is exactly when someone should be in
+shelter. Labeling it `none` would hide the most important moment of the night
+from the evaluation.
+
+**After the wave — genuinely `none`:**
+
+```
+У Голосіївському районі уламки БпЛА, пожежу ліквідовано
+```
+
+Consequence vocabulary sits **20-56 minutes** from a live threat. Nothing is
+flying: `threat: none`, `modality: aftermath`, `decision: silent`.
+
+So the question to ask is **"is anything still in the air?"** — and the channels
+answer it themselves: `над містом чисто` versus `Але летить ще 1`.
+
+In practice you rarely label aftermath at all: it is in the generated negative
+set, and your contribution there is five checks, once. When a post about fire
+crews or casualties comes up, skip it.
+
 ### `silent_reason`
 
 Only reasons that require **your judgement** are labeled by hand:
