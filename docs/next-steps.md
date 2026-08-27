@@ -1,6 +1,8 @@
 # Next steps
 
-Ordered by dependency. Item 1 is done; everything below it is not started.
+Ordered by dependency. Stages 1-3 are done; stage 4 is next.
+
+Visual status board: <https://claude.ai/code/artifact/a7a19c52-e4c8-4bad-9bf8-1c480dd8434c>
 
 ## 1. History export — done
 
@@ -15,7 +17,13 @@ is recognised by sentence shape rather than alarm words, jet Shaheds need their
 own class, reply chains are weaker evidence than they looked, and outcome
 vocabulary splits into a safe veto tier and an unsafe one.
 
-## 3. Label schema — fix before any labeling happens
+## 3. Label schema — done
+
+Frozen in [labeling-schema.md](labeling-schema.md). Labels land in
+`labels/moments.jsonl`, which is committed — unlike `data/`, human judgement is
+not re-derivable.
+
+What it settles:
 
 The decision the system makes is *notify or not, at a moment in time*, so labels
 are anchored to **moments, not messages**. A month is roughly 25-30 alert nights
