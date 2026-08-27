@@ -29,7 +29,11 @@ THREAT_RULES: tuple[tuple[str, str], ...] = (
     # Any other aviation is not a threat class. A bomber taking off triggers no
     # alert — the alert arrives with the cruise missiles it launches, and those
     # have their own class. Kept only so such a message can still be typed.
-    ("aviation", r"тактичн\w*\s+авіаці|су-?34|ту-?\s?(95|160|22)|бомбардувальник|"
+    # "Відбій авіаційної небезпеки" read as a FULL all-clear because no
+    # threat class matched "авіаційної" — so a partial lift announced the
+    # alert was over.
+    ("aviation", r"авіаці[йї]н\w*|тактичн\w*\s+авіаці|су-?34|"
+                 r"ту-?\s?(95|160|22)|бомбардувальник|"
                  r"стратегічн\w*\s+авіаці|ворожий борт|\bборт(и|ів)\b"),
     ("recon", r"розвідувальн|розвідник|гербер"),
     ("shahed", r"шахед|герань|мопед|\bбпла\b|дрон"),
