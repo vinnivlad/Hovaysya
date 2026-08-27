@@ -308,3 +308,52 @@ def test_a_donation_round_up_is_not_a_threat():
     ])
     r = play((0, t))
     assert levels(r) == [None]
+
+
+# --- per-class state, for the status line ---------------------------------
+
+
+def test_the_episode_remembers_which_classes_were_lifted():
+    """The user asked to know "що нема загрози балістики чи мігів" — the
+    persistent status is where that lives, so the state has to be kept."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    for off, text in ((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+                      (300, "❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка."),
+                      (900, "⚪️ Відбій загрози МіГ-31К.")):
+        o = observe(T0 + off, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+    assert tr.episode is not None
+    assert tr.episode.cleared == {"mig"}
+
+
+def test_a_class_named_flying_again_is_no_longer_lifted():
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    for off, text in ((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+                      (300, "⚪️По балістиці відбій."),
+                      (600, "❗️❗Є інформація про пуск балістичної ракети з Брянської області.")):
+        o = observe(T0 + off, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+    assert tr.episode is not None
+    assert "ballistic" not in tr.episode.cleared
+
+
+def test_a_full_all_clear_ends_the_episode_and_its_state():
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    for off, text in ((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+                      (300, "⚪️По балістиці відбій."),
+                      (600, "🟢 ВІДБІЙ ТРИВОГИ")):
+        o = observe(T0 + off, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+    assert tr.episode is None

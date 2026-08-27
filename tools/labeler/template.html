@@ -111,6 +111,7 @@
     border: 1px solid var(--line); color: var(--faint);
   }
   .tag.scope-my-area, .tag.scope-my-district { color: var(--near); border-color: var(--near); }
+  .tag.cleared { color: var(--done); border-color: var(--done); font-weight: 600; }
   .tag.toward { color: var(--urgent); border-color: var(--urgent); font-weight: 600; }
   .tag.away { color: var(--done); border-color: var(--done); }
   .tag.weak { color: var(--soft); border-style: dashed; }
@@ -327,6 +328,10 @@ const CERTAINTIES = ["confirmed", "probable", "lost", "clear"];
 // different decisions. Without this axis two labels on the same place look like
 // a contradiction when they are a real distinction.
 const HEADINGS = ["toward", "away", "loitering", "position", "unknown"];
+// Which class a partial all-clear lifts. Derived from the text, shown so it
+// can be corrected — never something to work out by hand.
+const CLEARED = ["ballistic", "mig", "cruise", "shahed-jet", "shahed",
+                 "aviation", "recon"];
 
 const ALARM_FOR = {
   recon: "recon", mig: "mig", shahed: "drone", "shahed-jet": "drone-jet",
@@ -550,6 +555,7 @@ function renderFeed() {
     tags += tag(m.s, "scope-" + m.s);
     if (m.m !== "live-threat") tags += tag(m.m, "mod-" + m.m);
     if (m.th !== "none") tags += tag(m.th);
+    if (m.cl) tags += tag("відбій: " + (UA.threat[m.cl] || m.cl), "cleared");
     if (m.hd === "toward") tags += tag("в мою сторону", "toward");
     else if (m.hd === "away") tags += tag("від мене", "away");
     if (m.st === "weak") tags += tag("weak", "weak");
@@ -649,6 +655,7 @@ function openDraft(decision) {
     scope: m.s === "unknown" && m.isc ? m.isc : m.s,
     certainty: m.ce,
     heading: m.hd,
+    cleared: m.cl || null,
     repeat_of: null,
     evidence: [{ channel: m.ch, message_id: m.id }],
     why: "",
@@ -772,6 +779,10 @@ function renderForm() {
          { tone: v => v === "aftermath" ? "muted" : "" }) + `</div>`;
   html += `<div class="row"><label>наскільки близько</label>` +
     pick("scope", SCOPES, draft.scope) + `</div>`;
+  if (m.cl || draft.cleared) {
+    html += `<div class="row"><label>по чому відбій</label>` +
+      pick("cleared", CLEARED, draft.cleared, { labels: UA.threat }) + `</div>`;
+  }
   html += `<div class="row"><label>куди рухається</label>` +
     pick("heading", HEADINGS, draft.heading) + `</div>`;
   html += `<div class="row"><label>певність</label>` +

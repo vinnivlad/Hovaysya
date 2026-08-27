@@ -657,3 +657,38 @@ def test_a_siren_reply_still_reads_as_a_siren_lexically():
     distinction lives in the policy, which is where the reply is known."""
     assert hints.alert_state("По ньому тривога") == "alert"
     assert hints.alert_state("По цих БПЛА тривога") == "alert"
+
+
+# --- which class a partial all-clear lifts ---------------------------------
+
+
+def test_the_lifted_class_is_derived_not_typed():
+    """Neither existing field can carry it: `threat` means what is in the air,
+    and the point of a partial clear is that this class no longer is."""
+    assert hints.cleared_class("⚪️ Відбій загрози МіГ-31К.") == "mig"
+    assert hints.cleared_class("⚪️По балістиці відбій.") == "ballistic"
+    assert hints.cleared_class("⚪️ Відбій загрози балістики.") == "ballistic"
+    assert hints.cleared_class("⚪️ Відбій авіаційної небезпеки.") == "aviation"
+
+
+def test_a_full_all_clear_lifts_no_particular_class():
+    assert hints.cleared_class("🟢 ВІДБІЙ ТРИВОГИ") is None
+    assert hints.cleared_class("Відбій, усім солодких снів 💕") is None
+
+
+def test_an_ordinary_threat_message_lifts_nothing():
+    assert hints.cleared_class("⚠️1 шахед на Жуляни") is None
+
+
+def test_a_pure_partial_clear_reports_nothing_flying():
+    """Answering `mig` would claim a MiG is up in the very message announcing
+    that it is not."""
+    s = hints.suggest("⚪️ Відбій загрози МіГ-31К.")
+    assert s["threat"] == "none"
+    assert s["cleared"] == "mig"
+
+
+def test_a_partial_clear_naming_another_class_reports_that_one():
+    s = hints.suggest("⚪️По балістиці відбій. / ⚠️2 шахеди на Чорноморськ/Одесу.")
+    assert s["threat"] == "shahed"
+    assert s["cleared"] == "ballistic"

@@ -50,6 +50,7 @@ rewriting, and so a diff shows exactly which labels changed.
 | `scope` | enum | yes | how close it is to me |
 | `certainty` | enum | yes | how well its position is known |
 | `heading` | enum | yes | which way it is going, relative to me |
+| `cleared` | enum \| null | no | which class a partial all-clear lifts |
 | `repeat_of` | string \| null | yes | the earlier label whose episode this one continues or closes, or `null` |
 | `evidence` | array | yes | the messages that justify this label |
 | `why` | string | for `notify` | one line, in your own words |
@@ -206,6 +207,22 @@ worse than hearing nothing, so the two cannot share a sound.
 
 They also do not close the episode, which is what makes the distinction matter:
 everything the night established stays in place.
+
+**Which class was lifted goes in `cleared`, not in `threat`.** `threat` means
+what is in the air, and the whole point of a partial clear is that this class no
+longer is — so putting it there would have the message announcing a MiG is up in
+the very sentence saying it is not. For the same reason a pure partial clear
+reports `threat: none`.
+
+Nothing has to be typed: the class named next to the all-clear word is the one
+being lifted, which is the same positional reading that finds what is *still*
+flying. The labeler pre-fills it and shows a "по чому відбій" row so it can be
+corrected.
+
+The tracker keeps the set of lifted classes on the open episode, and drops one
+as soon as that class is named flying again. That set is what the persistent
+status notification needs in order to answer the thing the user actually asked
+for — "було б гарно знати що нема загрози балістики чи мігів".
 
 `war_monitor` is where most of these come from — 12 to 33 a month against
 almost no declarations. For the policy that makes it the more informative

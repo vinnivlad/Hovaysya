@@ -112,6 +112,10 @@ class Episode:
     sent: list[Sent] = field(default_factory=list)
     # place name -> last time it was named near the user
     ring_seen: dict[str, int] = field(default_factory=dict)
+    # Classes reported lifted while this episode continues. The user asked to
+    # know "що нема загрози балістики чи мігів", and the persistent status
+    # notification is where that lives — so the state has to be kept.
+    cleared: set[str] = field(default_factory=set)
     last_live: int = 0
 
     @property
@@ -148,6 +152,7 @@ class Observation:
     nationwide: bool
     ring_places: tuple[str, ...]
     says_new: bool
+    cleared_class: str | None = None
     is_reply: bool = False
     partial_clear: bool = False
 
@@ -190,6 +195,7 @@ def observe(ts: int, text: str, is_reply: bool = False) -> Observation:
         says_new=_says_new(text),
         is_reply=is_reply,
         partial_clear=hints.partial_clear(text),
+        cleared_class=hints.cleared_class(text),
     )
 
 
@@ -331,8 +337,12 @@ class Tracker:
         # this flag and then silenced the city's, costing four misses.
         if obs.alert_state == "alert" and alarm == "alert":
             ep.alert_announced = True
+        if obs.cleared_class:
+            ep.cleared.add(obs.cleared_class)
         if obs.threat not in ("none", "unknown"):
             ep.threat = obs.threat
+            # Named again as flying: whatever was lifted is back.
+            ep.cleared.discard(obs.threat)
         if obs.says_new:
             ep.last_launch = obs.ts
         for place in obs.ring_places:

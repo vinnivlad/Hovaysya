@@ -174,6 +174,38 @@ def threat_hint(text: str) -> str:
     return "none"
 
 
+def cleared_class(text: str) -> str | None:
+    """Which threat class a partial all-clear lifts, or None.
+
+    "Відбій загрози МіГ-31К" lifts `mig`; "По балістиці відбій" lifts
+    `ballistic`. Nothing needs to be typed for this — the class named next to
+    the all-clear word is the one being lifted, which is the same positional
+    reading `active_threat` uses to find what is *still* flying.
+
+    It is worth recording separately because neither existing field can carry
+    it: `threat` means what is in the air, and the whole point of a partial
+    clear is that this class no longer is.
+    """
+    if not partial_clear(text):
+        return None
+    low = _low(text)
+    clear_at = min(
+        (low.find(t) for t in ALERT_CLEAR_TERMS if t in low), default=-1
+    )
+    if clear_at < 0:
+        return None
+    nearest, best = None, None
+    # `mig` is checked ahead of the rule list in `threat_hint`, so scanning only
+    # `_THREAT` never finds it — and "Відбій загрози МіГ-31К" is the commonest
+    # partial clear there is.
+    for kind, rx in ((("mig", _MIG),) + _THREAT):
+        for m in rx.finditer(text):
+            dist = abs(m.start() - clear_at)
+            if best is None or dist < best:
+                nearest, best = kind, dist
+    return nearest
+
+
 def active_threat(text: str) -> str:
     """The threat that is still flying, ignoring one that was just called off.
 
@@ -200,17 +232,19 @@ def active_threat(text: str) -> str:
     # "По балістиці відбій. / 2 шахеди на Одесу" both classes sit within a
     # couple of dozen characters of it.
     found: list[tuple[int, str]] = []
-    for kind, rx in _THREAT:
+    for kind, rx in ((("mig", _MIG),) + _THREAT):
         for m in rx.finditer(text):
             found.append((abs(m.start() - clear_at), kind))
-    if len(found) < 2:
+    if not found:
         return threat_hint(text)
     found.sort()
     lifted = found[0][1]
     for _dist, kind in found:
         if kind != lifted:
             return kind
-    return threat_hint(text)
+    # Only the lifted class is named, so nothing is stated as flying. Saying
+    # `mig` here would claim a MiG is up in the message announcing it is not.
+    return "none"
 
 
 def alarm_for(threat: str) -> str:
@@ -600,6 +634,7 @@ def suggest(text: str) -> dict[str, object]:
         "strength": live_strength(text),
         "alarm": alarm,
         "heading": heading(text),
+        "cleared": cleared_class(text),
         "modality": modality_hint(text),
         "certainty": certainty_hint(text),
         "shapes": live_shapes(text),
