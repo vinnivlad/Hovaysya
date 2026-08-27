@@ -647,3 +647,13 @@ def test_toward_wins_over_away_when_both_appear():
 
 def test_suggest_reports_the_heading():
     assert hints.suggest("Реактивний БпЛА курсом на Жуляни")["heading"] == "toward"
+
+
+# --- siren replies are refinements ----------------------------------------
+
+
+def test_a_siren_reply_still_reads_as_a_siren_lexically():
+    """The reply flag is not in the text, so `alert_state` cannot see it — the
+    distinction lives in the policy, which is where the reply is known."""
+    assert hints.alert_state("По ньому тривога") == "alert"
+    assert hints.alert_state("По цих БПЛА тривога") == "alert"

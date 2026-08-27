@@ -46,7 +46,7 @@ def load_labels(path: Path) -> list[dict]:
 
 
 def load_night(conn: sqlite3.Connection, night: str, labels: list[dict]
-               ) -> list[tuple[int, str, str]]:
+               ) -> list[tuple[int, str, str, bool]]:
     """Every message of the night, as (ts, key, text), in order.
 
     The whole night is replayed, not only the labelled messages: the policy's
@@ -56,14 +56,15 @@ def load_night(conn: sqlite3.Connection, night: str, labels: list[dict]
     from ..labeler.build import night_id
 
     rows = conn.execute(
-        "SELECT channel, message_id, ts, text_norm FROM messages "
+        "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
         "WHERE text_norm <> '' ORDER BY ts"
     ).fetchall()
     out = []
     for r in rows:
         if night_id(r["ts"]) != night:
             continue
-        out.append((r["ts"], f"{r['channel']}/{r['message_id']}", r["text_norm"]))
+        out.append((r["ts"], f"{r['channel']}/{r['message_id']}", r["text_norm"],
+                    r["reply_to"] is not None))
     return out
 
 
@@ -129,8 +130,9 @@ def main(argv: list[str] | None = None) -> int:
         by_anchor = {l["anchor"]: l for l in night_labels}
         messages = load_night(conn, night, night_labels)
 
-        observations = [observe(ts, text) for ts, _key, text in messages]
-        keys = [key for _ts, key, _text in messages]
+        observations = [observe(ts, text, is_reply)
+                        for ts, _key, text, is_reply in messages]
+        keys = [key for _ts, key, _text, _r in messages]
         decisions = run_policy(observations, Tracker())
         results = [(o, d, k) for (o, d), k in zip(decisions, keys)]
 

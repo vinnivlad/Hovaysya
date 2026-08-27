@@ -141,6 +141,7 @@ class Observation:
     nationwide: bool
     ring_places: tuple[str, ...]
     says_new: bool
+    is_reply: bool = False
 
     @property
     def near(self) -> bool:
@@ -151,8 +152,14 @@ class Observation:
         return self.modality == "live-threat"
 
 
-def observe(ts: int, text: str) -> Observation:
-    """Read one message into the fields the policy uses."""
+def observe(ts: int, text: str, is_reply: bool = False) -> Observation:
+    """Read one message into the fields the policy uses.
+
+    `is_reply` matters for sirens specifically: a reply saying "По ньому
+    тривога" refines an announcement rather than making one. Both such messages
+    in the labelled night were marked silent, while every standalone siren was a
+    wake-up.
+    """
     guess = hints.suggest(text)
     scope_places = tuple(
         p.name for p in find_places(text) if p.tier in NEAR_TIERS
@@ -173,6 +180,7 @@ def observe(ts: int, text: str) -> Observation:
         nationwide=hints.nationwide(text),
         ring_places=scope_places,
         says_new=_says_new(text),
+        is_reply=is_reply,
     )
 
 

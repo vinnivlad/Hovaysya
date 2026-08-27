@@ -74,6 +74,10 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     if obs.alert_state == "alert" and obs.scope in CITY_OR_NEARER:
         if ep is not None and ep.alert_announced:
             return _silent("already-notified: siren already announced")
+        if obs.is_reply:
+            # "По ньому тривога" answers an earlier message; it refines an
+            # announcement rather than being one.
+            return _silent("refinement: siren mentioned in a reply")
         return _notify("alert", "alert", "alert declared")
     if obs.alert_state == "alert":
         return _silent("too-far: another district's siren")
