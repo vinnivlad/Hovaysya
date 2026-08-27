@@ -188,6 +188,25 @@ labeling is also feedback on the baseline.
 See [docs/labeling-schema.md](docs/labeling-schema.md) for what the fields mean
 and how the harness scores them.
 
+### The page is generated, so it can go stale
+
+`data/labeler.html` is built, git-ignored, and opened by hand — a stale one looks
+exactly like a fresh one. That has cost real work twice: once when the night list
+did not contain the nights just recommended, and once when label corrections made
+in the file were absent from the page, so the next export undid them.
+
+`tools/tests/test_page_freshness.py` fails when the page is older than its
+template, `build.py`, the `tools/nlp` modules, or `labels/moments.jsonl`. Since
+the suite runs on every change, staleness surfaces immediately rather than during
+labelling. If it fails, the fix is the message it prints:
+
+```bash
+python -m tools.labeler.build
+```
+
+Labels merge by id on load, with the file winning where both have one, so
+corrections propagate into the page and work not yet exported survives.
+
 ## Tests
 
 ```bash
