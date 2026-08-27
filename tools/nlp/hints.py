@@ -138,6 +138,9 @@ AFTERMATH_TERMS = (
     "пожеж", "рятувальн", "дснс", "постраждал", "поранен", "загинул", "загибл",
     "пошкодж", "вибило", "уламк", "наслідк", "ліквідовано", "евакуа", "обвал",
     "медик", "швидка допомог", "кличко", "розбор завал", "загорян",
+    # Each of these woke the user in the dense night and should not have:
+    # "зруйновано Епіцентр біля ДВРЗ", "рф знищила на Київщині склад".
+    "зруйнован", "знищила", "знищено склад", "вигорі", "відбудов",
 )
 
 # NOT aftermath. "вибух" and "влучання" sit 1.8-2.2 min from live danger, and
@@ -149,6 +152,9 @@ SUMMARY_TERMS = (
     "за добу", "протягом ночі", "протягом доби", "протягом 24", "підсумк",
     "станом на", "ворог запустив", "за даними", "всього збито", "зафіксовано за",
     "в ніч на",
+    # "У ніч на 05.08.26, згідно зі звітом Повітряних Сил..." — the morning
+    # report, which named enough missiles to read as a live ballistic wave.
+    "згідно зі звіт", "звітом повітряних сил", "вночі рф", "вночі ворог",
 )
 
 # Not about an air threat at all: fundraising, channel social, civil news.
@@ -375,6 +381,14 @@ def alert_state(text: str) -> str | None:
     if any(t in low for t in ("очікує на відбій", "очікуємо на відбій",
                               "чекаємо на відбій", "очікуємо відбій")):
         return "alert" if any(t in low for t in ALERT_ON_TERMS) else None
+    # The mirror case, and it woke the user for nothing: "У Києві у найближчі
+    # хвилини можуть оголосити повітряну тривогу" is a forecast of a siren, and
+    # he wrote "Можуть оголосити! Ще не зрозуміло нічого". A siren that may be
+    # declared is not a siren.
+    if any(t in low for t in ("можуть оголосити", "може бути оголошен",
+                              "буде оголошен", "очікуємо тривог",
+                              "можлива тривога", "можуть дати тривог")):
+        return None
     if any(t in low for t in ALERT_CLEAR_TERMS):
         return "clear"
     if any(t in low for t in ALERT_ON_TERMS):

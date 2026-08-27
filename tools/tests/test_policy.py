@@ -376,3 +376,88 @@ def test_puskh_is_a_launch_word():
 def test_a_launch_from_a_russian_region_announces_something_new():
     o = observe(T0, "❗️❗Є інформація про пуск балістичної ракети з Курської області.")
     assert o.says_new
+
+
+# --- a salvo arriving over the user's own area ----------------------------
+
+
+def test_a_ballistic_salvo_over_my_area_rings_again():
+    """Seven misses in the dense night were this: "Жуляни🚀", "БОРЩАГА",
+    "Вишневе🚀", each annotated "близько" or "прям близько, треба
+    повідомлення", each silenced as the same wave."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    # The launch announcements matter: they are what makes each arrival a
+    # separate missile rather than the same one being re-listed.
+    seq = [(0, "‼️ Вихід балістики з Брянська"),
+           (60, "❗6-8 Цирконів на Київ, Бровари."),
+           (100, "‼️Київ / Бровари — спуск балістики! 9та"),
+           (120, "Жуляни🚀"),
+           (125, "Вишневе"),
+           (200, "‼️Київ / Бровари — спуск балістики! 10та"),
+           (205, "БОРЩАГА")]
+    got = []
+    for off, text in seq:
+        o = observe(T0 + off, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        got.append((text, d.audible, d.reason))
+    audible = {t: a for t, a, _r in got}
+    assert audible["Жуляни🚀"], got
+    # Five seconds later, the same missiles. He wrote "повтор" on it.
+    assert not audible["Вишневе"], got
+    # A tenth missile launched and then named overhead is its own event.
+    assert audible["БОРЩАГА"], got
+
+
+def test_a_relisting_with_no_new_launch_does_not_ring():
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    for off, text in ((0, "‼️ Вихід балістики з Брянська"), (60, "Жуляни🚀")):
+        o = observe(T0 + off, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+    o = observe(T0 + 400, "Вишневе, Теремки")     # well past the re-arm gap...
+    d = decide(o, tr)
+    assert not d.audible, d.reason                # ...but nothing new was launched
+
+
+def test_a_city_wide_drone_report_is_not_enough():
+    """His rule from the first conversation — "для дронів «летить на правий
+    берег» ще не досить". Of 78 city-scope drone moments he woke for 3."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    o = observe(T0, "⚠️4 реактивні шахеди на Київ/Бровари.")
+    d = decide(o, Tracker())
+    assert not d.audible, d.reason
+
+
+def test_one_mig_takeoff_is_one_event_however_many_channels_report_it():
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    got = []
+    for off, text in ((0, "❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка."),
+                      (60, "✈️⚠️Зліт МіГ-31К ВПС рф. Проходимо в укриття!"),
+                      (180, "🛫 Зліт МіГ-31К ВПС рф.")):
+        o = observe(T0 + off, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        got.append(d.audible)
+    assert got == [True, False, False], got
+
+
+def test_a_siren_that_may_be_declared_is_not_a_siren():
+    """"У Києві у найближчі хвилини можуть оголосити повітряну тривогу" — his
+    note: "Можуть оголосити! Ще не зрозуміло нічого"."""
+    from tools.nlp import hints
+
+    assert hints.alert_state(
+        "🔴У Києві у найближчі хвилини можуть оголосити повітряну тривогу") is None
+    assert hints.alert_state("⚠️❗️КИЇВ - ТРИВОГА. В укриття!") == "alert"

@@ -27,22 +27,26 @@ import sqlite3
 from collections import Counter
 from pathlib import Path
 
+from ..labeler.load import load_all
 from ..policy.episodes import Tracker, observe
 from ..policy.rules import run as run_policy
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DB_PATH = REPO_ROOT / "data" / "messages.db"
-LABELS_PATH = REPO_ROOT / "labels" / "moments.jsonl"
+LABELS_PATH = REPO_ROOT / "labels"
 
 RANK = {None: -1, "info": 0, "alert": 1}
 
 
 def load_labels(path: Path) -> list[dict]:
-    return [
-        json.loads(line)
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    """Every snapshot in the labels directory, newest per night winning.
+
+    `--labels` may name a single file, in which case only that one is read.
+    """
+    if path.is_dir():
+        return load_all(path)[0]
+    from ..labeler.load import read_file
+    return read_file(path)
 
 
 def load_night(conn: sqlite3.Connection, night: str, labels: list[dict]

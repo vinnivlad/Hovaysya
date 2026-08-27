@@ -28,9 +28,10 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from ..nlp import hints
+from .link_episodes import ALARM_FOR_THREAT
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-LABELS_PATH = REPO_ROOT / "labels" / "moments.jsonl"
+LABELS_PATH = REPO_ROOT / "labels"
 DB_PATH = REPO_ROOT / "data" / "messages.db"
 
 DECISIONS = {"notify", "silent"}
@@ -54,6 +55,9 @@ REQUIRED = ("id", "at", "decision", "threat", "modality", "scope", "certainty",
 def load(path: Path) -> list[dict]:
     if not path.exists():
         return []
+    if path.is_dir():
+        from .load import load_all
+        return load_all(path)[0]
     out = []
     for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = line.strip()
@@ -165,6 +169,16 @@ def check(labels: list[dict], messages: dict[str, dict]) -> list[tuple[str, str,
                 warn(lid, "audible notify while nothing is flying — `info`?")
             if l.get("certainty") == "clear" and l.get("alarm") != "clear":
                 warn(lid, "a threat tone on an all-clear")
+            # One tone per reaction class: a ballistic wake-up that rings the
+            # drone tone tells him the wrong thing before he opens his eyes,
+            # which is the whole point of separate sounds. Found in the dense
+            # night on "БОРЩАГА" — threat ballistic, alarm drone.
+            # `alert` is exempt: the plain siren tone says "the siren went
+            # off", which is true whatever is or is not identified as flying.
+            expected = ALARM_FOR_THREAT.get(l.get("threat"))
+            if expected and l.get("alarm") not in (None, "alert", expected):
+                warn(lid, f"alarm {l.get('alarm')!r} on threat "
+                          f"{l.get('threat')!r} — expected {expected!r}")
             if l.get("modality") in ("aftermath", "summary-news", "non-threat") \
                     and l.get("level") != "info":
                 warn(lid, f"audible notify on modality {l.get('modality')}")

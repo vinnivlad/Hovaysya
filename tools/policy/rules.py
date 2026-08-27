@@ -116,8 +116,15 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     # 6. Ballistic leaves no room for geography: minutes of flight, so a
     #    confirmed launch that could reach us is a shelter call city-wide.
     if threat == "ballistic" and obs.certainty == "confirmed":
-        # For ballistic, novelty is a launch — not a position. A bare "Жуляни"
-        # during a wave is that wave, and the user annotated exactly that case
+        # A salvo arriving over his own area is its own event. Seven misses in
+        # the dense night were exactly this — "Жуляни🚀", "БОРЩАГА", "Вишневе🚀",
+        # each annotated "близько" or "прям близько, треба повідомлення", each
+        # silenced as the same wave. `ring_rearmed` is what tells them from the
+        # repeats he marked "повтор" seconds later.
+        if tracker.ring_rearmed(obs):
+            return _notify("alert", "ballistic", "ballistic over my area")
+        # Otherwise novelty is a launch, not a position. A bare "Жуляни" during
+        # a wave is that wave, and the user annotated exactly that case
         # "Ця балістика вже розбудила".
         if (ep is not None and ep.notified
                 and not tracker.is_fresh_launch(obs)
@@ -130,9 +137,13 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     # 7. A MiG-31K in the air alerts the country, but the launch may be an hour
     #    away or never come — loud is wrong, silence is worse.
     if threat == "mig":
-        # The mig tone not having sounded is novelty in itself, the same rule
-        # ballistic uses. Relying on the wording alone silenced a takeoff.
-        if not tracker.is_new(obs) and not tracker.is_new_class("mig"):
+        # One takeoff, three channels: "Виліт винищувача МіГ-31К з аеродрому
+        # Саваслейка", then "Зліт МіГ-31К ВПС рф" a minute later and again two
+        # minutes after that. He woke for the first and called both others
+        # repeats. `is_new` could not tell them apart, because every report of a
+        # takeoff contains the takeoff word — so novelty here is the tone not
+        # having sounded, plus the cross-channel launch window.
+        if not tracker.is_new_class("mig") and not tracker.is_fresh_launch(obs):
             return _silent("already-notified: MiG already announced")
         return _notify("alert", "mig", "MiG-31K airborne")
 
@@ -158,8 +169,15 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
             return _notify("info", "none", "circling nearby")
         return _notify("alert", obs.alarm, "new target near me")
 
-    # 9. In the city but not near: worth knowing, not worth waking twice.
+    # 9. In the city but not near: worth knowing, not worth waking twice — and
+    #    for a drone, not worth waking at all. His rule from the first
+    #    conversation: "для дронів «летить на правий берег» ще не досить". The
+    #    labels bear it out — of 78 city-scope drone moments he woke for 3, and
+    #    "⚠️4 реактивні шахеди на Київ/Бровари" was a false wake-up twice over.
+    #    A drone night is opened by the siren instead, which is rule 2.
     if obs.live and obs.scope == "city":
+        if threat in ("shahed", "shahed-jet", "recon", "unknown", "none"):
+            return _silent("insufficient: city-wide is not enough for a drone")
         if ep is not None and ep.notified:
             return _silent("already-notified: city-level, already awake")
         return _notify("alert", obs.alarm, "threat over the city")

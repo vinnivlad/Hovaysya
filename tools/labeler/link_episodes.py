@@ -27,7 +27,7 @@ from datetime import datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-LABELS_PATH = REPO_ROOT / "labels" / "moments.jsonl"
+LABELS_PATH = REPO_ROOT / "labels"
 
 # Reasons that are inherently about an episode.
 EPISODE_REASONS = {"already-notified", "resolved"}
@@ -58,13 +58,18 @@ CONTRADICTIONS = {
                      "просто інформація", "загальний огляд"),
 }
 
+# Notes that argue for waking him, whatever the decision says. In 458 labels
+# every «близько» was a wake-up except one, and the one was a slip: the note
+# said «Близько» and the policy fired there while the label stayed silent.
+WAKE_WORDS = ("близьк", "треба повідом", "треба буди", "дзвони", "прям близ")
+
 
 def load(path: Path) -> list[dict]:
-    return [
-        json.loads(line)
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    if path.is_dir():
+        from .load import load_all
+        return load_all(path)[0]
+    from .load import read_file
+    return read_file(path)
 
 
 def by_night(labels: list[dict]) -> dict[str, list[dict]]:
@@ -140,6 +145,18 @@ def fill_alarms(labels: list[dict]) -> list[tuple[str, str]]:
     return fixed
 
 
+def notes_arguing_for_a_wake_up(labels: list[dict]) -> list[tuple[str, str]]:
+    """Silent labels whose own note says he should have been woken."""
+    out = []
+    for l in labels:
+        if l.get("decision") != "silent":
+            continue
+        why = (l.get("why") or "").lower()
+        if any(w in why for w in WAKE_WORDS):
+            out.append((l.get("id", "?"), l.get("why", "")))
+    return out
+
+
 def contradictions(labels: list[dict]) -> list[tuple[str, str, str, str]]:
     """(label id, chosen reason, suggested reason, why) where the note disagrees."""
     out = []
@@ -196,6 +213,13 @@ def main(argv: list[str] | None = None) -> int:
         print("  the same episode. Set these by hand, or leave them unlinked.")
         for lid, target, gap in distant:
             print(f"    {lid:<22} nearest wake-up {target} was {gap // 60} min earlier")
+        print()
+
+    wakes = notes_arguing_for_a_wake_up(labels)
+    if wakes:
+        print(f"Silent, but the note argues for waking  ({len(wakes)})")
+        for lid, why in wakes:
+            print(f"  {lid:<22} «{why}»")
         print()
 
     if clashes:
