@@ -474,3 +474,33 @@ def test_whitespace_between_multiword_stems_is_collapsed():
 def test_takeoff_is_probable_not_confirmed():
     t = "⚠️Виліт бомбардувальника Ту-95МС з аеродрому \"Оленья\", курс поки не відомий."
     assert hints.certainty_hint(t) == "probable"
+
+
+# --- bare impact reports --------------------------------------------------
+
+
+def test_a_bare_impact_report_is_unknown_not_nothing():
+    """Something arrived. "Nothing is flying" is the wrong default, and it was
+    the pre-fill for 105 of the corpus's 380 impact messages."""
+    for t in ("Вибухи", "Вибухи 💥💥💥 4 шт було", "Прозвучав вибух💥",
+              "Чутно було вибух 💥", "💥Влучання."):
+        s = hints.suggest(t)
+        assert s["threat"] == "unknown", t
+        assert s["certainty"] == "lost", t
+
+
+def test_a_bare_impact_report_is_never_clear():
+    """`clear` would say it is safe when nobody has said so, and impact reports
+    sit a median of 1.8 minutes from live danger."""
+    for t in ("Вибухи", "💥Влучання.", "Чутно було вибух 💥"):
+        assert hints.certainty_hint(t) != "clear", t
+
+
+def test_an_explicit_all_clear_still_wins_over_the_impact():
+    assert hints.certainty_hint("💥Вибухи у Дніпрі, над містом чисто.") == "clear"
+
+
+def test_a_named_type_survives_the_impact_promotion():
+    s = hints.suggest("💥Вибух в Одесі, попередньо ракета Іскандер-М.")
+    assert s["threat"] == "ballistic"
+    assert s["certainty"] == "probable"

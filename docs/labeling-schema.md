@@ -184,6 +184,17 @@ flying: `threat: none`, `modality: aftermath`, `decision: silent`.
 So the question to ask is **"is anything still in the air?"** — and the channels
 answer it themselves: `над містом чисто` versus `Але летить ще 1`.
 
+**A third case: the bare impact report.** `Вибухи 💥💥💥`, `Чутно було вибух` —
+no place, no type, and no word about whether anything remains. There the honest
+label is `threat: unknown` and `certainty: lost`: something arrived, we do not
+know what, and we do not know the current state.
+
+Not `none`, and never `clear`. `none` would say nothing is flying and `clear`
+would say it is safe, when in fact nobody has said either — and impact reports
+sit 1.8 minutes from live danger. The decision itself is usually
+`silent / already-notified` if this episode already woke you, or
+`silent / insufficient` if it did not and there is still nothing to act on.
+
 In practice you rarely label aftermath at all: it is in the generated negative
 set, and your contribution there is five checks, once. When a post about fire
 crews or casualties comes up, skip it.
@@ -257,7 +268,7 @@ report usually means the wave is still in progress.
 | --- | --- |
 | `confirmed` | position stated and current |
 | `probable` | inferred from direction or a previous position |
-| `lost` | was tracked, no longer is — `локаційно втрачено`, `без фіксації` |
+| `lost` | the state is unknown — tracked and lost (`локаційно втрачено`, `без фіксації`), or never known at all |
 | `clear` | actively reported clear — `чисто`, `збито` |
 
 `lost` and `clear` must never collapse into one value. `Локаційно втрачено`

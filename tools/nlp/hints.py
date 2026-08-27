@@ -309,6 +309,11 @@ def certainty_hint(text: str) -> str:
         return "lost"
     if any(t in low for t in RESOLUTION_CLOSING):
         return "clear"
+    # A bare impact report — "Вибухи 💥💥💥", "Чутно було вибух" — names no place
+    # and says nothing about whether anything is still in the air. That is an
+    # unknown state, not a confirmed one, and above all not safety.
+    if _hits(text, IMPACT_TERMS) and not place_spans(text):
+        return "lost"
     # A takeoff is a possibility, not a fact: the corpus has
     # "Борти МіГ-31К розвернулись на аеродром базування" as often as it has a
     # launch, and "курс поки не відомий" says so outright.
@@ -327,7 +332,10 @@ def suggest(text: str) -> dict[str, object]:
     different thing from "nothing is flying".
     """
     threat = threat_hint(text)
-    if threat == "none" and looks_live(text):
+    # Something arrived, so "nothing is flying" is the wrong default even when
+    # no type is named. 105 of the corpus's 380 impact messages were pre-filled
+    # as `none` before this.
+    if threat == "none" and (looks_live(text) or _hits(text, IMPACT_TERMS)):
         threat = "unknown"
     return {
         "threat": threat,
