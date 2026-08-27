@@ -595,6 +595,9 @@ def test_the_ring_holds_exactly_what_was_ruled_in():
         # Ruled in later, on his instruction: it contains Демiївка, and two
         # misses in the dense night were `Голос🚀` and `Голос✈️`.
         "Голосіїв",
+        # "Це недалеко, рахуй як Теремки" — the mall on the ring road, which the
+        # corpus writes together with Teremky.
+        "Республіка",
     }
 
 
@@ -847,3 +850,14 @@ def test_kursk_and_bryansk_are_launch_origins_in_every_form():
                  "‼️ Вихід балістики з Брянська. Уважно",
                  "❗️❗Загроза пуску балістичних ракет з Курської області."):
         assert hints.nationwide(text), text
+
+
+def test_respublika_belarus_is_not_the_mall_by_teremky():
+    """He spotted the collision himself. The settlement-outranks-landmark rule
+    is what handles it: Belarus is a place, the mall is a thing named after one,
+    and putting the mall in the near ring would otherwise make every mention of
+    Belarus read as his own doorstep."""
+    assert resolve_scope("⚠️Реактивний шахед на ТРЦ Республіка.") == "my-area"
+    assert resolve_scope("❗️2 крилаті ракети на Республіку/Теремки.") == "my-area"
+    assert resolve_scope("🔴У Республіці Білорусь запрацювали ретранслятори") == "elsewhere"
+    assert resolve_scope("Пуски з Республіки Білорусь") == "elsewhere"

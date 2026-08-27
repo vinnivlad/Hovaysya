@@ -95,6 +95,11 @@ MY_AREA = [
     # "оголосити" and "проголосували", and "голосно"/"голосування" do not occur
     # once in 4.5 months of these channels.
     _p("Голосіїв", "my-area", "голосіїв", "голосієв", "голос"),
+    # "Це недалеко, рахуй як Теремки" — the mall sits on the ring road right by
+    # Teremky, and the corpus writes them together: "2 крилаті ракети на
+    # Республіку/Теремки". A landmark, so a settlement named beside it still
+    # outranks it.
+    _p("Республіка", "my-area", "республіка", "республіки", landmark=True),
     _p("Теремки", "my-area", "теремк"),
     # Inferred, not ruled: woken for once ("реактив на Крюківщину/Борщагівки"),
     # marked far once. Left in pending a decision.
@@ -369,7 +374,13 @@ LANDMARKS = [
     _p("ТЕЦ-5", "city", "тец-5", "тец 5", "тец5", landmark=True),   # Голосіїв
     _p("ТЕЦ-6", "city", "тец-6", "тец 6", "тец6", landmark=True),   # Троєщина
     _p("ТЕЦ-2", "city", "тец-2", "тец 2", "тец2", landmark=True),   # Дарниця
-    _p("ТЦ Проспект", "city", "тц проспект", landmark=True),
+    # Shopping malls, which the channels use as landmarks the way they use
+    # districts. `ТРЦ Лавіна` turned up in the first minutes of the live watch
+    # and resolved to nowhere; `ТРЦ Проспект` was written `ТЦ` when it was
+    # added, so the prefix has to be part of neither stem.
+    _p("Проспект", "city", "тц проспект", "трц проспект", landmark=True),
+    _p("Лавіна", "city", "лавіна", "лавина", landmark=True),   # Виноградар
+
     _p("Видубичі", "city", "видубич"),
     _p("Залісся", "oblast", "залісся"),
 ]
