@@ -189,6 +189,10 @@ def build_nights(messages: list[dict]) -> list[dict]:
                 "count": len(msgs),
                 "relevant": len(relevant),
                 "near": len(near),
+                # Enough to pick a night out of 134 without opening it.
+                "siren": sum(1 for m in msgs if m["as"]),
+                "mig": sum(1 for m in msgs if m["th"] == "mig"),
+                "bal": sum(1 for m in msgs if m["th"] == "ballistic"),
                 "from": msgs[0]["t"],
                 "to": msgs[-1]["t"],
             }

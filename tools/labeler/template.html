@@ -45,6 +45,29 @@
   /* nights */
   #nights { grid-area: nights; overflow-y: auto; border-right: 1px solid var(--line);
             background: var(--panel); }
+  .nightbar {
+    position: sticky; top: 0; z-index: 3; background: var(--panel);
+    border-bottom: 1px solid var(--line); padding: 8px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .nightbar input {
+    width: 100%; font-family: var(--mono); font-size: 11.5px; padding: 5px 6px;
+    background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+  .nightbar .pick button { min-width: 0; padding: 4px 6px; font-size: 10.5px; }
+  .night .marks {
+    display: flex; flex-wrap: wrap; gap: 5px; font-family: var(--mono);
+    font-size: 9px; letter-spacing: .03em;
+  }
+  .night .marks .m-mig { color: var(--urgent); font-weight: 600; }
+  .night .marks .m-bal { color: #d98a3a; }
+  .night .marks .m-sir { color: var(--soft); }
+  .night .d { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+  .night .d .lab {
+    font-family: var(--mono); font-size: 9.5px; color: var(--done);
+    border: 1px solid var(--done); border-radius: 2px; padding: 0 3px;
+  }
   .night {
     padding: 8px 12px; border-bottom: 1px solid var(--line); cursor: pointer;
     display: flex; flex-direction: column; gap: 3px;
@@ -226,7 +249,13 @@
   <button id="exportBtn" class="primary">Експорт JSONL</button>
 </header>
 
-<div id="nights"></div>
+<div id="nights">
+  <div class="nightbar">
+    <input id="nightJump" type="text" placeholder="перейти: 2026-05-23" spellcheck="false">
+    <div class="pick" id="nightFilter"></div>
+  </div>
+  <div id="nightList"></div>
+</div>
 
 <div id="feed">
   <div class="bar">
@@ -398,20 +427,72 @@ function nextLabelId(m) {
 
 /* ---------- rendering ---------- */
 
+// 134 nights is too many for a flat list: most are quiet, and the interesting
+// ones are scattered. Without a filter the page always opens on the newest
+// night and everything else is a long scroll away.
+const NIGHT_FILTERS = [
+  { id: "busy",    name: "цікаві",    test: n => n.near >= 8 || n.mig > 0 || n.siren >= 6 },
+  { id: "labelled", name: "розмічені", test: n => labels.some(l => l.night === n.id) },
+  { id: "all",     name: "усі",       test: () => true },
+];
+let nightFilterIx = 0;
+
+function visibleNights() {
+  const f = NIGHT_FILTERS[nightFilterIx].test;
+  const shown = DATA.nights.filter(f);
+  // Never hide the night being worked on.
+  if (!shown.some(n => n.id === nightId)) {
+    const cur = DATA.nights.find(n => n.id === nightId);
+    if (cur) shown.unshift(cur);
+  }
+  return shown;
+}
+
 function renderNights() {
-  const el = document.getElementById("nights");
+  const bar = document.getElementById("nightFilter");
+  bar.innerHTML = NIGHT_FILTERS.map((f, i) =>
+    `<button type="button" data-ni="${i}" class="${i === nightFilterIx ? "on" : ""}">` +
+    `${esc(f.name)}</button>`).join("");
+  bar.querySelectorAll("button").forEach(b => {
+    b.onclick = () => { nightFilterIx = Number(b.dataset.ni); renderNights(); };
+  });
+
+  const el = document.getElementById("nightList");
   el.innerHTML = "";
-  for (const n of DATA.nights) {
+  const shown = visibleNights();
+  for (const n of shown) {
     const count = labels.filter(l => l.night === n.id).length;
     const d = document.createElement("div");
     d.className = "night" + (n.id === nightId ? " sel" : "");
+    const marks = [];
+    if (n.mig) marks.push(`<span class="m-mig">МіГ ${n.mig}</span>`);
+    if (n.bal) marks.push(`<span class="m-bal">бал ${n.bal}</span>`);
+    if (n.siren) marks.push(`<span class="m-sir">сир ${n.siren}</span>`);
     d.innerHTML =
-      `<span class="d">${n.id}</span>` +
-      `<span class="c">${n.count} · <span class="near">${n.near} поруч</span>` +
-      (count ? ` · <span class="lab">${count} мітк.</span>` : "") + `</span>`;
+      `<span class="d">${n.id}` +
+      (count ? `<span class="lab">${count}</span>` : "") + `</span>` +
+      `<span class="c">${n.count} · <span class="near">${n.near} поруч</span></span>` +
+      (marks.length ? `<span class="marks">${marks.join(" ")}</span>` : "");
     d.onclick = () => { nightId = n.id; selIx = -1; draft = null; renderAll(); };
     el.appendChild(d);
   }
+  if (!shown.length) {
+    el.innerHTML = `<div class="night"><span class="c">нічого не підходить</span></div>`;
+  }
+}
+
+function jumpToNight(value) {
+  const want = (value || "").trim();
+  const hit = DATA.nights.find(n => n.id === want) ||
+              DATA.nights.find(n => n.id.startsWith(want));
+  if (!hit) return false;
+  nightId = hit.id;
+  selIx = -1;
+  draft = null;
+  renderAll();
+  const row = document.querySelector(".night.sel");
+  if (row) row.scrollIntoView({ block: "center" });
+  return true;
 }
 
 function tag(text, cls) {
@@ -803,6 +884,13 @@ document.addEventListener("keydown", e => {
     case "Escape": draft = null; document.activeElement.blur(); renderAll(); break;
   }
 });
+
+const jump = document.getElementById("nightJump");
+jump.onkeydown = e => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  jump.style.borderColor = jumpToNight(jump.value) ? "" : "var(--urgent)";
+};
 
 document.getElementById("ref").textContent =
   `точка відліку: ${DATA.reference} · ${DATA.messages.length} повідомлень · ${DATA.nights.length} ночей`;
