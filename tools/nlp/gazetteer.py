@@ -1,0 +1,300 @@
+"""Toponym gazetteer with morphology, and resolution to a relevance tier.
+
+Built from the corpus, not from a map: every entry here was observed in the
+mined channel history (see docs/pattern-findings.md), including slang and
+informal areas that no official dataset carries — `Солома`, `Борщаги`,
+`Лівобережний масив`, `ДВРЗ`.
+
+Matching is by **stem prefix**, never by exact string. Ukrainian case endings
+make exact matching useless: `Київщину / Київщини / Київщина / Київщині /
+Київщиною` are one place, and channels are inconsistent about capitalisation
+(`КИЇВ`, `ТРОЄЩИНА`). A short lowercase prefix collapses each family, which was
+verified against every inflection family in the corpus.
+
+Tiers are relative to the reference location, Zhuliany:
+
+    my-area    Zhuliany and the ring that shares its risk
+    my-district Solomianskyi district generally
+    city       elsewhere in Kyiv
+    oblast     Kyiv oblast outside the city
+    elsewhere  another region — 22% of the corpus, discardable
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+
+# Tiers, ordered most to least relevant. Order matters: resolution returns the
+# most relevant tier present in a message, because "Жуляни та Троєщина" is about
+# my area even though it also names a far one.
+TIERS = ("my-area", "my-district", "city", "oblast", "elsewhere")
+
+
+@dataclass(frozen=True)
+class Place:
+    name: str  # canonical display form
+    tier: str
+    stems: tuple[str, ...]  # lowercase prefixes that identify it
+
+
+def _p(name: str, tier: str, *stems: str) -> Place:
+    return Place(name, tier, tuple(s.lower() for s in stems))
+
+
+# Zhuliany plus the places that share its immediate risk: the same approach
+# corridor from the south-west, and the neighbourhoods a drone over Zhuliany is
+# seconds from. Derived from co-mention frequency in the corpus.
+MY_AREA = [
+    _p("Жуляни", "my-area", "жулян"),
+    _p("Теремки", "my-area", "теремк"),
+    _p("Чоколівка", "my-area", "чоколів"),
+    _p("Деміївка", "my-area", "деміїв"),
+    _p("Солом'янка", "my-area", "солом'ян", "соломян", "солома", "соломи"),
+    _p("Мишоловка", "my-area", "мишолов"),
+    _p("Совки", "my-area", "совки"),
+    _p("Іподром", "my-area", "іподром"),
+    _p("Караваєві Дачі", "my-area", "караваєв"),
+    _p("Вишневе", "my-area", "вишнев"),
+    _p("Крюківщина", "my-area", "крюківщ"),
+    _p("Гатне", "my-area", "гатне"),
+    _p("Віта-Поштова", "my-area", "віта-поштов", "віту-поштов"),
+    _p("Віта-Литовська", "my-area", "віта-литовськ"),
+    _p("Крушинка", "my-area", "крушинк"),
+    _p("Чабани", "my-area", "чабани"),
+]
+
+MY_DISTRICT = [
+    _p("Солом'янський район", "my-district", "солом'янськ", "соломянськ"),
+]
+
+# The rest of Kyiv, including the informal "масив" areas the channels use.
+CITY = [
+    _p("Троєщина", "city", "троєщ", "троєща", "троя", "трою"),
+    _p("Оболонь", "city", "оболон"),
+    _p("Дарниця", "city", "дарниц"),
+    _p("Позняки", "city", "позняк"),
+    _p("Борщагівка", "city", "борщагів", "борщаг"),
+    _p("Лук'янівка", "city", "лук'янів", "лукянів"),
+    _p("Виноградар", "city", "виноградар", "виноград"),
+    _p("Святошин", "city", "святошин"),
+    _p("Голосіїв", "city", "голосіїв", "голосієв"),
+    _p("Печерськ", "city", "печерс"),
+    _p("Поділ", "city", "подільс", "поділ"),
+    _p("Осокорки", "city", "осокорк"),
+    _p("Русанівка", "city", "русанів"),
+    _p("Нивки", "city", "нивк"),
+    _p("Сирець", "city", "сирец"),
+    _p("Куренівка", "city", "куренівк"),
+    _p("Пріорка", "city", "пріорк"),
+    _p("Березняки", "city", "березняк"),
+    _p("Воскресенка", "city", "воскресенк"),
+    _p("ДВРЗ", "city", "дврз"),
+    _p("Бортничі", "city", "бортнич"),
+    _p("Академмістечко", "city", "академмістечк", "академ"),
+    _p("Відрадний", "city", "відрадн"),
+    _p("Лісовий масив", "city", "лісовий"),
+    _p("Лівобережний масив", "city", "лівобережн"),
+    _p("Харківський масив", "city", "харківський масив"),
+    _p("Дарницький масив", "city", "дарницький масив"),
+    _p("Мінський масив", "city", "мінський масив"),
+    _p("Соцмісто", "city", "соцміст"),
+    _p("Труханів", "city", "труханів"),
+    _p("Центр", "city", "центр"),
+    _p("Шевченківський район", "city", "шевченківс"),
+    _p("Деснянський район", "city", "деснянс"),
+    _p("Дніпровський район", "city", "дніпровськ"),
+    _p("Оболонський район", "city", "оболонськ"),
+    _p("Дарницький район", "city", "дарницьк"),
+    _p("Пуща-Водиця", "city", "пуща-водиц", "пущу-водиц"),
+    _p("Правий берег", "city", "правий берег", "правобереж"),
+    _p("Лівий берег", "city", "лівий берег", "лівобереж"),
+    _p("Шулявка", "city", "шулявк"),
+    _p("Клов", "city", "клов"),
+    _p("Антонов", "city", "антонов"),
+    _p("Мостицький", "city", "мостиц"),
+    _p("Виставковий центр", "city", "ввц", "виставков"),
+    _p("Київ", "city", "київ", "києв", "києм"),
+]
+
+OBLAST = [
+    _p("Бровари", "oblast", "бровар"),
+    _p("Вишгород", "oblast", "вишгород"),
+    _p("Бориспіль", "oblast", "бориспіл", "борисполь", "борисполя"),
+    _p("Обухів", "oblast", "обухів", "обухов"),
+    _p("Васильків", "oblast", "васильків", "василькова"),
+    _p("Ірпінь", "oblast", "ірпін"),
+    _p("Буча", "oblast", "буча", "бучі"),
+    _p("Гостомель", "oblast", "гостомел"),
+    _p("Біла Церква", "oblast", "біла церкв", "білу церкв", "білоцерків"),
+    _p("Фастів", "oblast", "фастів"),
+    _p("Переяслав", "oblast", "переяслав"),
+    _p("Славутич", "oblast", "славутич"),
+    _p("Жукин", "oblast", "жукин"),
+    _p("Згурівка", "oblast", "згурівк"),
+    _p("Баришівка", "oblast", "баришівк"),
+    _p("Макарів", "oblast", "макарів"),
+    _p("Боярка", "oblast", "боярк"),
+    _p("Українка", "oblast", "українка", "українці"),
+    _p("Димер", "oblast", "димер"),
+    _p("Велика Димерка", "oblast", "велика димерк", "великої димерк"),
+    _p("Погреби", "oblast", "погреб"),
+    _p("Зазим'я", "oblast", "зазим"),
+    _p("Коцюбинське", "oblast", "коцюбинс"),
+    _p("Мощун", "oblast", "мощун"),
+    _p("Горенка", "oblast", "горенк"),
+    _p("Княжичі", "oblast", "княжич"),
+    _p("Гнідин", "oblast", "гнідин"),
+    _p("Глеваха", "oblast", "глевах"),
+    _p("Хотянівка", "oblast", "хотянівк"),
+    _p("Київщина", "oblast", "київщин"),
+]
+
+ELSEWHERE = [
+    _p("Одещина", "elsewhere", "одес", "одещин"),
+    _p("Дніпропетровщина", "elsewhere", "дніпро", "дніпропетровщин", "дніпрі", "дніпром"),
+    _p("Харківщина", "elsewhere", "харків", "харківщин"),
+    _p("Полтавщина", "elsewhere", "полтав"),
+    _p("Черкащина", "elsewhere", "черкас", "черкащин"),
+    _p("Миколаївщина", "elsewhere", "миколаїв"),
+    _p("Запоріжжя", "elsewhere", "запоріж", "запорізьк"),
+    _p("Херсонщина", "elsewhere", "херсон"),
+    _p("Сумщина", "elsewhere", "сумщин", "суми", "сумах"),
+    _p("Чернігівщина", "elsewhere", "чернігів"),
+    _p("Житомирщина", "elsewhere", "житомир"),
+    _p("Кіровоградщина", "elsewhere", "кіровоградщин", "кропивницьк"),
+    _p("Вінниччина", "elsewhere", "вінниц", "вінниччин"),
+    _p("Хмельниччина", "elsewhere", "хмельниц"),
+    _p("Львівщина", "elsewhere", "львів"),
+    _p("Чорноморськ", "elsewhere", "чорноморськ"),
+    _p("Кременчук", "elsewhere", "кременчу"),
+    _p("Кривий Ріг", "elsewhere", "кривий ріг", "кривому роз", "кривом"),
+    _p("Крим", "elsewhere", "крим", "криму"),
+    _p("Ізмаїл", "elsewhere", "ізмаїл"),
+    _p("Брянщина", "elsewhere", "брянськ", "брянсько"),
+    _p("Курщина", "elsewhere", "курськ", "курсько"),
+]
+
+PLACES: tuple[Place, ...] = tuple(MY_AREA + MY_DISTRICT + CITY + OBLAST + ELSEWHERE)
+
+# Named infrastructure. Not a tier of its own: a power plant matters because of
+# where it is, and the corpus names them alongside districts.
+INFRASTRUCTURE = (
+    ("ТЕЦ", "тец"),
+    ("аеропорт", "аеропорт"),
+    ("вокзал", "вокзал"),
+    ("метро", "метро"),
+    ("підстанція", "підстанц"),
+)
+
+_WORDISH = re.compile(r"[^а-яіїєґёa-z0-9'\- ]+", re.IGNORECASE)
+
+
+def _flatten(text: str) -> str:
+    """Lowercase and strip punctuation so stems match across `Жуляни/Жуляни.`."""
+    return _WORDISH.sub(" ", (text or "").lower())
+
+
+_WORDCHAR = re.compile(r"[а-яіїєґёa-z0-9'\-]", re.IGNORECASE)
+
+
+def _at_word_start(flat: str, i: int) -> bool:
+    return i == 0 or not _WORDCHAR.match(flat[i - 1])
+
+
+def _word_end(flat: str, i: int) -> int:
+    """Extend to the end of the word containing position i.
+
+    Stems are prefixes, so a match on `деміїв` inside `деміївка` would otherwise
+    leave `ка` behind. Callers that subtract place spans from the text need the
+    whole word gone, or every inflected toponym leaves debris.
+    """
+    while i < len(flat) and _WORDCHAR.match(flat[i]):
+        i += 1
+    return i
+
+
+def _stem_matches(flat: str) -> list[tuple[int, int, int, Place]]:
+    """Every (length, start, end, place) stem occurrence, word-aligned."""
+    found: list[tuple[int, int, int, Place]] = []
+    for place in PLACES:
+        for stem in place.stems:
+            start = flat.find(stem)
+            while start != -1:
+                if _at_word_start(flat, start):
+                    end = _word_end(flat, start + len(stem))
+                    found.append((len(stem), start, end, place))
+                start = flat.find(stem, start + 1)
+    return found
+
+
+def find_places(text: str) -> list[Place]:
+    """Gazetteer entries named in the text, resolved by longest match.
+
+    Longest-match is not a nicety: `київ` is a prefix of `київщин`, so without
+    it every "Київщину" would resolve as the city rather than the oblast — and
+    since city outranks oblast in relevance, 906 corpus messages would report
+    the wrong tier. The same applies to `дніпро` inside `дніпровський`.
+    """
+    flat = _flatten(text)
+    candidates = sorted(_stem_matches(flat), key=lambda c: (-c[0], c[1]))
+    taken: list[tuple[int, int]] = []
+    resolved: dict[str, Place] = {}
+    for _length, start, end, place in candidates:
+        if any(start < t_end and end > t_start for t_start, t_end in taken):
+            continue  # a longer stem already claimed this span
+        taken.append((start, end))
+        resolved.setdefault(place.name, place)
+    return list(resolved.values())
+
+
+def place_spans(text: str) -> list[tuple[int, int, Place]]:
+    """Resolved, non-overlapping (start, end, place) spans in flattened text.
+
+    Exposed so callers can subtract place names from a message and ask what is
+    left — the test for the bare-toponym-list template.
+    """
+    flat = _flatten(text)
+    candidates = sorted(_stem_matches(flat), key=lambda c: (-c[0], c[1]))
+    taken: list[tuple[int, int, Place]] = []
+    for _length, start, end, place in candidates:
+        if any(start < t_end and end > t_start for t_start, t_end, _ in taken):
+            continue
+        taken.append((start, end, place))
+    return sorted(taken, key=lambda t: t[0])
+
+
+def flatten(text: str) -> str:
+    """Public form of the normalisation `place_spans` indexes against."""
+    return _flatten(text)
+
+
+def resolve_scope(text: str) -> str:
+    """The most relevant tier named in the text, or `unknown` if none is.
+
+    Most relevant wins: "Жуляни та Троєщина" is about my area even though it
+    also names a distant one, because the notification decision hinges on the
+    nearest threat.
+    """
+    found = find_places(text)
+    if not found:
+        return "unknown"
+    tiers = {p.tier for p in found}
+    for tier in TIERS:
+        if tier in tiers:
+            return tier
+    return "unknown"
+
+
+def find_infrastructure(text: str) -> list[str]:
+    flat = _flatten(text)
+    return [name for name, stem in INFRASTRUCTURE if stem in flat]
+
+
+def is_relevant(text: str) -> bool:
+    """True unless the message is only about other regions, or names nowhere.
+
+    This is the cheap first-stage filter: measured against the corpus it drops
+    roughly 62% of traffic before anything expensive runs.
+    """
+    return resolve_scope(text) in ("my-area", "my-district", "city", "oblast")
