@@ -224,8 +224,7 @@ def inconsistencies(labels: list[dict], messages: dict[str, dict]) -> list[str]:
                        if l.get("decision") == "notify"
                        else f"silent · {l.get('silent_reason')}")
             text = messages.get(l.get("anchor"), {}).get("text", "")
-            text = text.replace("
-", " / ")[:64]
+            text = text.replace(chr(10), " / ")[:64]
             why = (l.get("why") or "").strip()
             out.append(f"    {l.get('id', '?'):<22} {verdict:<26} {text}")
             if why:
