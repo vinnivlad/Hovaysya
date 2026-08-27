@@ -276,8 +276,8 @@ const FILTERS = [
 ];
 
 const LEVELS = ["info", "alert", "shelter"];
-const ALARMS = ["ballistic", "mig", "cruise", "drone-jet", "drone", "recon",
-                "clear", "none"];
+const ALARMS = ["alert", "ballistic", "mig", "cruise", "drone-jet", "drone",
+                "recon", "clear", "none"];
 const SILENT_REASONS = ["too-far", "already-notified", "resolved", "insufficient"];
 // Five primary types, ordered by how urgently they need a reaction, one sound
 // each. The rest sit behind a secondary row so the common case stays one row.
@@ -323,7 +323,7 @@ const UA = {
   alarm: {
     ballistic: "балістика", mig: "МіГ", cruise: "ракета",
     "drone-jet": "реактивний", drone: "дрон", recon: "розвідник",
-    clear: "відбій", aviation: "—", none: "без звуку",
+    alert: "тривога", clear: "відбій", aviation: "—", none: "без звуку",
   },
   silent_reason: {
     "too-far": "далеко від мене", "already-notified": "вже будив",
@@ -512,7 +512,9 @@ function openDraft(decision) {
     at: new Date(m.t * 1000).toISOString().replace(/\.\d+Z$/, "Z"),
     decision: "notify",
     level: m.as ? "alert" : (prev && prev.level ? prev.level : "alert"),
-    alarm: m.as === "clear" ? "clear" : (m.al === "none" ? "drone" : m.al),
+    alarm: m.as === "clear" ? "clear"
+         : m.as === "alert" ? "alert"
+         : (m.al === "none" ? "drone" : m.al),
     silent_reason: prev && prev.silent_reason ? prev.silent_reason : "already-notified",
     // A moment is judged in context, so a message stating no type or place
     // inherits the last one the feed gave. Judging posts in isolation is the
@@ -583,6 +585,11 @@ function renderForm() {
       хибне пробудження. Перевір, чи є в тексті щось конкретніше.</div>`;
   }
 
+  if (!m.as && m.ce === "probable" && m.th !== "none") {
+    html += `<div class="inh">Це <b>попередження</b>, не подія — загроза пуску,
+      а не пуск. Статус оновити варто, але новий звук тут переграє тривогу
+      даремно: він потрібен, коли пуск підтвердиться.</div>`;
+  }
   if (m.as) {
     html += `<div class="inh">Це <b>${m.as === "clear" ? "відбій" : "оголошення тривоги"}</b> —
       сирена, а не окрема ціль. Обидва мають звучати: на оголошення бо треба
@@ -607,7 +614,8 @@ function renderForm() {
     pick("threat", THREATS_MORE, draft.threat) + `</details></div>`;
 
   if (draft.decision === "notify") {
-    const auto = m.as === "clear" ? "clear" : (ALARM_FOR[draft.threat] || "drone");
+    const auto = m.as ? (m.as === "clear" ? "clear" : "alert")
+                      : (ALARM_FOR[draft.threat] || "drone");
     html += `<div class="row"><label>звук ` +
       (draft.alarm === auto ? `<span class="auto">за типом</span>`
                             : `<span class="auto manual">вручну</span>`) +
@@ -648,7 +656,7 @@ function renderForm() {
       const v = b.dataset.v;
       draft[f] = (f === "repeat_of" && v === "") ? null : v;
       // Sound follows the type until it is set by hand.
-      if (f === "threat" && !draft._alarmManual && m.as !== "clear") {
+      if (f === "threat" && !draft._alarmManual && !m.as) {
         draft.alarm = ALARM_FOR[v] || "drone";
       }
       if (f === "alarm") draft._alarmManual = true;

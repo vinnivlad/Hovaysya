@@ -51,6 +51,17 @@ _THREAT = tuple((kind, re.compile(pat, re.IGNORECASE)) for kind, pat in THREAT_R
 # takeoff boilerplate reads "МіГ-31К — носій аеробалістичної ракети", which any
 # ballistic pattern matches even though nothing is flying — so the carrier
 # state must win until a launch is actually mentioned.
+# Anticipation, not occurrence: a warning that something *may* be launched or
+# used. Checked before every other certainty rule because the phrase contains
+# the same words an actual event does.
+_ANTICIPATED = re.compile(
+    r"загроз\w*\s+(пуск|застосув|використ|удар|атак)|"
+    r"можлив\w*\s+(пуск|застосув|удар)|"
+    r"ризик\w*\s+(пуск|застосув)|"
+    r"загроза\s+балістик|загроза\s+застосування",
+    re.IGNORECASE,
+)
+
 _MIG = re.compile(r"м[іi]г-?\s?31", re.IGNORECASE)
 _LAUNCHED = re.compile(r"пуск|запуск|стартув|випустив|відпрац", re.IGNORECASE)
 
@@ -342,6 +353,12 @@ def certainty_hint(text: str) -> str:
     # unknown state, not a confirmed one, and above all not safety.
     if _hits(text, IMPACT_TERMS) and not place_spans(text):
         return "lost"
+    # An anticipatory warning is not an event. "Загроза пуску балістичних ракет"
+    # and "Є інформація про пуск" both contain "пуск", but only the second means
+    # something is in the air — and the difference decides whether a new sound
+    # fires at all, so it cannot be blurred.
+    if _ANTICIPATED.search(text or ""):
+        return "probable"
     # A takeoff is a possibility, not a fact: the corpus has
     # "Борти МіГ-31К розвернулись на аеродром базування" as often as it has a
     # launch, and "курс поки не відомий" says so outright.
@@ -368,12 +385,24 @@ def suggest(text: str) -> dict[str, object]:
     # An all-clear says the opposite: nothing is flying any more. Only when no
     # type was actually named — "По балістиці відбій. 2 шахеди на Одесу" keeps
     # its shaheds.
-    if threat == "unknown" and alert_state(text) == "clear":
+    state = alert_state(text)
+    if threat == "unknown" and state == "clear":
         threat = "none"
+
+    # A siren is not a target. A declaration with no type stated must not
+    # borrow a threat tone — sounding like a drone when nobody said drone is how
+    # the tones stop meaning anything.
+    if state == "clear":
+        alarm = "clear"
+    elif state == "alert":
+        alarm = "alert"
+    else:
+        alarm = alarm_for(threat)
+
     return {
         "threat": threat,
         "strength": live_strength(text),
-        "alarm": alarm_for(threat),
+        "alarm": alarm,
         "modality": modality_hint(text),
         "certainty": certainty_hint(text),
         "shapes": live_shapes(text),

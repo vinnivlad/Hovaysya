@@ -43,7 +43,7 @@ rewriting, and so a diff shows exactly which labels changed.
 | `at` | ISO 8601 UTC | yes | The decision moment. |
 | `decision` | enum | yes | `notify` \| `silent` |
 | `level` | enum | if `notify` | `info` \| `alert` \| `shelter` — how insistent |
-| `alarm` | enum | if `notify` | `ballistic` \| `mig` \| `cruise` \| `drone-jet` \| `drone` \| `recon` \| `clear` \| `none` — which sound |
+| `alarm` | enum | if `notify` | `alert` \| `ballistic` \| `mig` \| `cruise` \| `drone-jet` \| `drone` \| `recon` \| `clear` \| `none` — which sound |
 | `silent_reason` | enum | if `silent` | why no notification was warranted |
 | `threat` | enum | yes | what is flying |
 | `modality` | enum | yes | live threat, aftermath, summary, or social |
@@ -76,7 +76,7 @@ each other and get applied inconsistently. So insistence and sound are separate.
 | `alert` | sound, wakes you, does not repeat | a real threat to the city that is not near you yet |
 | `shelter` | loud, repeating, full-screen | act now — near you, or ballistic anywhere over Kyiv |
 
-**`alarm` — which sound:** `ballistic` · `mig` · `cruise` · `drone-jet` · `drone` · `recon` · `clear` · `none`
+**`alarm` — which sound:** `alert` · `ballistic` · `mig` · `cruise` · `drone-jet` · `drone` · `recon` · `clear` · `none`
 
 The point of separating sound from loudness is that **you should know what is
 coming without opening your eyes.** Ballistic must not sound like a drone: woken
@@ -113,6 +113,43 @@ launch may be an hour away, or may never come; a propeller Shahed leaves
 minutes; a jet Shahed far less; ballistic none. Sharing a tone across those
 would defeat the point of separate sounds, which is knowing what is coming
 before opening your eyes.
+
+### When a new sound fires — and when it must not
+
+From labelling a real sequence, 2026-08-27 20:55-20:56:
+
+```
+20:55  ⚠️❗️КИЇВ - ТРИВОГА. В укриття!                      alert sound, type unknown
+20:56  ❗️❗❗Загроза пуску балістичних ракет з Курської      NO new sound
+20:56  ❗️❗Є інформація про пуск балістичної ракети         new sound: ballistic
+```
+
+The middle message is the one that matters. It warns that a launch *may* happen;
+nothing is in the air. Re-alarming there spends the user's attention on an
+anticipation, and the sound that should mean "ballistic is coming" gets worn out
+before it is true.
+
+The rule this gives:
+
+> **A new sound fires when the threat class changes and the new information is
+> confirmed.** An anticipatory warning updates the status and does not re-alarm.
+
+No new field is needed — `certainty` already carries it. `загроза пуску` is
+`probable`, `є інформація про пуск` is `confirmed`. The implementation
+consequence is that `загроза\s+(пуску|застосування)` must be detected *before*
+any other certainty rule, because the phrase contains the same words an actual
+launch does.
+
+This is also the precise form of the original complaint about repeat signals:
+not "notify more often", but "notify again exactly when something new and real
+happens".
+
+### `alert` — the sound of a declaration with no type yet
+
+`КИЇВ - ТРИВОГА. В укриття!` states that something is coming without saying
+what. It must be audible, and it must not borrow a threat tone: sounding like a
+drone when nobody said drone is how the tones stop meaning anything. So a siren
+declaration gets its own generic `alert` tone, and the labeler pre-fills it.
 
 ### `clear` — the all-clear is a notification too
 
