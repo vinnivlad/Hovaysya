@@ -24,7 +24,7 @@ THREAT_RULES: tuple[tuple[str, str], ...] = (
     # крилата ракета that way, and without them it also matches Крушинка,
     # кружляють, and Крим.
     ("cruise", r"крилат|калібр|х-?101|х-?59|х-?55|бандерол|\bкр\b|\bкрів\b"),
-    ("shahed-jet", r"реактивн"),
+    ("shahed-jet", r"реактив"),
     ("kab", r"\bкаб\b|\bкар\b|керован(а|их|ої)\s+авіабомб"),
     # Any other aviation is not a threat class. A bomber taking off triggers no
     # alert — the alert arrives with the cruise missiles it launches, and those
@@ -131,6 +131,8 @@ LIVE_SHAPES: tuple[tuple[str, str], ...] = (
                    r"уважн|загроза|тривог"),
 )
 _LIVE = tuple((name, re.compile(pat, re.IGNORECASE)) for name, pat in LIVE_SHAPES)
+
+_THREAT_BESIDE_PLACE = re.compile(_THREAT_WORD, re.IGNORECASE)
 
 # Consequence-management vocabulary. Measured 20-56 min from the nearest live
 # threat, so it is genuinely retrospective and safe to treat as aftermath.
@@ -395,7 +397,13 @@ def alert_state(text: str) -> str | None:
     # declared is not a siren.
     if any(t in low for t in ("можуть оголосити", "може бути оголошен",
                               "буде оголошен", "очікуємо тривог",
-                              "можлива тривога", "можуть дати тривог")):
+                              "можлива тривога", "можуть дати тривог",
+                              # Found live, and it woke him: "Київ очікує на
+                              # повітряну тривогу через 10-15 хвилин". The
+                              # mirror guard covered "очікує на відбій" only.
+                              "очікує на повітряну тривог",
+                              "очікує на тривог", "очікуємо на тривог",
+                              "чекаємо на тривог", "перед тривогою")):
         return None
     if any(t in low for t in ALERT_CLEAR_TERMS):
         return "clear"
@@ -449,6 +457,11 @@ def live_shapes(text: str) -> list[str]:
         found.append("bare-place-list")
     if has_marker_emoji(text) and place_spans(text):
         found.append("emoji-with-place")
+    # A threat word beside a resolved place, with no preposition between them:
+    # "Святошин реактив", "Десна підліт реактива", "Бровари два реактива". The
+    # prepositional shapes above wanted `на` or `над` and these have neither.
+    if _THREAT_BESIDE_PLACE.search(text or "") and place_spans(text):
+        found.append("threat-with-place")
     return found
 
 
@@ -521,6 +534,7 @@ def has_marker_emoji(text: str) -> bool:
 STRONG_SHAPES = frozenset({
     "count-marker",
     "launch",
+    "threat-with-place",
     "threat-toward-place",
     "place-with-threat",
     "movement",
@@ -565,6 +579,25 @@ def _strongly_social(text: str) -> bool:
     return sum(1 for t in SOCIAL_TERMS if t in low) >= 3
 
 
+# Saying what *will* be attacked is a forecast, however urgent the wording.
+# "🚨Під атакою реактивних шахедів буде Київ, Бровари та ймовірно Вишневе" woke
+# him on the first evening of live watching: it names his own neighbour and
+# nothing was in the air yet.
+#
+# Deliberately narrow. Several live reports carry a forecast clause — "⚠️Нові 2
+# реактивні шахеди з акваторії Чорного моря на Миколаївщину, будуть атакувати" —
+# and those are drones already flying. So the patterns below match the shapes
+# where the forecast *is* the message, not where it trails a live report.
+_FORECAST = re.compile(
+    r"під атакою.{0,40}\bбуде\b|"
+    r"\bатака буде\b|"
+    r"ймовірні мікрорайони|"
+    r"ворог (планує|готує|може завдати)|"
+    r"попередження про (ймовірн|можлив)",
+    re.IGNORECASE,
+)
+
+
 def modality_hint(text: str) -> str:
     """live-threat | aftermath | summary-news | non-threat.
 
@@ -572,7 +605,7 @@ def modality_hint(text: str) -> str:
     also contains threat words; impact terms are checked before aftermath so an
     explosion report is never demoted to retrospective.
     """
-    if _hits(text, SUMMARY_TERMS):
+    if _hits(text, SUMMARY_TERMS) or _FORECAST.search(text or ""):
         return "summary-news"
     if _hits(text, IMPACT_TERMS):
         return "live-threat"

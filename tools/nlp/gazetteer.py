@@ -380,6 +380,7 @@ LANDMARKS = [
     # added, so the prefix has to be part of neither stem.
     _p("Проспект", "city", "тц проспект", "трц проспект", landmark=True),
     _p("Лавіна", "city", "лавіна", "лавина", landmark=True),   # Виноградар
+    _p("Кільцева", "city", "кільцева", "кільцевій", "кільцевої", landmark=True),
 
     _p("Видубичі", "city", "видубич"),
     _p("Залісся", "oblast", "залісся"),

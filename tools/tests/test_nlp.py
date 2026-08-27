@@ -872,3 +872,48 @@ def test_a_loop_over_my_area_is_a_live_threat():
                  "Намотав коло по Києву і знову на Рожни"):
         assert hints.suggest(text)["modality"] == "live-threat", text
     assert "movement" in hints.live_shapes("На Жуляни знову коло.")
+
+
+def test_a_jet_drone_is_a_jet_drone_without_the_full_word():
+    """`war_monitor` writes "1х реактив", "3х реактива", "по реактиву" — 279
+    messages whose class was simply not detected, and it is the fastest class,
+    the one with its own tone."""
+    for text in ("🅿️ 1х реактив на Крюківщину / Борщагівки.",
+                 "Бровари два реактива, швидкість за 350",
+                 "Десна підліт реактива!",
+                 "Сектор ТЕЦ-6 - Биківня - Бровари увага по реактиву!"):
+        assert hints.threat_hint(text) == "shahed-jet", text
+
+
+def test_a_threat_word_beside_a_place_needs_no_preposition():
+    """"Святошин реактив. Бородянка реактив." read as `non-threat`: the shapes
+    that existed all wanted `на` or `над` in front, and this has neither."""
+    for text in ("Святошин реактив. Бородянка реактив.", "Десна підліт реактива!"):
+        assert hints.suggest(text)["modality"] == "live-threat", text
+    assert "threat-with-place" in hints.live_shapes("Святошин реактив.")
+
+
+def test_a_forecast_of_an_attack_is_not_an_attack():
+    """"🚨Під атакою реактивних шахедів буде Київ, Бровари та ймовірно Вишневе"
+    woke him on the first evening of live watching. It names his own neighbour,
+    and nothing was in the air yet."""
+    for text in ("🚨Під атакою реактивних шахедів буде Київ, Бровари та ймовірно Вишневе.",
+                 "Поки все виглядає так що під атакою буде Київ.",
+                 "Ймовірні мікрорайони які ворог може атакувати у м.Києві цієї ночі"):
+        assert hints.suggest(text)["modality"] == "summary-news", text
+
+
+def test_a_live_report_with_a_forecast_clause_is_still_live():
+    """The narrowness is the point: several real reports trail a forecast, and
+    those drones are already flying."""
+    text = ("⚠️Нові 2 реактивні шахеди з акваторії Чорного моря на "
+            "Миколаївщину, будуть атакувати")
+    assert hints.suggest(text)["modality"] == "live-threat"
+
+
+def test_a_forecast_siren_is_still_not_a_siren():
+    """Found live, and it rang: "Київ очікує на повітряну тривогу через 10-15
+    хвилин". The mirror guard covered "очікує на відбій" only."""
+    assert hints.alert_state(
+        "🔴Київ очікує на повітряну тривогу через 10-15 хвилин.") is None
+    assert hints.alert_state("🛑 ТРИВОГА") == "alert"
