@@ -9,7 +9,7 @@
     --bg: #14181d; --panel: #1c2127; --panel2: #232931; --line: #2f373f;
     --ink: #e8ecef; --soft: #a3aeb9; --faint: #6f7c88;
     --now: #f0a83c; --done: #4fbfae; --near: #f0a83c; --dist: #6f7c88;
-    --shelter: #e5484d; --alert: #f0a83c; --info: #5b9dd9; --silent: #6f7c88;
+    --urgent: #e5484d; --alert: #f0a83c; --info: #5b9dd9; --silent: #6f7c88;
     --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
     --sans: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
   }
@@ -88,7 +88,7 @@
     border: 1px solid var(--line); color: var(--faint);
   }
   .tag.scope-my-area, .tag.scope-my-district { color: var(--near); border-color: var(--near); }
-  .tag.toward { color: var(--shelter); border-color: var(--shelter); font-weight: 600; }
+  .tag.toward { color: var(--urgent); border-color: var(--urgent); font-weight: 600; }
   .tag.away { color: var(--done); border-color: var(--done); }
   .tag.weak { color: var(--soft); border-style: dashed; }
   .tag.mod-aftermath { color: #c98ad6; border-color: #6a5f8a; }
@@ -117,8 +117,6 @@
   .pick button .sub { font-size: 9.5px; color: var(--faint); letter-spacing: .02em; }
   .pick button.on { background: var(--now); color: #14181d; border-color: var(--now); font-weight: 600; }
   .pick button.on .sub { color: #14181d; opacity: .72; }
-  .pick button.on.shelter { background: var(--shelter); border-color: var(--shelter); color: #fff; }
-  .pick button.on.shelter .sub { color: #fff; opacity: .8; }
   .pick button.on.info { background: var(--info); border-color: var(--info); color: #14181d; }
   .pick button.on.muted { background: var(--panel2); border-color: var(--soft); color: var(--ink); }
   .pick button.on.muted .sub { color: var(--faint); }
@@ -138,7 +136,6 @@
   .seg button:first-child { border-radius: 3px 0 0 3px; }
   .seg button:last-child { border-radius: 0 3px 3px 0; }
   .seg button.on { background: var(--now); color: #14181d; border-color: var(--now); font-weight: 600; }
-  .seg button.on.shelter { background: var(--shelter); border-color: var(--shelter); color: #fff; }
   .seg button.on.info { background: var(--info); border-color: var(--info); color: #14181d; }
   .ctx {
     background: var(--bg); border: 1px solid var(--line); border-radius: 3px;
@@ -152,16 +149,16 @@
   .msg:hover .quick, .msg.sel .quick { opacity: 1; }
   .quick:hover { border-color: var(--soft); }
   .req {
-    font-family: var(--mono); font-size: 9px; color: var(--shelter);
-    border: 1px solid var(--shelter); border-radius: 2px; padding: 0 3px;
+    font-family: var(--mono); font-size: 9px; color: var(--urgent);
+    border: 1px solid var(--urgent); border-radius: 2px; padding: 0 3px;
     letter-spacing: .04em;
   }
   .msg.siren { background: #171d24; }
-  .msg.siren-alert { border-left-color: var(--shelter); }
+  .msg.siren-alert { border-left-color: var(--urgent); }
   .msg.siren-clear { border-left-color: var(--done); }
   .msg.siren .tx { font-weight: 600; }
   .tag.siren-tag { font-weight: 600; }
-  .tag.siren-tag.alert { color: var(--shelter); border-color: var(--shelter); }
+  .tag.siren-tag.alert { color: var(--urgent); border-color: var(--urgent); }
   .tag.siren-tag.clear { color: var(--done); border-color: var(--done); }
   .moment {
     display: flex; align-items: baseline; gap: 10px; cursor: pointer;
@@ -178,7 +175,6 @@
     padding: 0 4px;
   }
   .moment .mw { color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .moment.shelter { border-left-color: var(--shelter); } .moment.shelter .mk, .moment.shelter .mr { color: var(--shelter); }
   .moment.alert   { border-left-color: var(--alert); }   .moment.alert .mk, .moment.alert .mr { color: var(--alert); }
   .moment.info    { border-left-color: var(--info); }    .moment.info .mk, .moment.info .mr { color: var(--info); }
   .moment.silent  { border-left-color: var(--silent); }  .moment.silent .mk { color: var(--silent); }
@@ -208,7 +204,7 @@
   }
   .inh b { color: var(--ink); font-family: var(--mono); }
   .warn {
-    background: #3b1c1e; border: 1px solid var(--shelter); color: #ffb3b5;
+    background: #3b1c1e; border: 1px solid var(--urgent); color: #ffb3b5;
     border-radius: 3px; padding: 7px 9px; font-size: 12px; margin-bottom: 11px;
     line-height: 1.4;
   }
@@ -277,7 +273,11 @@ const FILTERS = [
   { id: "all",      name: "усе", test: () => true },
 ];
 
-const LEVELS = ["info", "alert", "shelter"];
+// Two levels, not three. `shelter` duplicated what the sound already said:
+// across a labelled night it was used three times and every one was
+// ballistic. Insistence is a property of the tone now — the ballistic one
+// repeats and takes the screen, the drone one rings once.
+const LEVELS = ["info", "alert"];
 const ALARMS = ["alert", "ballistic", "mig", "cruise", "drone-jet", "drone",
                 "recon", "clear", "none"];
 const SILENT_REASONS = ["too-far", "already-notified", "resolved", "insufficient"];
@@ -308,10 +308,9 @@ const ALARM_FOR = {
 // Ukrainian labels for clicking; stored values stay the schema's enums.
 const UA = {
   decision: { notify: "буди", silent: "не буди" },
-  level: { info: "тихо", alert: "звук", shelter: "гучно, в укриття" },
+  level: { info: "тихо", alert: "звук" },
   levelHint: {
-    info: "тільки статус", alert: "розбудити раз",
-    shelter: "повторно, весь екран",
+    info: "тільки статус", alert: "розбудити — звук скаже що робити",
   },
   threat: {
     recon: "розвідник", mig: "МіГ-31К", shahed: "дрон",
@@ -577,7 +576,7 @@ function renderForm() {
 
   const earlier = labelsForNight()
     .filter(l => l.id !== draft.id && l.decision === "notify" && l.at < draft.at);
-  const weakShelter = draft.decision === "notify" && draft.level === "shelter" && m.st === "weak";
+  const weakShelter = draft.decision === "notify" && draft.level === "alert" && m.st === "weak";
   const before = visibleMessages().slice(Math.max(0, selIx - 3), selIx);
   let html =
     `<div class="moment-head"><span class="mt">${esc(m.hm)}</span>` +
@@ -600,8 +599,9 @@ function renderForm() {
 
   if (weakShelter) {
     html += `<div class="warn">Єдина ознака тут — емодзі, а це слабкий сигнал:
-      ⚠️ стоїть на 26% усіх повідомлень. <b>Гучно</b> на такому — це майбутнє
-      хибне пробудження. Перевір, чи є в тексті щось конкретніше.</div>`;
+      ⚠️ стоїть на 26% усіх повідомлень. Побудка на такому — це майбутнє
+      хибне пробудження. Перевір, чи є в тексті щось конкретніше, або постав
+      <b>тихо</b>.</div>`;
   }
 
   if (!m.as && m.ce === "probable" && m.th !== "none") {
@@ -716,7 +716,7 @@ function save(advance) {
   // unbearable, and most of a night is silent.
   if (draft.decision === "notify" && !draft.why.trim()) {
     const ta = document.querySelector("textarea[data-f=why]");
-    if (ta) { ta.focus(); ta.style.borderColor = "var(--shelter)"; }
+    if (ta) { ta.focus(); ta.style.borderColor = "var(--urgent)"; }
     return;
   }
   const out = Object.assign({}, draft);

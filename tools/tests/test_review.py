@@ -111,9 +111,13 @@ def test_info_level_with_nothing_flying_is_fine():
     assert check([label(threat="none", level="info", alarm="none")], {}) == []
 
 
-def test_shelter_on_an_all_clear_warns():
-    f = check([label(level="shelter", certainty="clear")], {})
+def test_a_threat_tone_on_an_all_clear_warns():
+    f = check([label(certainty="clear", alarm="drone")], {})
     assert any("all-clear" in m for m in ids(f, "warning"))
+
+
+def test_the_all_clear_tone_on_an_all_clear_is_fine():
+    assert check([label(certainty="clear", alarm="clear")], {}) == []
 
 
 def test_audible_notify_on_aftermath_warns():
@@ -121,15 +125,15 @@ def test_audible_notify_on_aftermath_warns():
     assert any("aftermath" in m for m in ids(f, "warning"))
 
 
-def test_shelter_on_emoji_only_evidence_warns():
+def test_a_wake_up_on_emoji_only_evidence_warns():
     msgs = {"mon1tor_ua/1": {"text": "🔴Київ — буде гучно."}}
-    f = check([label(level="shelter", alarm="drone")], msgs)
+    f = check([label(alarm="drone")], msgs)
     assert any("emoji" in m for m in ids(f, "warning"))
 
 
-def test_shelter_on_textual_evidence_does_not_warn():
+def test_a_wake_up_on_textual_evidence_does_not_warn():
     msgs = {"mon1tor_ua/1": {"text": "⚠️1 реактивний шахед на Жуляни."}}
-    assert check([label(level="shelter")], msgs) == []
+    assert check([label()], msgs) == []
 
 
 def test_already_notified_without_an_earlier_notify_warns():
@@ -243,7 +247,7 @@ def test_a_notify_and_a_silent_on_the_same_signature_are_reported():
 def test_different_situations_are_not_compared():
     from tools.labeler.review import inconsistencies
 
-    a = label(id="a", scope="my-area", level="shelter")
+    a = label(id="a", scope="my-area", alarm="ballistic")
     b = label(id="b", at="2026-08-27T20:00:00Z", scope="city", level="alert")
     assert inconsistencies([a, b], {}) == []
 
@@ -251,9 +255,9 @@ def test_different_situations_are_not_compared():
 def test_the_reason_is_shown_so_a_split_can_be_judged():
     from tools.labeler.review import inconsistencies
 
-    a = label(id="a", at="2026-08-27T19:00:00Z", level="shelter",
+    a = label(id="a", at="2026-08-27T19:00:00Z", alarm="ballistic",
               why="йшло прямо на Жуляни")
-    b = label(id="b", at="2026-08-27T20:00:00Z", level="alert",
+    b = label(id="b", at="2026-08-27T20:00:00Z", level="info", alarm="none",
               why="ще далеко, тільки курс")
     out = "\n".join(inconsistencies([a, b], {}))
     assert "йшло прямо на Жуляни" in out

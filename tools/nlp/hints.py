@@ -266,6 +266,12 @@ def alert_state(text: str) -> str | None:
     invert the meaning.
     """
     low = _low(text)
+    # "Київ очікує на відбій" is waiting for one, not having one. Reading it as
+    # an all-clear produced a false wake-up telling the user it was over while
+    # a drone was still up.
+    if any(t in low for t in ("очікує на відбій", "очікуємо на відбій",
+                              "чекаємо на відбій", "очікуємо відбій")):
+        return "alert" if any(t in low for t in ALERT_ON_TERMS) else None
     if any(t in low for t in ALERT_CLEAR_TERMS):
         return "clear"
     if any(t in low for t in ALERT_ON_TERMS):

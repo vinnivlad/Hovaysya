@@ -516,8 +516,16 @@ def test_alert_declarations_and_all_clears_are_recognised():
               "⚠️У Києві тривога через шахед"):
         assert hints.alert_state(t) == "alert", t
     for t in ("🛑 Відбій тривоги", "Відбій, усім солодких снів та тихої ночі💕",
-              "⚪️Київ очікує на відбій."):
+              "🟢 ВІДБІЙ ТРИВОГИ"):
         assert hints.alert_state(t) == "clear", t
+
+
+def test_waiting_for_an_all_clear_is_not_an_all_clear():
+    """"Київ очікує на відбій" is waiting for one. Announcing it told the user
+    it was over while a drone was still up — one of the first run's false
+    wake-ups."""
+    assert hints.alert_state("⚪️Київ очікує на відбій.") != "clear"
+    assert hints.alert_state("⚪️Очікуємо на відбій.") != "clear"
 
 
 def test_an_all_clear_wins_over_the_word_alert_in_the_same_message():

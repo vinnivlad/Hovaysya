@@ -206,6 +206,17 @@ ELSEWHERE = [
     _p("Луганщина", "elsewhere", "луганщин", "луганськ"),
     _p("Чорноморськ", "elsewhere", "чорноморськ"),
     _p("Кременчук", "elsewhere", "кременчу"),
+    # Named as ballistic targets during the labelled night and resolving as
+    # nowhere, which let `nationwide` treat them as untargeted launches.
+    _p("Павлоград", "elsewhere", "павлоград"),
+    _p("Кам'янське", "elsewhere", "кам'янськ", "камянськ"),
+    _p("Знам'янка", "elsewhere", "знам'янк", "знамянк"),
+    _p("Прилуки", "elsewhere", "прилук"),
+    _p("Ніжин", "elsewhere", "ніжин"),
+    _p("Полтава", "elsewhere", "полтав"),
+    _p("Ізюм", "elsewhere", "ізюм"),
+    _p("Лозова", "elsewhere", "лозов"),
+    _p("Синельникове", "elsewhere", "синельников"),
     _p("Кривий Ріг", "elsewhere", "кривий ріг", "кривого рог", "кривим рог",
        "кривом", "криворіж", "криворізьк"),
     _p("Крим", "elsewhere", "крим", "криму"),

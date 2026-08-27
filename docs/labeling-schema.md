@@ -69,13 +69,35 @@ detach every stored label.
 Nine levels (3 loudness x 3 threat types) would be unlabelable: they blur into
 each other and get applied inconsistently. So insistence and sound are separate.
 
-**`level` — how insistent:**
+**`level` — audible or not:**
 
 | level | phone behaviour | use when |
 | --- | --- | --- |
 | `info` | silent; the persistent status notification updates only | something changed worth knowing, nothing to act on |
-| `alert` | sound, wakes you, does not repeat | a real threat to the city that is not near you yet |
-| `shelter` | loud, repeating, full-screen | act now — near you, or ballistic anywhere over Kyiv |
+| `alert` | sound — and the tone says what to do | anything worth waking for |
+
+There were three levels at first, with `shelter` for "loud, repeating, full
+screen". It was dropped after the first labelled night, where it was used three
+times out of twenty-three and every one was ballistic — it was saying what the
+ballistic tone already said.
+
+**Insistence is now a property of the tone, not a separate axis.** The ballistic
+tone repeats and takes the screen; the drone tone rings once; the recon tone is
+barely there. In the user's words: "у нас же різні звуки на різні загрози, цього
+достатньо" — the sound tells you what to do, so a second axis for how urgently
+only adds a way to disagree with it.
+
+Why `shelter` existed at all is the same reason it is not needed: "я там поставив
+шелтер бо на балістику ховатись треба завжди і зразу". That is now the definition
+of the ballistic tone rather than a level layered on top of it, and it fixes two
+rules in the policy:
+
+- **Ballistic always notifies audibly, immediately, and city-wide.** No
+  proximity qualification — flight time is minutes, so there is no room for
+  geography. Only a target stated in another region takes it out of scope.
+- **The ballistic tone is never used for anything else.** If it sounds, hiding is
+  the correct response every time, which is only true if nothing quieter borrows
+  it.
 
 **`alarm` — which sound:** `alert` · `ballistic` · `mig` · `cruise` · `drone-jet` · `drone` · `recon` · `clear` · `none`
 

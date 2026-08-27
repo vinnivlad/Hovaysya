@@ -1,0 +1,305 @@
+"""Episode and novelty tracking — the part the labelled night said to build first.
+
+Measuring `heading` against 124 real labels showed direction is not what drives
+the decision. Novelty is: every `position` label that woke the user says so in
+its note ("новий дрон", "ще один дрон", "виліз поруч з районом"), and
+`already-notified` carries 78 of the 101 silent labels.
+
+So the state this holds is deliberately small:
+
+- whether an episode is open, and whether the siren has been announced
+- what has already been notified about, so a repeat can be recognised
+- which places near the user have been named recently, so a *new* one can be
+
+Three parameters decide behaviour, and all three are tuned against labels rather
+than guessed — see `tools/eval`.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+
+from ..nlp import hints
+from ..nlp.gazetteer import find_places
+
+# An episode closes on an all-clear, or after this long with no live threat.
+IDLE_CLOSE_S = 45 * 60
+
+# A place near the user counts as new again once it has been quiet this long.
+# The night showed "Жуляни" waking him at 07:02 and again at 07:35 after a lull,
+# with the note "новий дрон" — but 10 minutes let far too much through.
+RING_MEMORY_S = 20 * 60
+
+# Words the channels use when adding a target rather than restating one.
+#
+# Ordinals are deliberately absent. "‼️ Київ — спуск балістики! Друга" counts
+# the second missile of the same volley, and the user labelled all three of
+# those as "уточнення попереднього" — treating them as novelty produced three
+# shelter-level false wake-ups in a row.
+_NOVELTY = re.compile(
+    r"\bще\b|\+\s*\d|\bнов[аиійе]\w*|\bнаступн\w*|\bдодатков\w*|"
+    r"\bдолетів\b|\bз.явив\w*",
+    re.IGNORECASE,
+)
+
+# A launch verb marks a new event only when it names where the launch came
+# from. The labelled night says this outright:
+#
+#   ‼️ Вихід балістики з Брянська      shelter   "Пуск невідомо куди"
+#   ‼️Балістика на Київ/передмістя      silent    "уточнення попереднього"
+#   ‼️ Київ — спуск балістики! Третя    silent
+#
+# Launched *from* somewhere is an event; arriving *at* somewhere is the same
+# missiles being tracked. Keying on the verb alone re-fired four times.
+_LAUNCH = re.compile(r"\bвихід\w*|\bпуск\w*|\bспуск\w*|\bстарт\w*", re.IGNORECASE)
+
+# ...unless the message is counting off one volley. "спуск балістики! Друга"
+# contains a launch verb but is the second missile of a wave already announced,
+# and the user labelled every such message "уточнення попереднього". The veto
+# has to be explicit because the launch verb is right there in the text.
+_ORDINAL = re.compile(
+    r"\bдруг[аийе]\w*|\bтрет[яійе]\w*|\bчетверт\w*|\bп.ят[аийе]\w*|"
+    r"\bшост\w*",
+    re.IGNORECASE,
+)
+
+# After waking someone, a bare position message must not wake them again. Only
+# an explicit new target may, and only inside this window. Seven of the twenty
+# false wake-ups in the first run were repeats within it.
+#
+# Near the user it has to be shorter: he was woken for Zhuliany at 07:02, 07:06
+# and 07:35 and called each one a new drone. Twenty minutes silenced two of the
+# three.
+REFRACTORY_S = 20 * 60
+REFRACTORY_NEAR_S = 6 * 60
+
+# Two channels announcing the same launch a minute apart is one launch. The
+# pattern mining measured a median 39 s lag between channels reporting the same
+# event, p90 167 s, so a window of four minutes covers it.
+LAUNCH_DEDUP_S = 4 * 60
+
+NEAR_TIERS = ("my-area", "my-district")
+
+
+@dataclass
+class Sent:
+    """A notification the policy has already issued in this episode."""
+
+    ts: int
+    level: str
+    alarm: str
+
+
+@dataclass
+class Episode:
+    opened_at: int
+    # The class of threat this episode is about, carried forward so a bare
+    # "Жуляни" during a ballistic wave is not read as a fresh drone. The
+    # labeler has done this since the user pointed out that judging posts in
+    # isolation is the wrong unit; the policy had not.
+    threat: str | None = None
+    alert_announced: bool = False
+    last_launch: int | None = None
+    cleared: bool = False
+    sent: list[Sent] = field(default_factory=list)
+    # place name -> last time it was named near the user
+    ring_seen: dict[str, int] = field(default_factory=dict)
+    last_live: int = 0
+
+    @property
+    def notified(self) -> bool:
+        """Whether anything audible has been sent for this episode."""
+        return any(s.level != "info" for s in self.sent)
+
+    @property
+    def loudest(self) -> str | None:
+        order = {"info": 0, "alert": 1}
+        audible = [s for s in self.sent if s.level != "info"]
+        if not audible:
+            return None
+        return max(audible, key=lambda s: order[s.level]).level
+
+    def alarms_used(self) -> set[str]:
+        return {s.alarm for s in self.sent if s.level != "info"}
+
+
+@dataclass
+class Observation:
+    """What one message says, as the policy needs it."""
+
+    ts: int
+    text: str
+    threat: str
+    alarm: str
+    modality: str
+    certainty: str
+    scope: str
+    heading: str
+    strength: str
+    alert_state: str | None
+    nationwide: bool
+    ring_places: tuple[str, ...]
+    says_new: bool
+
+    @property
+    def near(self) -> bool:
+        return self.scope in NEAR_TIERS
+
+    @property
+    def live(self) -> bool:
+        return self.modality == "live-threat"
+
+
+def observe(ts: int, text: str) -> Observation:
+    """Read one message into the fields the policy uses."""
+    guess = hints.suggest(text)
+    scope_places = tuple(
+        p.name for p in find_places(text) if p.tier in NEAR_TIERS
+    )
+    from ..nlp.gazetteer import resolve_scope
+
+    return Observation(
+        ts=ts,
+        text=text,
+        threat=str(guess["threat"]),
+        alarm=str(guess["alarm"]),
+        modality=str(guess["modality"]),
+        certainty=str(guess["certainty"]),
+        scope=resolve_scope(text),
+        heading=str(guess["heading"]),
+        strength=str(guess["strength"]),
+        alert_state=hints.alert_state(text),
+        nationwide=hints.nationwide(text),
+        ring_places=scope_places,
+        says_new=_says_new(text),
+    )
+
+
+def _says_new(text: str) -> bool:
+    """Whether the message announces something rather than restating it."""
+    text = text or ""
+    if _ORDINAL.search(text):
+        return False
+    if _NOVELTY.search(text):
+        return True
+    if _LAUNCH.search(text):
+        # A launch counts only with an origin. Russian regions and airfields are
+        # origins; a Ukrainian place in the same sentence is the target.
+        from ..nlp.gazetteer import find_places
+
+        places = find_places(text)
+        if not places:
+            return True
+        return all(p.tier == "elsewhere" for p in places)
+    return False
+
+
+class Tracker:
+    """Keeps the current episode across a stream of observations."""
+
+    def __init__(self, idle_close_s: int = IDLE_CLOSE_S,
+                 ring_memory_s: int = RING_MEMORY_S,
+                 refractory_s: int = REFRACTORY_S,
+                 refractory_near_s: int = REFRACTORY_NEAR_S,
+                 launch_dedup_s: int = LAUNCH_DEDUP_S) -> None:
+        self.idle_close_s = idle_close_s
+        self.ring_memory_s = ring_memory_s
+        self.refractory_s = refractory_s
+        self.refractory_near_s = refractory_near_s
+        self.launch_dedup_s = launch_dedup_s
+        self.episode: Episode | None = None
+        self.closed: list[Episode] = []
+
+    # -- lifecycle ---------------------------------------------------------
+
+    def _open(self, ts: int) -> Episode:
+        self.episode = Episode(opened_at=ts, last_live=ts)
+        return self.episode
+
+    def _close(self) -> None:
+        if self.episode is not None:
+            self.closed.append(self.episode)
+            self.episode = None
+
+    def before(self, obs: Observation) -> Episode | None:
+        """Advance time, closing a stale episode. Call before deciding."""
+        ep = self.episode
+        if ep is not None and obs.ts - ep.last_live > self.idle_close_s:
+            self._close()
+            ep = None
+        return ep
+
+    # -- novelty -----------------------------------------------------------
+
+    def is_new(self, obs: Observation) -> bool:
+        """Whether this message introduces something not already notified.
+
+        Nothing sent yet: anything is new. Otherwise the channel has to say so,
+        or a place near the user has to have been quiet long enough to count
+        again — and neither counts inside the refractory period, because during
+        a volley almost every message names something not said in the last
+        minute.
+        """
+        ep = self.episode
+        if ep is None or not ep.notified:
+            return True
+
+        window = self.refractory_near_s if obs.near else self.refractory_s
+        last_audible = max((s.ts for s in ep.sent if s.level != "info"), default=None)
+        if last_audible is not None and obs.ts - last_audible < window:
+            # Only an outright statement of a new target breaks through.
+            return bool(obs.says_new and (obs.near or obs.nationwide))
+
+        if obs.says_new and (obs.near or obs.nationwide):
+            return True
+        for place in obs.ring_places:
+            seen = ep.ring_seen.get(place)
+            if seen is None or obs.ts - seen > self.ring_memory_s:
+                return True
+        return False
+
+    def is_fresh_launch(self, obs: Observation) -> bool:
+        """A launch announcement not already announced by another channel.
+
+        Cross-channel duplication, finally load-bearing: two channels reported
+        the same launch from Bryansk a minute apart and the second was a false
+        wake-up.
+        """
+        if not obs.says_new:
+            return False
+        ep = self.episode
+        if ep is None or ep.last_launch is None:
+            return True
+        return obs.ts - ep.last_launch > self.launch_dedup_s
+
+    # -- bookkeeping -------------------------------------------------------
+
+    def record(self, obs: Observation, level: str | None, alarm: str | None) -> None:
+        """Fold one observation, and any notification for it, into the state."""
+        if obs.alert_state == "clear":
+            if self.episode is not None:
+                self.episode.cleared = True
+            self._close()
+            return
+
+        ep = self.episode
+        if ep is None:
+            if not (obs.live or obs.alert_state == "alert" or obs.nationwide):
+                return
+            ep = self._open(obs.ts)
+
+        if obs.live or obs.alert_state == "alert":
+            ep.last_live = obs.ts
+        # Only an announcement *we made* counts. An oblast district's siren set
+        # this flag and then silenced the city's, costing four misses.
+        if obs.alert_state == "alert" and alarm == "alert":
+            ep.alert_announced = True
+        if obs.threat not in ("none", "unknown"):
+            ep.threat = obs.threat
+        if obs.says_new:
+            ep.last_launch = obs.ts
+        for place in obs.ring_places:
+            ep.ring_seen[place] = obs.ts
+        if level is not None and alarm is not None:
+            ep.sent.append(Sent(ts=obs.ts, level=level, alarm=alarm))

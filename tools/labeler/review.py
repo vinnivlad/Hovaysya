@@ -34,7 +34,7 @@ LABELS_PATH = REPO_ROOT / "labels" / "moments.jsonl"
 DB_PATH = REPO_ROOT / "data" / "messages.db"
 
 DECISIONS = {"notify", "silent"}
-LEVELS = {"info", "alert", "shelter"}
+LEVELS = {"info", "alert"}
 ALARMS = {"alert", "ballistic", "mig", "cruise", "drone-jet", "drone", "recon",
           "clear", "none"}
 SILENT_REASONS = {"too-far", "already-notified", "resolved", "insufficient"}
@@ -45,7 +45,7 @@ SCOPES = {"my-area", "my-district", "city", "oblast", "elsewhere", "unknown"}
 CERTAINTIES = {"confirmed", "probable", "lost", "clear"}
 HEADINGS = {"toward", "away", "loitering", "position", "unknown"}
 
-LEVEL_RANK = {"info": 0, "alert": 1, "shelter": 2}
+LEVEL_RANK = {"info": 0, "alert": 1}
 
 REQUIRED = ("id", "at", "decision", "threat", "modality", "scope", "certainty",
             "night", "anchor")
@@ -151,15 +151,15 @@ def check(labels: list[dict], messages: dict[str, dict]) -> list[tuple[str, str,
                 warn(lid, "notify on a threat resolved to another region")
             if l.get("threat") == "none" and l.get("level") != "info":
                 warn(lid, "audible notify while nothing is flying — `info`?")
-            if l.get("certainty") == "clear" and l.get("level") == "shelter":
-                warn(lid, "`shelter` on an all-clear")
+            if l.get("certainty") == "clear" and l.get("alarm") != "clear":
+                warn(lid, "a threat tone on an all-clear")
             if l.get("modality") in ("aftermath", "summary-news", "non-threat") \
                     and l.get("level") != "info":
                 warn(lid, f"audible notify on modality {l.get('modality')}")
             if anchor and anchor in messages:
                 text = messages[anchor]["text"]
-                if l.get("level") == "shelter" and hints.live_strength(text) == "weak":
-                    warn(lid, "`shelter` where the only evidence is an emoji")
+                if l.get("level") == "alert" and hints.live_strength(text) == "weak":
+                    warn(lid, "a wake-up where the only evidence is an emoji")
 
         if decision == "silent" and l.get("silent_reason") == "already-notified":
             earlier = [
