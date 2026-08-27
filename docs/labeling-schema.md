@@ -43,7 +43,7 @@ rewriting, and so a diff shows exactly which labels changed.
 | `at` | ISO 8601 UTC | yes | The decision moment. |
 | `decision` | enum | yes | `notify` \| `silent` |
 | `level` | enum | if `notify` | `info` \| `alert` \| `shelter` — how insistent |
-| `alarm` | enum | if `notify` | `ballistic` \| `cruise` \| `drone` \| `aviation` — which sound |
+| `alarm` | enum | if `notify` | `ballistic` \| `cruise` \| `drone-jet` \| `drone` \| `recon` \| `aviation` — which sound |
 | `silent_reason` | enum | if `silent` | why no notification was warranted |
 | `threat` | enum | yes | what is flying |
 | `modality` | enum | yes | live threat, aftermath, summary, or social |
@@ -76,7 +76,7 @@ each other and get applied inconsistently. So insistence and sound are separate.
 | `alert` | sound, wakes you, does not repeat | a real threat to the city that is not near you yet |
 | `shelter` | loud, repeating, full-screen | act now — near you, or ballistic anywhere over Kyiv |
 
-**`alarm` — which sound:** `ballistic` · `cruise` · `drone` · `aviation` · `none`
+**`alarm` — which sound:** `ballistic` · `cruise` · `drone-jet` · `drone` · `recon` · `aviation`
 
 The point of separating sound from loudness is that **you should know what is
 coming without opening your eyes.** Ballistic must not sound like a drone: woken
@@ -84,9 +84,10 @@ by the first, you get up immediately; by the second, you can look at the screen
 first. That is the real difference in response, and it is not a difference of
 volume.
 
-On Android this is 3 sounds x 2 audible levels = 6 notification channels, plus
+On Android this is 5 sounds x 2 audible levels = 10 notification channels, plus
 one silent channel for the persistent status. Volume is adjustable per channel,
-so a quieter drone tone and a maximum-volume ballistic tone are one setting each.
+so a barely-there recon tone and a maximum-volume ballistic tone are one setting
+each.
 
 Mapping from `threat` to `alarm`:
 
@@ -94,9 +95,23 @@ Mapping from `threat` to `alarm`:
 | --- | --- |
 | `ballistic` | `ballistic` |
 | `cruise`, `kab` | `cruise` |
-| `shahed`, `shahed-jet` | `drone` |
-| `aviation`, `recon` | `aviation` |
+| `shahed-jet` | `drone-jet` |
+| `shahed` | `drone` |
+| `recon` | `recon` |
+| `aviation` | `aviation` |
 | `mixed` | the most severe class present |
+
+The five sounds map one-to-one onto the five reaction classes, which is how the
+labeler presents them, ordered by urgency:
+
+**розвідник → дрон → реактивний дрон → ракета → балістика**
+
+Each gets its own tone because each implies a different response. A recon drone
+is information, a propeller Shahed leaves minutes, a jet Shahed leaves far less,
+and ballistic leaves none. Sharing a tone across those would defeat the point of
+separate sounds, which is knowing what is coming before opening your eyes. The
+rarer types (`kab`, `aviation`, `mixed`, `unknown`) sit behind a secondary row in
+the labeler and fold into the nearest sound.
 
 Ballistic is always at least `shelter` city-wide: flight time is minutes, so
 there is no room for geography.

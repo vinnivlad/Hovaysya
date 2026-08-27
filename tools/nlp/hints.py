@@ -34,14 +34,18 @@ THREAT_RULES: tuple[tuple[str, str], ...] = (
 
 _THREAT = tuple((kind, re.compile(pat, re.IGNORECASE)) for kind, pat in THREAT_RULES)
 
+# Four sounds, one per reaction class. A jet Shahed is several times faster than
+# a propeller one and leaves far less time, so it gets its own tone rather than
+# sharing the drone one — the point of separate sounds is knowing what is coming
+# before you open your eyes.
 ALARM_FOR_THREAT = {
     "ballistic": "ballistic",
     "cruise": "cruise",
     "kab": "cruise",
     "shahed": "drone",
-    "shahed-jet": "drone",
+    "shahed-jet": "drone-jet",
     "aviation": "aviation",
-    "recon": "aviation",
+    "recon": "recon",
     "mixed": "ballistic",
     "unknown": "drone",
     "none": "none",

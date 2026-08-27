@@ -129,7 +129,7 @@ def test_alarm_mapping_separates_the_three_sounds():
     assert hints.alarm_for("cruise") == "cruise"
     assert hints.alarm_for("kab") == "cruise"
     assert hints.alarm_for("shahed") == "drone"
-    assert hints.alarm_for("shahed-jet") == "drone"
+    assert hints.alarm_for("shahed-jet") == "drone-jet"
     assert hints.alarm_for("aviation") == "aviation"
 
 
@@ -210,7 +210,7 @@ def test_probable_when_hedged():
 def test_suggest_returns_the_full_prefill():
     s = hints.suggest("⚠️Реактивний шахед курсом на Жуляни.")
     assert s["threat"] == "shahed-jet"
-    assert s["alarm"] == "drone"
+    assert s["alarm"] == "drone-jet"
     assert s["modality"] == "live-threat"
     assert s["shapes"]
 

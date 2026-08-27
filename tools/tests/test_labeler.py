@@ -97,7 +97,7 @@ def test_hints_are_prefilled(tmp_path):
     zh = next(m for m in msgs if m["id"] == 100)
     assert zh["s"] == "my-area"
     assert zh["th"] == "shahed-jet"
-    assert zh["al"] == "drone"
+    assert zh["al"] == "drone-jet"
     assert zh["m"] == "live-threat"
     assert zh["st"] == "strong"
 
@@ -144,3 +144,42 @@ def test_payload_survives_a_script_tag_in_the_text(tmp_path):
     body = html.split('type="application/json">')[1].split("</script>")[0]
     payload = json.loads(body.replace(chr(60) + chr(92) + chr(47), chr(60) + chr(47)))
     assert payload["messages"][0]["x"] == "текст </script> далі"
+
+
+# --- page structure -------------------------------------------------------
+
+
+def test_page_javascript_is_structurally_sound():
+    """No JS engine here, so this is the closest thing to a syntax check.
+    It catches the failure mode that renders the whole page blank."""
+    from tools.labeler import checkjs
+
+    js = checkjs.extract_js(checkjs.TEMPLATE.read_text(encoding="utf-8"))
+    assert checkjs.problems(js) == []
+
+
+def test_checkjs_detects_a_broken_structure():
+    from tools.labeler import checkjs
+
+    assert checkjs.problems("function f() { if (a) { return 1; }") != []
+    assert checkjs.problems("const s = '}}}}'; function f() { return 1; }") == []
+
+
+def test_every_threat_maps_to_an_alarm():
+    """The form derives the sound from the type, so a gap would leave a
+    notification with no channel to fire on."""
+    from tools.nlp import hints
+
+    for t in ("recon","shahed","shahed-jet","cruise","ballistic","kab",
+              "aviation","mixed","unknown","none"):
+        assert hints.alarm_for(t), t
+
+
+def test_the_five_primary_types_have_five_distinct_sounds():
+    """Knowing what is coming without opening your eyes only works if the
+    reaction classes do not share a tone."""
+    from tools.nlp import hints
+
+    sounds = [hints.alarm_for(t) for t in
+              ("recon", "shahed", "shahed-jet", "cruise", "ballistic")]
+    assert len(set(sounds)) == 5, sounds

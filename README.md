@@ -169,8 +169,14 @@ Writes `data/labeler.html` — a self-contained page, no server and no
 dependencies. Open it, work a night, press **Експорт JSONL**, and save the
 download over `labels/moments.jsonl`.
 
-Keys: `j`/`k` move, `n` notify, `s` silent, `1`/`2`/`3` level, `Enter` save,
-`x` delete, `f` cycle filter, `[`/`]` change night.
+Every field is a row of clickable options — nothing is a dropdown, and nothing
+requires the keyboard. Threat type is five buttons ordered by urgency
+(розвідник / дрон / реактивний дрон / ракета / балістика), and the notification
+sound follows the type automatically unless you override it.
+
+Keyboard shortcuts exist as a bonus, not a requirement: `j`/`k` move, `n` notify,
+`s` silent, `1`/`2`/`3` level, `Enter` save, `x` delete, `f` cycle filter,
+`[`/`]` change night.
 
 Each message is pre-filled by `tools/nlp/` — scope, threat, alarm sound,
 modality, certainty, and whether the live-threat evidence is strong or only an

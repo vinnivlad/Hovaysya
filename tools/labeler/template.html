@@ -115,6 +115,31 @@
     width: 100%;
   }
   textarea { resize: vertical; min-height: 52px; line-height: 1.4; }
+  .pick { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pick button {
+    flex: 1 1 auto; min-width: 86px; padding: 8px 10px; font-size: 12.5px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    line-height: 1.25;
+  }
+  .pick button .sub { font-size: 9.5px; color: var(--faint); letter-spacing: .02em; }
+  .pick button.on { background: var(--now); color: #14181d; border-color: var(--now); font-weight: 600; }
+  .pick button.on .sub { color: #14181d; opacity: .72; }
+  .pick button.on.shelter { background: var(--shelter); border-color: var(--shelter); color: #fff; }
+  .pick button.on.shelter .sub { color: #fff; opacity: .8; }
+  .pick button.on.info { background: var(--info); border-color: var(--info); color: #14181d; }
+  .pick button.on.muted { background: var(--panel2); border-color: var(--soft); color: var(--ink); }
+  .pick button.on.muted .sub { color: var(--faint); }
+  details.more { margin-top: 6px; }
+  details.more summary {
+    cursor: pointer; font-family: var(--mono); font-size: 10px; color: var(--faint);
+    letter-spacing: .08em; text-transform: uppercase; padding: 2px 0;
+  }
+  details.more .pick { margin-top: 6px; }
+  .auto {
+    font-family: var(--mono); font-size: 9px; padding: 1px 4px; border-radius: 2px;
+    border: 1px solid var(--line); color: var(--faint); letter-spacing: .04em;
+  }
+  .auto.manual { color: var(--now); border-color: var(--now); }
   .seg { display: flex; gap: 0; }
   .seg button { flex: 1; border-radius: 0; font-size: 11.5px; padding: 6px 4px; }
   .seg button:first-child { border-radius: 3px 0 0 3px; }
@@ -188,12 +213,56 @@ const FILTERS = [
 ];
 
 const LEVELS = ["info", "alert", "shelter"];
-const ALARMS = ["ballistic", "cruise", "drone", "aviation"];
+const ALARMS = ["ballistic", "cruise", "drone-jet", "drone", "recon", "aviation"];
 const SILENT_REASONS = ["too-far", "already-notified", "resolved", "insufficient"];
-const THREATS = ["shahed","shahed-jet","cruise","ballistic","kab","aviation","recon","mixed","unknown","none"];
-const MODALITIES = ["live-threat","aftermath","summary-news","non-threat"];
-const SCOPES = ["my-area","my-district","city","oblast","elsewhere","unknown"];
-const CERTAINTIES = ["confirmed","probable","lost","clear"];
+// Five primary types, ordered by how urgently they need a reaction, one sound
+// each. The rest sit behind a secondary row so the common case stays one row.
+const THREATS_MAIN = ["recon", "shahed", "shahed-jet", "cruise", "ballistic"];
+const THREATS_MORE = ["kab", "aviation", "mixed", "unknown", "none"];
+const MODALITIES = ["live-threat", "aftermath", "summary-news", "non-threat"];
+const SCOPES = ["my-area", "my-district", "city", "oblast", "elsewhere", "unknown"];
+const CERTAINTIES = ["confirmed", "probable", "lost", "clear"];
+
+const ALARM_FOR = {
+  recon: "recon", shahed: "drone", "shahed-jet": "drone-jet",
+  cruise: "cruise", ballistic: "ballistic", kab: "cruise",
+  aviation: "aviation", mixed: "ballistic", unknown: "drone", none: "none",
+};
+
+// Ukrainian labels for clicking; stored values stay the schema's enums.
+const UA = {
+  decision: { notify: "буди", silent: "не буди" },
+  level: { info: "тихо", alert: "звук", shelter: "гучно, в укриття" },
+  levelHint: {
+    info: "тільки статус", alert: "розбудити раз",
+    shelter: "повторно, весь екран",
+  },
+  threat: {
+    recon: "розвідник", shahed: "дрон", "shahed-jet": "реактивний дрон",
+    cruise: "ракета", ballistic: "балістика", kab: "КАБ",
+    aviation: "авіація", mixed: "змішано", unknown: "невідомо", none: "нічого",
+  },
+  alarm: {
+    ballistic: "балістика", cruise: "ракета", "drone-jet": "реактивний",
+    drone: "дрон", recon: "розвідник", aviation: "авіація", none: "—",
+  },
+  silent_reason: {
+    "too-far": "далеко від мене", "already-notified": "вже будив",
+    resolved: "відбій", insufficient: "ще рано",
+  },
+  modality: {
+    "live-threat": "жива загроза", aftermath: "наслідки",
+    "summary-news": "зведення", "non-threat": "не загроза",
+  },
+  scope: {
+    "my-area": "моя зона", "my-district": "мій район", city: "місто",
+    oblast: "область", elsewhere: "інде", unknown: "невідомо",
+  },
+  certainty: {
+    confirmed: "підтверджено", probable: "ймовірно",
+    lost: "втрачено з виду", clear: "чисто",
+  },
+};
 
 let labels = loadLabels();
 let nightId = DATA.nights.length ? DATA.nights[0].id : null;
@@ -334,79 +403,107 @@ function openDraft(decision) {
   if (decision) draft.decision = decision;
 }
 
-function seg(field, values, cur, classFor) {
-  return `<div class="seg">` + values.map(v =>
-    `<button data-f="${field}" data-v="${v}" class="${v === cur ? "on " + (classFor ? classFor(v) : "") : ""}">${esc(v)}</button>`
-  ).join("") + `</div>`;
-}
-function sel(field, values, cur) {
-  return `<select data-f="${field}">` + values.map(v =>
-    `<option value="${v}"${v === cur ? " selected" : ""}>${esc(v)}</option>`).join("") + `</select>`;
+function pick(field, values, cur, opts) {
+  opts = opts || {};
+  const labels = opts.labels || UA[field] || {};
+  const subs = opts.subs || {};
+  return `<div class="pick">` + values.map(v => {
+    const on = v === cur;
+    const cls = [on ? "on" : "", on && opts.tone ? opts.tone(v) : ""].join(" ").trim();
+    const sub = subs[v] ? `<span class="sub">${esc(subs[v])}</span>` : "";
+    return `<button type="button" data-f="${field}" data-v="${esc(v)}" class="${cls}">` +
+           `${esc(labels[v] || v)}${sub}</button>`;
+  }).join("") + `</div>`;
 }
 
 function renderForm() {
   const body = document.getElementById("formBody");
   const m = selected();
   if (!m || !draft) {
-    body.innerHTML = `<div class="empty">Вибери повідомлення у фіді — кліком або <b>j</b>/<b>k</b>.<br><br>
-      Мітка вішається на <b>момент часу</b>, а не на текст: питання завжди «чи мусив застосунок
-      розбудити мене саме тут».</div>`;
+    body.innerHTML = `<div class="empty">Клікни повідомлення у фіді.<br><br>
+      Мітка вішається на <b>момент часу</b>, а не на текст: питання завжди
+      «чи мусив застосунок розбудити мене саме тут».</div>`;
     return;
   }
 
   const earlier = labelsForNight().filter(l => l.id !== draft.id && l.decision === "notify");
   const weakShelter = draft.decision === "notify" && draft.level === "shelter" && m.st === "weak";
-
   let html = `<div class="ctx"><span class="t">${esc(m.hm)} · ${esc(m.c)} · #${m.id}</span><br>${esc(m.x)}</div>`;
 
   if (weakShelter) {
-    html += `<div class="warn">Єдина ознака тут — емодзі, а це слабкий сигнал (⚠️ стоїть на 26%
-      усіх повідомлень). <b>shelter</b> на такому — це майбутнє хибне пробудження. Перевір, чи є
-      в тексті щось конкретніше.</div>`;
+    html += `<div class="warn">Єдина ознака тут — емодзі, а це слабкий сигнал:
+      ⚠️ стоїть на 26% усіх повідомлень. <b>Гучно</b> на такому — це майбутнє
+      хибне пробудження. Перевір, чи є в тексті щось конкретніше.</div>`;
   }
 
-  html += `<div class="row"><label>рішення</label>${seg("decision", ["notify","silent"], draft.decision)}</div>`;
+  html += `<div class="row"><label>рішення</label>` +
+    pick("decision", ["notify", "silent"], draft.decision,
+         { tone: v => v === "silent" ? "muted" : "" }) + `</div>`;
 
   if (draft.decision === "notify") {
-    html += `<div class="row"><label>рівень — наскільки настійливо</label>
-      ${seg("level", LEVELS, draft.level, v => v)}</div>`;
-    html += `<div class="row"><label>звук</label>${sel("alarm", ALARMS, draft.alarm)}</div>`;
-    html += `<div class="row"><label>повтор епізоду</label>
-      <select data-f="repeat_of"><option value="">— перший сигнал —</option>` +
-      earlier.map(l => `<option value="${esc(l.id)}"${draft.repeat_of === l.id ? " selected" : ""}>` +
-        `${esc(l.id.slice(11))} · ${esc(l.level)}</option>`).join("") + `</select></div>`;
+    html += `<div class="row"><label>наскільки настійливо</label>` +
+      pick("level", LEVELS, draft.level, { subs: UA.levelHint, tone: v => v }) + `</div>`;
   } else {
-    html += `<div class="row"><label>чому молчимо</label>${sel("silent_reason", SILENT_REASONS, draft.silent_reason)}</div>`;
+    html += `<div class="row"><label>чому молчимо</label>` +
+      pick("silent_reason", SILENT_REASONS, draft.silent_reason) + `</div>`;
   }
 
-  html += `<div class="row"><label>що летить</label>${sel("threat", THREATS, draft.threat)}</div>`;
-  html += `<div class="row"><label>модальність</label>${sel("modality", MODALITIES, draft.modality)}</div>`;
-  html += `<div class="row"><label>наскільки близько</label>${sel("scope", SCOPES, draft.scope)}</div>`;
-  html += `<div class="row"><label>певність</label>${sel("certainty", CERTAINTIES, draft.certainty)}</div>`;
-  html += `<div class="row"><label>чому — своїми словами</label>
-    <textarea data-f="why" placeholder="одна фраза">${esc(draft.why)}</textarea></div>`;
-  html += `<div class="row"><label>сумнів (не обов'язково)</label>
-    <input type="text" data-f="open_question" value="${esc(draft.open_question)}"></div>`;
-  html += `<div class="actions"><button class="primary" id="saveBtn">Зберегти</button>
-    <button id="cancelBtn">Скасувати</button>` +
-    (labelForMessage(m) ? `<button id="delBtn">Видалити</button>` : "") + `</div>`;
+  const showMore = THREATS_MORE.indexOf(draft.threat) >= 0;
+  html += `<div class="row"><label>що летить</label>` +
+    pick("threat", THREATS_MAIN, draft.threat) +
+    `<details class="more"${showMore ? " open" : ""}><summary>інше</summary>` +
+    pick("threat", THREATS_MORE, draft.threat) + `</details></div>`;
+
+  if (draft.decision === "notify") {
+    const auto = ALARM_FOR[draft.threat] || "drone";
+    html += `<div class="row"><label>звук ` +
+      (draft.alarm === auto ? `<span class="auto">за типом</span>`
+                            : `<span class="auto manual">вручну</span>`) +
+      `</label>` + pick("alarm", ALARMS, draft.alarm) + `</div>`;
+
+    html += `<div class="row"><label>чи це повтор епізоду</label><div class="pick">` +
+      `<button type="button" data-f="repeat_of" data-v="" class="${draft.repeat_of ? "" : "on"}">` +
+      `перший сигнал</button>` +
+      earlier.map(l => `<button type="button" data-f="repeat_of" data-v="${esc(l.id)}" ` +
+        `class="${draft.repeat_of === l.id ? "on" : ""}">повтор ${esc(l.id.slice(11))}` +
+        `<span class="sub">${esc(UA.level[l.level] || l.level)}</span></button>`).join("") +
+      `</div></div>`;
+  }
+
+  html += `<div class="row"><label>модальність</label>` +
+    pick("modality", MODALITIES, draft.modality,
+         { tone: v => v === "aftermath" ? "muted" : "" }) + `</div>`;
+  html += `<div class="row"><label>наскільки близько</label>` +
+    pick("scope", SCOPES, draft.scope) + `</div>`;
+  html += `<div class="row"><label>певність</label>` +
+    pick("certainty", CERTAINTIES, draft.certainty) + `</div>`;
+
+  html += `<div class="row"><label>чому — своїми словами</label>` +
+    `<textarea data-f="why" placeholder="одна фраза">${esc(draft.why)}</textarea></div>`;
+  html += `<div class="row"><label>сумнів (не обов'язково)</label>` +
+    `<input type="text" data-f="open_question" value="${esc(draft.open_question)}"></div>`;
+  html += `<div class="actions"><button type="button" class="primary" id="saveBtn">Зберегти</button>` +
+    `<button type="button" id="cancelBtn">Скасувати</button>` +
+    (labelForMessage(m) ? `<button type="button" id="delBtn">Видалити</button>` : "") + `</div>`;
 
   body.innerHTML = html;
 
   body.querySelectorAll("button[data-f]").forEach(b => {
-    b.onclick = () => { draft[b.dataset.f] = b.dataset.v; renderForm(); };
-  });
-  body.querySelectorAll("select[data-f], textarea[data-f], input[data-f]").forEach(el => {
-    el.oninput = () => {
-      const v = el.value;
-      draft[el.dataset.f] = (el.dataset.f === "repeat_of" && v === "") ? null : v;
-      if (el.tagName === "SELECT") renderForm();
+    b.onclick = () => {
+      const f = b.dataset.f;
+      const v = b.dataset.v;
+      draft[f] = (f === "repeat_of" && v === "") ? null : v;
+      // Sound follows the type until it is set by hand.
+      if (f === "threat" && !draft._alarmManual) draft.alarm = ALARM_FOR[v] || "drone";
+      if (f === "alarm") draft._alarmManual = true;
+      renderForm();
     };
   });
-  const saveBtn = document.getElementById("saveBtn");
-  if (saveBtn) saveBtn.onclick = save;
-  const cancelBtn = document.getElementById("cancelBtn");
-  if (cancelBtn) cancelBtn.onclick = () => { draft = null; renderAll(); };
+  body.querySelectorAll("textarea[data-f], input[data-f]").forEach(el => {
+    el.oninput = () => { draft[el.dataset.f] = el.value; };
+  });
+  document.getElementById("saveBtn").onclick = save;
+  document.getElementById("cancelBtn").onclick = () => { draft = null; renderAll(); };
   const delBtn = document.getElementById("delBtn");
   if (delBtn) delBtn.onclick = remove;
 }
@@ -419,6 +516,7 @@ function save() {
     return;
   }
   const out = Object.assign({}, draft);
+  delete out._alarmManual;  // UI state, not data
   if (out.decision === "notify") delete out.silent_reason;
   else { delete out.level; delete out.alarm; delete out.repeat_of; out.repeat_of = null; }
   if (!out.open_question) out.open_question = null;
