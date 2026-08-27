@@ -155,6 +155,29 @@ def alarm_for(threat: str) -> str:
     return ALARM_FOR_THREAT.get(threat, "drone")
 
 
+# An air-alert declaration or all-clear is the frame of the whole night: without
+# it there is no way to tell when a threat passed. These messages routinely name
+# no place at all — "Відбій, усім солодких снів" — so a geographic filter drops
+# them, which hid 245 of the corpus's 658 alert-state messages.
+ALERT_ON_TERMS = ("тривог",)
+ALERT_CLEAR_TERMS = ("відбій",)
+
+
+def alert_state(text: str) -> str | None:
+    """`clear`, `alert`, or None — whether this message is about the siren.
+
+    All-clear is checked first: "По балістиці відбій" is an all-clear even
+    though a live threat may continue, and reading it as a declaration would
+    invert the meaning.
+    """
+    low = _low(text)
+    if any(t in low for t in ALERT_CLEAR_TERMS):
+        return "clear"
+    if any(t in low for t in ALERT_ON_TERMS):
+        return "alert"
+    return None
+
+
 def nationwide(text: str) -> bool:
     """True when the threat is country-wide however little geography is named.
 

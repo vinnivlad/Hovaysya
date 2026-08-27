@@ -114,6 +114,9 @@ def load_messages(conn: sqlite3.Connection, since: str | None) -> list[dict]:
                 # A MiG-31K takeoff names a Russian airfield and no Ukrainian
                 # target, so the geographic filter alone would hide it.
                 "nw": hints.nationwide(text),
+                # Siren declarations and all-clears frame the night; they often
+                # name no place, so they need their own reason to stay visible.
+                "as": hints.alert_state(text),
                 "m": guess["modality"],
                 "th": guess["threat"],
                 "al": guess["alarm"],
@@ -238,11 +241,13 @@ def main(argv: list[str] | None = None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8", newline="\n")
 
+    alert_state = sum(1 for m in messages if m["as"])
     inherited = sum(1 for m in messages if m["ith"] or m["isc"])
     near = sum(n["near"] for n in payload["nights"])
     print(f"Wrote {out}  ({out.stat().st_size / 1048576:.1f} MB)")
     print(f"  {len(messages)} messages across {len(payload['nights'])} nights")
     print(f"  {near} mention your area or district")
+    print(f"  {alert_state} are alert declarations or all-clears")
     print(f"  {inherited} take their type or place from earlier in the feed")
     print(f"  {len(payload['labels'])} existing labels loaded")
     print(f"\nOpen it in a browser: {out}")

@@ -295,6 +295,33 @@ running — the second ballistic wave, a new group after a lull. This is the fie
 that encodes the original complaint that repeat signals either never arrive or
 arrive unpredictably. `null` for the first notification of an episode.
 
+## Alert declarations and all-clears are never hidden
+
+The siren is the frame of the night: without it there is no telling when a
+threat passed. These messages routinely name no place at all —
+`Відбій, усім солодких снів та тихої ночі💕` — so the geographic filter dropped
+them, hiding **245 of the corpus's 658** alert-state messages, including exactly
+the ones that close an episode.
+
+They now pass every filter unless they resolve to another region, and render
+with their own colour: red for a declaration, teal for an all-clear.
+
+Treating a place-less one as local is not a guess. Measured over the corpus,
+of 323 scope-less alert messages **68.4% come from `kievinform_ua1`**, the
+Kyiv-focused channel, 28.2% from `war_monitor`, and only 3.4% from
+`mon1tor_ua` — which covers all of Ukraine but names the region when it means
+another one. Only **10** alert messages in 4.5 months name a region explicitly
+other than Kyiv's, so the cost of showing the unaddressed ones is negligible and
+the cost of hiding them was the episode-closing signal.
+
+An all-clear is detected before a declaration, because `Відбій тривоги` contains
+both words and reading it as a declaration would invert the meaning.
+
+**This is a proxy, not the real thing.** The authoritative alert timeline comes
+from the official API (`alerts.in.ua` / `api.ukrainealarm.com`), which is free
+and listed as a stage-8 dependency. Labeling would be easier with it now: the
+frame would be exact rather than inferred from channel chatter.
+
 ## Why a moment is picked by clicking a message
 
 Labels are moments, so it is fair to ask why the labeler makes you click a

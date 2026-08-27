@@ -504,3 +504,36 @@ def test_a_named_type_survives_the_impact_promotion():
     s = hints.suggest("💥Вибух в Одесі, попередньо ракета Іскандер-М.")
     assert s["threat"] == "ballistic"
     assert s["certainty"] == "probable"
+
+
+# --- alert declarations and all-clears ------------------------------------
+
+
+def test_alert_declarations_and_all_clears_are_recognised():
+    """Without them there is no telling when a threat passed — and 245 of the
+    corpus's 658 such messages were being hidden by the geographic filter."""
+    for t in ("🛑 ТРИВОГА", "🔴Оголошено повітряну тривогу у місті.",
+              "⚠️У Києві тривога через шахед"):
+        assert hints.alert_state(t) == "alert", t
+    for t in ("🛑 Відбій тривоги", "Відбій, усім солодких снів та тихої ночі💕",
+              "⚪️Київ очікує на відбій."):
+        assert hints.alert_state(t) == "clear", t
+
+
+def test_an_all_clear_wins_over_the_word_alert_in_the_same_message():
+    """"Відбій тривоги" contains both; reading it as a declaration would invert
+    the meaning."""
+    assert hints.alert_state("🛑 Відбій тривоги") == "clear"
+    assert hints.alert_state("⚪️По балістиці відбій. Тривога триває.") == "clear"
+
+
+def test_ordinary_threat_messages_are_not_alert_state():
+    assert hints.alert_state("⚠️1 реактивний шахед на Жуляни.") is None
+    assert hints.alert_state("1х Центр.") is None
+
+
+def test_the_remaining_oblasts_resolve_as_elsewhere():
+    """An alert in another region should not reach the local feed."""
+    for t in ("На Закарпатті тривога превентивна", "Тривога на Рівненщині",
+              "Відбій у Чернівцях", "тривога на Волині", "Івано-Франківщина"):
+        assert resolve_scope(t) == "elsewhere", t
