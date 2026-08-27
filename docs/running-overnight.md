@@ -22,20 +22,33 @@ powercfg /change monitor-timeout-ac 10
 The last line lets the screen go dark after 10 minutes, which is what you want
 at night.
 
-## 2. Stop "modern standby" from sleeping anyway
+`hibernate-timeout-ac 0` is not optional wherever hibernation is available:
+Windows will hibernate on its own schedule even with sleep disabled, and a
+hibernated machine is a stopped watch.
 
-Some laptops sleep despite the setting above, through S0 low-power idle. Check:
+## 2. Check which sleep states the machine even has
 
 ```
 powercfg /a
 ```
 
-If the output mentions **"Standby (S0 Low Power Idle)"**, also run:
+- **"Standby (S3)"** and no S0 — classic suspend. Step 1 is the whole of it,
+  nothing further to do. This is what the dev machine here reports.
+- **"Standby (S0 Low Power Idle)"** — modern standby, and it will sleep despite
+  step 1. Then also run:
 
 ```
 powercfg /setacvalueindex SCHEME_CURRENT SUB_NONE CONSOLELOCK 0
 powercfg /setactive SCHEME_CURRENT
 ```
+
+**If it does sleep anyway, the watcher survives it.** On S3 the process is
+suspended and resumes mid-loop, so the missed stretch arrives all at once. That
+is detected — a poll returning more than two minutes late is read as a suspend,
+not as a slow poll — and the batch is treated as catch-up: it goes through the
+tracker, prints a note instead of a fake live feed, and stays out of the lag
+statistics, where one forty-minute delay would destroy the only measurement this
+stage produces.
 
 ## 3. Do not require a password on wake, if you want to see the screen
 

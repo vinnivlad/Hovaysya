@@ -76,3 +76,23 @@ def test_the_warm_flag_is_recorded_so_a_log_can_be_filtered(tmp_path):
     evidence about latency or about what he would have heard."""
     session = _run(["⚠️❗️КИЇВ - ТРИВОГА. В укриття!"], warm=True)
     assert session.log[0]["warm"] is True
+
+
+def test_a_gap_means_the_machine_slept_not_that_the_loop_was_slow():
+    """On S3 the process survives suspend and resumes mid-loop, so the whole
+    missed stretch arrives at once. Printed as live it looks like an attack
+    happening now; counted as live it lands in the lag statistics as one
+    forty-minute delay, destroying the only number this stage produces."""
+    import argparse
+
+    from tools.live.run import SLEEP_GAP_S, interval_hint
+
+    args = argparse.Namespace(quiet_interval=45.0, alert_interval=6.0)
+    session = Session()
+    assert interval_hint(args, session) == 45.0
+    handle(session, "mon1tor_ua", 1, T0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!",
+           False, T0 + 1)
+    assert interval_hint(args, session) == 6.0     # tighter with an episode open
+    threshold = interval_hint(args, session) + SLEEP_GAP_S
+    assert 40 * 60 > threshold          # forty minutes is a suspend
+    assert 20 < threshold               # twenty seconds is just a slow poll

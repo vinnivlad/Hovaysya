@@ -69,6 +69,13 @@ BACKOFF_MAX_S = 300.0
 # How often to print a still-here line while nothing is happening.
 HEARTBEAT_S = 900.0
 
+# A poll that comes back this much later than it was scheduled means the machine
+# was asleep, not that the loop was slow. On S3 the process survives suspend and
+# resumes mid-loop, so without this the whole missed stretch arrives at once,
+# prints as if it were live, and lands in the lag statistics as a single
+# forty-minute delay — destroying the one number this stage exists to produce.
+SLEEP_GAP_S = 120.0
+
 _STOP = False
 
 
@@ -198,6 +205,12 @@ def poll_once(client: Client, conn: sqlite3.Connection, watchers: list[Watcher],
     return len(fresh)
 
 
+def interval_hint(args, session: Session) -> float:
+    """The interval the last sleep was supposed to be."""
+    return (args.alert_interval if session.tracker.episode is not None
+            else args.quiet_interval)
+
+
 def write_log(session: Session, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as fh:
@@ -277,8 +290,16 @@ def main(argv: list[str] | None = None) -> int:
     print()
 
     last_beat = time.time()
+    last_poll = time.time()
     while not _STOP:
-        poll_once(client, conn, watchers, session)
+        # Was the machine asleep? Then this batch is catch-up, not live.
+        overslept = time.time() - last_poll
+        slept = overslept > interval_hint(args, session) + SLEEP_GAP_S
+        if slept:
+            print(f"  · машина спала ~{overslept / 60:.0f} хв — "
+                  f"наздоганяю тихо", flush=True)
+        poll_once(client, conn, watchers, session, warm=slept)
+        last_poll = time.time()
         write_log(session, log_path)
 
         open_episode = session.tracker.episode is not None
