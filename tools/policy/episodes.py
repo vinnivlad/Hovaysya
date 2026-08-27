@@ -142,6 +142,7 @@ class Observation:
     ring_places: tuple[str, ...]
     says_new: bool
     is_reply: bool = False
+    partial_clear: bool = False
 
     @property
     def near(self) -> bool:
@@ -181,6 +182,7 @@ def observe(ts: int, text: str, is_reply: bool = False) -> Observation:
         ring_places=scope_places,
         says_new=_says_new(text),
         is_reply=is_reply,
+        partial_clear=hints.partial_clear(text),
     )
 
 
@@ -285,7 +287,9 @@ class Tracker:
 
     def record(self, obs: Observation, level: str | None, alarm: str | None) -> None:
         """Fold one observation, and any notification for it, into the state."""
-        if obs.alert_state == "clear":
+        # A partial all-clear lifts one threat class, not the alert. Closing the
+        # episode here would forget everything the night had established.
+        if obs.alert_state == "clear" and not obs.partial_clear:
             if self.episode is not None:
                 self.episode.cleared = True
             self._close()

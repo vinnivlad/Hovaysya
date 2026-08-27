@@ -64,6 +64,10 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     #    all-clear always closes. But only *my* siren — an all-clear for Fastiv
     #    district is not an all-clear for me, and announcing those woke the user
     #    three times.
+    if obs.alert_state == "clear" and obs.partial_clear:
+        # One class lifted while the alert continues: worth showing, not worth
+        # the all-clear tone, which means "you can come out".
+        return _notify("info", "none", "partial all-clear")
     if obs.alert_state == "clear" and obs.scope in CITY_OR_NEARER:
         return _notify("alert", "clear", "all-clear")
     if obs.alert_state == "clear":

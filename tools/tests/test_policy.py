@@ -158,3 +158,45 @@ def test_every_decision_carries_the_rule_that_made_it():
     """A false wake-up has to be traceable to one rule."""
     r = play((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"), (60, "Дякую за підтримку"))
     assert all(d.reason for _o, d in r)
+
+
+# --- partial all-clears ---------------------------------------------------
+
+
+def test_a_partial_all_clear_does_not_sound_the_all_clear():
+    """"Відбій загрози МіГ-31К" lifts one class while the alert continues.
+    The all-clear tone means "you can come out"."""
+    r = play((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+             (600, "⚪️ Відбій загрози МіГ-31К."))
+    assert r[1][1].level == "info"
+    assert r[1][1].alarm != "clear"
+
+
+def test_a_partial_all_clear_does_not_close_the_episode():
+    """Closing it would forget the night and re-announce the siren."""
+    r = play((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+             (600, "⚪️По балістиці відбій."),
+             (700, "🛑 ТРИВОГА"))
+    assert levels(r) == ["alert", "info", None]
+
+
+def test_a_full_all_clear_still_closes_it():
+    r = play((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+             (600, "🟢 ВІДБІЙ ТРИВОГИ"),
+             (700, "🛑 ТРИВОГА"))
+    assert levels(r) == ["alert", "alert", "alert"]
+
+
+def test_the_mig_cycle_takeoff_then_launch_at_kyiv():
+    """From 2026-05-23: the case the first labelled night never contained."""
+    r = play((0, "❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка."),
+             (60, "Кинджал на Київ/Вишгород."))
+    assert levels(r) == ["alert", "alert"]
+    assert [d.alarm for _o, d in r] == ["mig", "ballistic"]
+
+
+def test_the_mig_cycle_takeoff_then_nothing():
+    """From 2026-08-04: took off, then "Відбій загрози МіГ-31К"."""
+    r = play((0, "❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка."),
+             (1020, "⚪️ Відбій загрози МіГ-31К."))
+    assert levels(r) == ["alert", "info"]

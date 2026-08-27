@@ -258,6 +258,19 @@ def heading(text: str) -> str:
     return "unknown"
 
 
+def partial_clear(text: str) -> bool:
+    """An all-clear for one threat class while the alert itself continues.
+
+    "⚪️ Відбій загрози МіГ-31К" and "⚪️По балістиці відбій" lift one part of a
+    situation, not the situation. Reading them as the end of the alert both
+    announces safety that does not exist and closes an episode that is still
+    running, which loses the repeat logic for everything that follows.
+    """
+    if not any(t in _low(text) for t in ALERT_CLEAR_TERMS):
+        return False
+    return threat_hint(text) != "none"
+
+
 def alert_state(text: str) -> str | None:
     """`clear`, `alert`, or None — whether this message is about the siren.
 
