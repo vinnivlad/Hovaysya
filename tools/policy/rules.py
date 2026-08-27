@@ -101,7 +101,10 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
 
     # 5. Anticipation is not an event. "Загроза пуску" updates the picture; the
     #    sound belongs to the launch. Straight from the labelled sequence.
-    if obs.certainty == "probable" and threat in ("ballistic", "cruise", "mig"):
+    # `mig` is excluded on purpose: a takeoff is reported as "виліт ... з
+    # аеродрому", which reads as anticipation, but for a MiG-31K the takeoff *is*
+    # the event — the whole country is alerted at that moment.
+    if obs.certainty == "probable" and threat in ("ballistic", "cruise"):
         if ep is not None and ep.notified:
             return _silent("already-notified: anticipation during a live episode")
         return _silent("insufficient: threatened, not launched")
@@ -112,7 +115,9 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
         # For ballistic, novelty is a launch — not a position. A bare "Жуляни"
         # during a wave is that wave, and the user annotated exactly that case
         # "Ця балістика вже розбудила".
-        if ep is not None and ep.notified and not tracker.is_fresh_launch(obs):
+        if (ep is not None and ep.notified
+                and not tracker.is_fresh_launch(obs)
+                and not tracker.is_new_class("ballistic")):
             return _silent("already-notified: same ballistic wave")
         # Audible, with the ballistic tone. The tone is what says "now" —
         # a separate loudness level said it twice.

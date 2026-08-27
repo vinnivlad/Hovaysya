@@ -19,7 +19,7 @@ from .gazetteer import flatten, place_spans
 # Ordered by specificity — the first match wins, so a jet Shahed is not read as
 # a plain one, and Iskander is not read as generic "ракета".
 THREAT_RULES: tuple[tuple[str, str], ...] = (
-    ("ballistic", r"балістик|балістичн|іскандер|кн-?23|брсд|кинжал|кинджал|циркон"),
+    ("ballistic", r"балісти|іскандер|кн-?23|брсд|кинжал|кинджал|циркон"),
     # The boundaries around "кр" are load-bearing: the channels abbreviate
     # крилата ракета that way, and without them it also matches Крушинка,
     # кружляють, and Крим.
@@ -58,7 +58,7 @@ _ANTICIPATED = re.compile(
     r"загроз\w*\s+(пуск|застосув|використ|удар|атак)|"
     r"можлив\w*\s+(пуск|застосув|удар)|"
     r"ризик\w*\s+(пуск|застосув)|"
-    r"загроза\s+балістик|загроза\s+застосування",
+    r"загроза\s+балісти|загроза\s+застосування",
     re.IGNORECASE,
 )
 
@@ -96,7 +96,7 @@ NATIONWIDE_THREATS = frozenset({"mig", "ballistic"})
 # telegraphically ("1х Центр.", "Жуляни ✈️") with no "загроза" anywhere. Keying
 # on vocabulary alone left 78% of district messages unclassified.
 _THREAT_WORD = (
-    r"(шахед|бпла|ракет|балістик|циркон|іскандер|кинжал|кинджал|каб\b|"
+    r"(шахед|бпла|ракет|балісти|циркон|іскандер|кинжал|кинджал|каб\b|"
     r"герань|бандерол|гербер|ціл[ьі]|мопед|реактив)"
 )
 LIVE_SHAPES: tuple[tuple[str, str], ...] = (
@@ -160,6 +160,45 @@ def threat_hint(text: str) -> str:
         if rx.search(text or ""):
             return kind
     return "none"
+
+
+def active_threat(text: str) -> str:
+    """The threat that is still flying, ignoring one that was just called off.
+
+    "⚪️По балістиці відбій. / ⚠️2 шахеди на Чорноморськ" names two classes: one
+    is being lifted, the other is in the air. Ordered matching answers with
+    whichever appears in the rule list first, which is the wrong one here.
+
+    Resolved positionally: a class named next to the all-clear word is the one
+    being lifted, so anything named further away wins.
+    """
+    text = text or ""
+    if not partial_clear(text):
+        return threat_hint(text)
+
+    low = text.lower()
+    clear_at = min(
+        (low.find(t) for t in ALERT_CLEAR_TERMS if t in low), default=-1
+    )
+    if clear_at < 0:
+        return threat_hint(text)
+
+    # Nearest to the all-clear word is the class being lifted; anything else is
+    # still in the air. A fixed distance window does not work — in
+    # "По балістиці відбій. / 2 шахеди на Одесу" both classes sit within a
+    # couple of dozen characters of it.
+    found: list[tuple[int, str]] = []
+    for kind, rx in _THREAT:
+        for m in rx.finditer(text):
+            found.append((abs(m.start() - clear_at), kind))
+    if len(found) < 2:
+        return threat_hint(text)
+    found.sort()
+    lifted = found[0][1]
+    for _dist, kind in found:
+        if kind != lifted:
+            return kind
+    return threat_hint(text)
 
 
 def alarm_for(threat: str) -> str:
@@ -504,7 +543,7 @@ def suggest(text: str) -> dict[str, object]:
     stated in an earlier message of the episode, and "we do not know what" is a
     different thing from "nothing is flying".
     """
-    threat = threat_hint(text)
+    threat = active_threat(text)
     # Something arrived, so "nothing is flying" is the wrong default even when
     # no type is named. 105 of the corpus's 380 impact messages were pre-filled
     # as `none` before this.

@@ -200,3 +200,43 @@ def test_the_mig_cycle_takeoff_then_nothing():
     r = play((0, "❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка."),
              (1020, "⚪️ Відбій загрози МіГ-31К."))
     assert levels(r) == ["alert", "info"]
+
+
+# --- ballistic novelty without the word "пуск" ----------------------------
+
+
+def test_a_bare_vyhid_is_a_launch():
+    """The user's note: a message may be just "Вихід" with no "пуск" in it."""
+    r = play((0, "‼️ Вихід балістики з Брянська"))
+    assert levels(r) == ["alert"]
+    assert r[0][1].alarm == "ballistic"
+
+
+def test_balistyka_na_kyiv_with_no_launch_word_still_wakes_you_first_time():
+    """"Балістика на Київ" names no launch. It is new because the ballistic tone
+    has not sounded in this episode yet, not because of any word in it."""
+    r = play((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+             (60, "🔴🔴🔴🚀Балістика на Київ/передмістя."))
+    assert levels(r) == ["alert", "alert"]
+    assert [d.alarm for _o, d in r] == ["alert", "ballistic"]
+
+
+def test_the_same_wording_later_in_the_wave_is_a_refinement():
+    r = play((0, "🔴🔴🔴🚀Балістика на Київ/передмістя."),
+             (120, "‼️Балістика на Київ/передмістя."))
+    assert levels(r) == ["alert", None]
+
+
+def test_a_new_class_breaks_through_an_ongoing_wave():
+    """A Kinzhal after a MiG alert is the event the MiG alert warned about."""
+    r = play((0, "❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка."),
+             (300, "Кинджал на Київ/Вишгород."))
+    assert [d.alarm for _o, d in r] == ["mig", "ballistic"]
+
+
+def test_the_lifted_class_is_not_read_as_the_active_one():
+    """"По балістиці відбій. / 2 шахеди на Одесу" lifts ballistic while shaheds
+    fly; ordered matching answered with the wrong one."""
+    from tools.nlp import hints
+    t = "⚪️По балістиці відбій. / ⚠️2 шахеди на Чорноморськ/Одесу."
+    assert hints.active_threat(t) == "shahed"

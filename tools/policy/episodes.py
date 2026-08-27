@@ -269,6 +269,23 @@ class Tracker:
                 return True
         return False
 
+    def is_new_class(self, alarm: str) -> bool:
+        """Whether this tone has not sounded in this episode.
+
+        A change of class is novelty in itself — the user's own rule for when a
+        new sound belongs. A Kinzhal launched at Kyiv after a MiG-31K alert was
+        being silenced as "the same wave" when it is the event the MiG alert was
+        warning about.
+
+        The caller passes the alarm it intends to use, not the observation's
+        own: a bare "Жуляни" mid-wave carries a drone alarm of its own while the
+        decision is about the ballistic wave it belongs to.
+        """
+        ep = self.episode
+        if ep is None:
+            return True
+        return alarm not in ep.alarms_used()
+
     def is_fresh_launch(self, obs: Observation) -> bool:
         """A launch announcement not already announced by another channel.
 
