@@ -152,6 +152,12 @@
     padding: 8px 9px; font-size: 12.5px; margin-bottom: 12px; line-height: 1.4;
   }
   .ctx .t { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .inh {
+    background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--info);
+    border-radius: 3px; padding: 7px 9px; font-size: 12px; margin-bottom: 11px;
+    line-height: 1.4; color: var(--soft);
+  }
+  .inh b { color: var(--ink); font-family: var(--mono); }
   .warn {
     background: #3b1c1e; border: 1px solid var(--shelter); color: #ffb3b5;
     border-radius: 3px; padding: 7px 9px; font-size: 12px; margin-bottom: 11px;
@@ -405,9 +411,13 @@ function openDraft(decision) {
     level: "alert",
     alarm: m.al === "none" ? "drone" : m.al,
     silent_reason: "too-far",
-    threat: m.th === "none" ? "unknown" : m.th,
+    // A moment is judged in context, so a message stating no type or place
+    // inherits the last one the feed gave. Judging posts in isolation is the
+    // mistake the schema opens by warning about.
+    threat: (m.th === "none" || m.th === "unknown") && m.ith ? m.ith
+          : (m.th === "none" ? "unknown" : m.th),
     modality: m.m,
-    scope: m.s,
+    scope: m.s === "unknown" && m.isc ? m.isc : m.s,
     certainty: m.ce,
     repeat_of: null,
     evidence: [{ channel: m.ch, message_id: m.id }],
@@ -443,6 +453,15 @@ function renderForm() {
   const earlier = labelsForNight().filter(l => l.id !== draft.id && l.decision === "notify");
   const weakShelter = draft.decision === "notify" && draft.level === "shelter" && m.st === "weak";
   let html = `<div class="ctx"><span class="t">${esc(m.hm)} · ${esc(m.c)} · #${m.id}</span><br>${esc(m.x)}</div>`;
+
+  if ((m.ith || m.isc) && m.ifrom) {
+    const parts = [];
+    if (m.ith) parts.push(`${UA.threat[m.ith] || m.ith}`);
+    if (m.isc) parts.push(`${UA.scope[m.isc] || m.isc}`);
+    html += `<div class="inh">Саме повідомлення типу й місця не називає —
+      підставлено з фіду о <b>${esc(m.ifrom)}</b>: ${esc(parts.join(", "))}.
+      Перевір, чи це ще актуально.</div>`;
+  }
 
   if (weakShelter) {
     html += `<div class="warn">Єдина ознака тут — емодзі, а це слабкий сигнал:

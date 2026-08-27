@@ -295,6 +295,41 @@ running — the second ballistic wave, a new group after a lull. This is the fie
 that encodes the original complaint that repeat signals either never arrive or
 arrive unpredictably. `null` for the first notification of an episode.
 
+## Judging a moment, not a post
+
+The schema opens by saying a label attaches to a moment, and that has a
+consequence for the tooling: **the pre-fill must read the feed, not one
+message.** Most messages state neither type nor place —
+
+```
+1х Центр. / 1х Троєщина.      Вибухи      Збито      Продовжує рух на Центр
+```
+
+— and in isolation the honest answer for every one of them is "unknown", which
+is useless as a starting point. In context the answer is usually obvious,
+because a message minutes earlier said `3 реактивні шахеди на Київ`.
+
+So the labeler carries the last stated type and place forward for up to
+**15 minutes**, shows which message it came from, and asks you to confirm. Over
+the sampled month this fills in **3 760 of 5 167 messages (73%)**.
+
+Three rules keep it from inventing things:
+
+- **An explicit `відбій` resets it.** After an all-clear nothing is known to be
+  in the air, and carrying across that would manufacture a threat.
+- **It expires.** Beyond 15 minutes the situation has probably moved on, and a
+  blank field is better than a stale guess.
+- **A stated value always wins.** If the message names a type, that is the type,
+  even when the inherited one seemed more specific.
+
+Resolutions (`Збито`, `чисто`, `мінус`, `локаційно втрачено`) count as
+live-situation events rather than chatter, precisely because they are the
+messages that most need the earlier context.
+
+The pre-fill is a starting point, not an answer. Correcting it is useful twice:
+it fixes the label, and the same module runs in the stage-6 baseline, so the
+correction is also a report about the baseline.
+
 ## The negative set — built, not labeled
 
 The headline metric is false wake-ups, so inputs that must produce **no**

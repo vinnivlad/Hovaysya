@@ -291,6 +291,11 @@ def modality_hint(text: str) -> str:
         return "non-threat"
     if _hits(text, AFTERMATH_TERMS):
         return "aftermath"
+    # Resolutions are part of the live situation, not social chatter. "Збито"
+    # and "чисто" close an episode, and they are precisely the messages that
+    # need the earlier context — they name neither type nor place.
+    if _hits(text, RESOLUTION_CLOSING) or _hits(text, RESOLUTION_UNKNOWN):
+        return "live-threat"
     if looks_live(text):
         return "live-threat"
     if threat_hint(text) != "none":

@@ -183,3 +183,86 @@ def test_the_five_primary_types_have_five_distinct_sounds():
     sounds = [hints.alarm_for(t) for t in
               ("recon", "shahed", "shahed-jet", "cruise", "ballistic")]
     assert len(set(sounds)) == 5, sounds
+
+
+# --- context carried forward ---------------------------------------------
+
+
+def ctx_msgs(items):
+    """items: (offset_seconds, text). Returns messages with context filled."""
+    base = ts(2026, 8, 26, 21)
+    conn = store.connect(Path(__file__).parent / "_ctx_tmp.db") if False else None
+    msgs = []
+    for off, text in items:
+        from tools.nlp import hints
+        from tools.nlp.gazetteer import resolve_scope
+
+        guess = hints.suggest(text)
+        msgs.append({
+            "k": f"c/{off}", "n": "2026-08-26", "c": "c", "ch": "c", "id": off,
+            "t": base + off, "hm": f"{build.kyiv_dt(base + off):%H:%M}",
+            "x": text, "q": "", "r": None,
+            "s": resolve_scope(text), "m": guess["modality"], "th": guess["threat"],
+            "al": guess["alarm"], "ce": guess["certainty"], "st": guess["strength"],
+            "sh": guess["shapes"], "p": [], "inf": [],
+            "ith": None, "isc": None, "ifrom": None,
+        })
+    build.carry_context(msgs)
+    return msgs
+
+
+def test_a_continuation_inherits_the_stated_type():
+    """"Вибухи" and "1х Центр." name no type; judging them alone is the mistake
+    the schema opens by warning about."""
+    m = ctx_msgs([
+        (0, "⚠️3 реактивні шахеди на Київ."),
+        (120, "1х Центр. / 1х Троєщина."),
+    ])
+    assert m[1]["th"] == "unknown"
+    assert m[1]["ith"] == "shahed-jet"
+    assert m[1]["ifrom"] == m[0]["hm"]
+
+
+def test_a_continuation_inherits_the_place_when_it_names_none():
+    m = ctx_msgs([
+        (0, "⚠️1 реактивний шахед на Жуляни."),
+        (60, "Збито"),
+    ])
+    assert m[1]["s"] == "unknown"
+    assert m[1]["isc"] == "my-area"
+
+
+def test_context_expires_rather_than_being_guessed():
+    m = ctx_msgs([
+        (0, "⚠️3 реактивні шахеди на Київ."),
+        (20 * 60, "Вибухи"),
+    ])
+    assert m[1]["ith"] is None
+
+
+def test_an_all_clear_resets_the_carry():
+    """After "відбій" nothing is known to be in the air; inheriting across it
+    would invent a threat."""
+    m = ctx_msgs([
+        (0, "⚠️3 реактивні шахеди на Київ."),
+        (60, "🛑 Відбій тривоги"),
+        (120, "Вибухи"),
+    ])
+    assert m[2]["ith"] is None
+
+
+def test_a_stated_type_wins_over_the_inherited_one():
+    m = ctx_msgs([
+        (0, "⚠️3 реактивні шахеди на Київ."),
+        (60, "❗Група ракет Калібр на Київ."),
+    ])
+    assert m[1]["th"] == "cruise"
+
+
+def test_social_messages_do_not_inherit():
+    m = ctx_msgs([
+        (0, "⚠️3 реактивні шахеди на Київ."),
+        (60, "Дуже вам вдячний за підтримку ❤️"),
+    ])
+    assert m[1]["ith"] is None
+    assert m[1]["m"] == "non-threat"

@@ -122,9 +122,52 @@ def load_messages(conn: sqlite3.Connection, since: str | None) -> list[dict]:
                 "sh": guess["shapes"],
                 "p": places,
                 "inf": find_infrastructure(text),
+                # Filled by carry_context: the best answer available from the
+                # feed when the message itself states none.
+                "ith": None,
+                "isc": None,
+                "ifrom": None,
             }
         )
     return out
+
+
+# How long a stated threat type or location stays the best available answer for
+# a message that gives none of its own. Beyond this the situation has probably
+# moved on and guessing does more harm than leaving it blank.
+CARRY_WINDOW_S = 15 * 60
+
+
+def carry_context(messages: list[dict]) -> None:
+    """Fill each message's inherited threat and scope, in place.
+
+    A label answers "what is flying at this moment", not "what does this post
+    say". Continuation messages — `Вибухи`, `Збито`, `Продовжує рух на Центр` —
+    carry no type or place of their own, and judging them in isolation is
+    exactly the mistake the schema warns about. So the pre-fill inherits from
+    the most recent message that did state one.
+
+    An explicit all-clear resets the carry: after `відбій` nothing is known to
+    be in the air, and inheriting across it would invent a threat.
+    """
+    last_threat: tuple[str, int, str] | None = None  # value, ts, hh:mm
+    last_scope: tuple[str, int, str] | None = None
+
+    for m in messages:
+        if m["m"] == "live-threat":
+            if last_threat and m["t"] - last_threat[1] <= CARRY_WINDOW_S:
+                m["ith"], m["ifrom"] = last_threat[0], last_threat[2]
+            if last_scope and m["t"] - last_scope[1] <= CARRY_WINDOW_S:
+                m["isc"] = last_scope[0]
+
+        if "відбій" in m["x"].lower():
+            last_threat = last_scope = None
+            continue
+
+        if m["th"] not in ("none", "unknown"):
+            last_threat = (m["th"], m["t"], m["hm"])
+        if m["s"] != "unknown":
+            last_scope = (m["s"], m["t"], m["hm"])
 
 
 def build_nights(messages: list[dict]) -> list[dict]:
@@ -171,6 +214,7 @@ def main(argv: list[str] | None = None) -> int:
     conn.row_factory = sqlite3.Row
     messages = load_messages(conn, args.since)
     conn.close()
+    carry_context(messages)
 
     if not messages:
         print("No messages matched — nothing to label.")
@@ -194,10 +238,12 @@ def main(argv: list[str] | None = None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8", newline="\n")
 
+    inherited = sum(1 for m in messages if m["ith"] or m["isc"])
     near = sum(n["near"] for n in payload["nights"])
     print(f"Wrote {out}  ({out.stat().st_size / 1048576:.1f} MB)")
     print(f"  {len(messages)} messages across {len(payload['nights'])} nights")
     print(f"  {near} mention your area or district")
+    print(f"  {inherited} take their type or place from earlier in the feed")
     print(f"  {len(payload['labels'])} existing labels loaded")
     print(f"\nOpen it in a browser: {out}")
     return 0
