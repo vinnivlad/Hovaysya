@@ -221,8 +221,10 @@ const ALARMS = ["ballistic", "mig", "cruise", "drone-jet", "drone", "recon", "no
 const SILENT_REASONS = ["too-far", "already-notified", "resolved", "insufficient"];
 // Five primary types, ordered by how urgently they need a reaction, one sound
 // each. The rest sit behind a secondary row so the common case stays one row.
-const THREATS_MAIN = ["recon", "mig", "shahed", "shahed-jet", "cruise", "ballistic"];
-const THREATS_MORE = ["kab", "aviation", "mixed", "unknown", "none"];
+// Ordered by how little time each leaves, starting from nothing at all —
+// informational messages are the single most common case in the corpus.
+const THREATS_MAIN = ["none", "recon", "mig", "shahed", "shahed-jet", "cruise", "ballistic"];
+const THREATS_MORE = ["kab", "aviation", "mixed", "unknown"];
 const MODALITIES = ["live-threat", "aftermath", "summary-news", "non-threat"];
 const SCOPES = ["my-area", "my-district", "city", "oblast", "elsewhere", "unknown"];
 const CERTAINTIES = ["confirmed", "probable", "lost", "clear"];
@@ -248,7 +250,8 @@ const UA = {
     unknown: "невідомо", none: "нічого",
   },
   threatHint: {
-    recon: "не шкодить", mig: "тривога на всю країну", shahed: "хвилини",
+    none: "інформаційне", recon: "не шкодить",
+    mig: "тривога на всю країну", shahed: "хвилини",
     "shahed-jet": "мало хвилин", cruise: "хвилини", ballistic: "часу немає",
     aviation: "задовго до тривоги",
   },

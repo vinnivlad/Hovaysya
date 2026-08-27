@@ -177,8 +177,12 @@ would be waste.
 `recon` · `mig` · `shahed` · `shahed-jet` · `cruise` · `ballistic` · `kab` ·
 `aviation` · `mixed` · `unknown` · `none`
 
-The first six are the labeler's primary row, ordered by how little time each
-leaves. The rest sit behind a secondary row.
+The labeler's primary row is `none`, `recon`, `mig`, `shahed`, `shahed-jet`,
+`cruise`, `ballistic` — ordered by how little time each leaves, starting from
+nothing at all. `none` is there rather than behind the secondary row because
+purely informational messages are the most common case in the corpus (4 148 of
+11 609), and reaching for a collapsed row that often is friction. `kab`,
+`aviation`, `mixed` and `unknown` stay secondary.
 
 `shahed` and `shahed-jet` are separate on purpose. A jet-powered Shahed
 (`реактивний`) is several times faster than a propeller one and appears in 1 511
