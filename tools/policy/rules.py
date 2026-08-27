@@ -110,8 +110,18 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     # the event — the whole country is alerted at that moment.
     if obs.certainty == "probable" and threat in ("ballistic", "cruise"):
         if ep is not None and ep.notified:
-            return _silent("already-notified: anticipation during a live episode")
-        return _silent("insufficient: threatened, not launched")
+            # Also words, no sound — this is the second half of his example:
+            # "Тривога", then "Загроза балістики", and he wants to hear the
+            # class named after the siren. Silence dropped it entirely.
+            return _notify("info", "none",
+                           "already-notified: anticipation during a live episode")
+        # Words, no sound. He asked to hear "почалась тривога по балістиці" and
+        # then "був пуск" as two separate things — but of eleven anticipated
+        # threats in the labels exactly one is a wake-up, and sounding every
+        # episode's first one costs three false wake-ups. `info` is the channel
+        # that was already there for this: the announcement queue and the
+        # persistent status get the sentence, nothing rings.
+        return _notify("info", "none", "insufficient: threatened, not launched")
 
     # 6. Ballistic leaves no room for geography: minutes of flight, so a
     #    confirmed launch that could reach us is a shelter call city-wide.

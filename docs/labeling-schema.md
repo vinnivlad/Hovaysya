@@ -747,3 +747,46 @@ Two rules that keep the data honest:
 
 Reported per night, not aggregated: a single terrible night matters more than a
 good average, because that is the night you stop trusting the app.
+
+## What he hears
+
+The notification is a **queue of spoken Ukrainian sentences**, not a set of
+tones. His design:
+
+> Повідомлення ставляться в чергу. Якщо прилітають "Загроза балістики" і слідом
+> "Вихід на Київ", то я хочу почути що почалась тривога по балістиці і потім що
+> був пуск. Скоріше за все, ці звуки будуть не просто звуки, а слова.
+
+Three properties follow, and `tools/policy/announce.py` implements them.
+
+**An utterance says what changed.** The second sentence in each of his examples
+is shorter than the first, because the siren has already been announced by then.
+Reading the whole situation aloud every time is how a voice channel becomes
+noise — the failure the tone channel had when every message rang.
+
+**Nothing is dropped.** A tone arriving while another plays is lost; a sentence
+waits its turn. So it is a queue, and the queue is deliberately not
+de-duplicated: the policy has already decided what is worth saying, and making
+that judgement twice in two places is how the two drift apart.
+
+**`alarm` still names the class**, because the lead-in sound plays before the
+words and has to say what is coming before he is properly awake.
+
+    🔔 Тривога.
+    💬 Загроза: балістика.
+    🔔 Пуск: балістика.
+    🔔 Жуляни.
+    🔔 Відбій по балістиці.
+    🔔 Відбій тривоги.
+
+The 💬 line is the reason `info` exists. An anticipated launch writes a sentence
+and rings nothing: he asked to hear the class named after the siren, and of
+eleven anticipated threats in the labels exactly one is a wake-up — sounding
+every episode's first one costs three false wake-ups.
+
+That change is also what made **long-range forecasts** matter. "Загроза
+балістичного удару по Києву протягом 48 годин" is `live-threat`, `probable`,
+`ballistic` — identical in every field to an imminent launch threat — and once
+anticipation writes a status line, a two-day forecast would sit there saying
+"Загроза: балістика" all night. Sixty-five such messages are now read as
+summaries.

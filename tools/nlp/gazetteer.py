@@ -537,3 +537,35 @@ def launch_origins() -> frozenset[str]:
     places, and a real ballistic launch from Voronezh stopped being country-wide.
     """
     return frozenset(p.name for p in PLACES if p.origin)
+
+
+_COUNT = re.compile(r"(" + chr(92) + "d+)" + chr(92) + "s*[хx]" + chr(92) + "b")
+
+# A count binds to the place that follows it — "1х Жуляни", "2х Вишневе Жуляни",
+# "🅿️ Київ / 1х реактив Боярка далі Крюківщина". Beyond this many characters it
+# belongs to some other clause.
+_COUNT_REACH = 30
+
+
+def stated_count(text: str, tiers: tuple[str, ...] = ("my-area", "my-district")) -> int:
+    """How many objects the message puts over those tiers, as the channel says.
+
+    The channels publish a roll call — `🅿️ Київ / 1х Жуляни` — so the count is a
+    stated fact, not an inference. It is the one signal measured to separate a
+    new drone from the same one being tracked: across 29 near-ring drone moments
+    a count above the running peak marked four wake-ups and not one of the
+    twenty silences.
+
+    0 when no such place is named; 1 when one is named without a count.
+    """
+    flat = _flatten(text)
+    spans = [(a, b, pl) for a, b, pl in place_spans(text) if pl.tier in tiers]
+    if not spans:
+        return 0
+    best = 0
+    for m in _COUNT.finditer(flat):
+        n = int(m.group(1))
+        for start, _end, _pl in spans:
+            if 0 <= start - m.end() <= _COUNT_REACH:
+                best = max(best, n)
+    return best or 1

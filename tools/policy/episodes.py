@@ -21,7 +21,7 @@ import re
 from dataclasses import dataclass, field
 
 from ..nlp import hints
-from ..nlp.gazetteer import find_places
+from ..nlp.gazetteer import find_places, stated_count
 
 # An episode closes on an all-clear, or after this long with no live threat.
 IDLE_CLOSE_S = 45 * 60
@@ -117,6 +117,10 @@ class Episode:
     sent: list[Sent] = field(default_factory=list)
     # place name -> last time it was named near the user
     ring_seen: dict[str, int] = field(default_factory=dict)
+    # The highest count the channels have stated over the ring since the last
+    # audible alert. His model of a drone night — "кожен дрон то як і хвиля
+    # ракет" — and the roll call is where the wave count is stated out loud.
+    ring_peak: int = 0
     # Classes reported lifted while this episode continues. The user asked to
     # know "що нема загрози балістики чи мігів", and the persistent status
     # notification is where that lives — so the state has to be kept.
@@ -157,6 +161,10 @@ class Observation:
     nationwide: bool
     ring_places: tuple[str, ...]
     says_new: bool
+    # Whether the text says something launched, wherever it is aimed. Distinct
+    # from `says_new`, which asks whether that launch is a *new* event.
+    says_launch: bool = False
+    ring_count: int = 0
     cleared_class: str | None = None
     is_reply: bool = False
     partial_clear: bool = False
@@ -198,6 +206,8 @@ def observe(ts: int, text: str, is_reply: bool = False) -> Observation:
         nationwide=hints.nationwide(text),
         ring_places=scope_places,
         says_new=_says_new(text),
+        says_launch=bool(_LAUNCH.search(text or "")),
+        ring_count=stated_count(text),
         is_reply=is_reply,
         partial_clear=hints.partial_clear(text),
         cleared_class=hints.cleared_class(text),
@@ -271,6 +281,13 @@ class Tracker:
         """
         ep = self.episode
         if ep is None or not ep.notified:
+            return True
+
+        # A stated count above the running peak is a new object, and it is the
+        # channel saying so rather than us inferring it — measured across 29
+        # near-ring drone moments to mark four wake-ups and none of the twenty
+        # silences, so it breaks the refractory outright.
+        if obs.ring_count > ep.ring_peak:
             return True
 
         window = self.refractory_near_s if obs.near else self.refractory_s
@@ -352,5 +369,9 @@ class Tracker:
             ep.last_launch = obs.ts
         for place in obs.ring_places:
             ep.ring_seen[place] = obs.ts
+        ep.ring_peak = max(ep.ring_peak, obs.ring_count)
         if level is not None and alarm is not None:
             ep.sent.append(Sent(ts=obs.ts, level=level, alarm=alarm))
+            # The peak resets with each alert: the question is always "more than
+            # I was last told about", not "more than tonight's worst moment".
+            ep.ring_peak = obs.ring_count

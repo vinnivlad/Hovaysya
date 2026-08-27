@@ -86,7 +86,11 @@ def test_an_anticipated_launch_does_not_re_alarm():
     sound belongs to the launch."""
     r = play((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
              (60, "❗️❗❗Загроза пуску балістичних ракет \"Іскандер-М\" з Курської області."))
-    assert levels(r) == ["alert", None]
+    assert levels(r) == ["alert", "info"]
+    # `info` rather than nothing: he asked to hear the class named after the
+    # siren — "Тривога", then "по балістиці" — and silence dropped it. It is
+    # still not a sound, which is what this test is about.
+    assert not r[1][1].audible
 
 
 def test_ordinals_within_one_volley_do_not_re_alarm():
@@ -460,3 +464,73 @@ def test_a_siren_that_may_be_declared_is_not_a_siren():
     assert hints.alert_state(
         "🔴У Києві у найближчі хвилини можуть оголосити повітряну тривогу") is None
     assert hints.alert_state("⚠️❗️КИЇВ - ТРИВОГА. В укриття!") == "alert"
+
+
+# --- what he actually hears ------------------------------------------------
+
+
+def _speak(texts, spacing=200):
+    from tools.policy.announce import Announcer
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr, ann = Tracker(), Announcer()
+    out = []
+    for i, text in enumerate(texts):
+        o = observe(T0 + i * spacing, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        u = ann.announce(o, d)
+        out.append((d.audible, u.text if u else None))
+    return out
+
+
+def test_his_first_example():
+    """"Якщо прилітають «Загроза балістики» і слідом «Вихід на Київ», то я хочу
+    почути що почалась тривога по балістиці і потім що був пуск." """
+    said = _speak(["❗️❗Загроза пуску балістичних ракет Іскандер-М.",
+                   "‼️ Вихід балістики з Брянська на Київ"])
+    assert said[0] == (False, "Тривога. Балістика.")   # words, no sound
+    assert said[1] == (True, "Пуск: балістика.")
+
+
+def test_his_second_example():
+    """"Якщо просто «Тривога», «Загроза балістики», то почути що почалась
+    тривога, а потім по балістиці." """
+    said = _speak(["⚠️❗️КИЇВ - ТРИВОГА. В укриття!",
+                   "❗️❗Загроза пуску балістичних ракет Іскандер-М.",
+                   "‼️ Вихід балістики з Курська"])
+    assert said[0] == (True, "Тривога.")
+    assert said[1] == (False, "Загроза: балістика.")
+    assert said[2] == (True, "Пуск: балістика.")
+
+
+def test_an_utterance_says_only_what_changed():
+    """Re-reading the whole situation aloud every time is how a voice channel becomes
+    noise — the failure the tone channel had when every message rang."""
+    said = _speak(["⚠️❗️КИЇВ - ТРИВОГА. В укриття!",
+                   "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"])
+    assert said[0][1] == "Тривога."
+    assert said[1][1] is None          # the siren is announced once
+
+
+def test_a_launch_is_not_announced_as_a_threat_as_well():
+    """"Загроза: балістика. Пуск: балістика." is one fact said twice."""
+    said = _speak(["⚠️❗️КИЇВ - ТРИВОГА. В укриття!",
+                   "‼️ Вихід балістики з Брянська"])
+    assert said[1][1] == "Пуск: балістика."
+
+
+def test_the_all_clear_wipes_what_was_said():
+    said = _speak(["⚠️❗️КИЇВ - ТРИВОГА. В укриття!",
+                   "🟢 ВІДБІЙ ТРИВОГИ",
+                   "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"])
+    assert said[1][1] == "Відбій тривоги."
+    assert said[2][1] == "Тривога."    # a new episode says it again
+
+
+def test_a_partial_all_clear_names_the_class_it_lifts():
+    said = _speak(["⚠️❗️КИЇВ - ТРИВОГА. В укриття!",
+                   "‼️ Вихід балістики з Брянська",
+                   "⚪️По балістиці відбій."])
+    assert said[2][1] == "Відбій по балістиці."

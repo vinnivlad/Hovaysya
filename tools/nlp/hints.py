@@ -155,6 +155,14 @@ SUMMARY_TERMS = (
     # "У ніч на 05.08.26, згідно зі звітом Повітряних Сил..." — the morning
     # report, which named enough missiles to read as a live ballistic wave.
     "згідно зі звіт", "звітом повітряних сил", "вночі рф", "вночі ворог",
+    # Long-range forecasts. They look exactly like an imminent launch threat to
+    # every field — "Загроза балістичного удару по Києву протягом 48 годин" is
+    # `live-threat`, `probable`, `ballistic` — and the only thing separating
+    # them is the horizon. It matters now that an anticipated threat writes a
+    # line into the status: a two-day forecast must not sit there saying
+    # "Загроза: балістика" all night.
+    "48 годин", "годин", "може атакувати", "можуть атакувати",
+    "найближчої доби", "найближчу добу", "наступної доби", "наступні 2 дні",
 )
 
 # Not about an air threat at all: fundraising, channel social, civil news.
