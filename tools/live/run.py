@@ -76,6 +76,14 @@ HEARTBEAT_S = 900.0
 # forty-minute delay — destroying the one number this stage exists to produce.
 SLEEP_GAP_S = 120.0
 
+# How much recent history to replay through the tracker at startup. Polling
+# catches up on what arrived while the process was down, but a restart during an
+# alert has nothing to catch up on and would begin blind: no episode, so the
+# first place name re-announces a wave already announced, and the loop polls at
+# the quiet interval through an attack. So the warm-up reads the store instead of
+# relying on the poll, and an hour and a half comfortably spans an episode.
+WARM_WINDOW_S = 90 * 60
+
 _STOP = False
 
 
@@ -273,6 +281,22 @@ def main(argv: list[str] | None = None) -> int:
           f"{args.alert_interval:.0f}s під тривогу")
     print(f"  лог: {log_path}")
 
+    # Warm the tracker from what is already stored, before polling at all. A
+    # restart mid-alert has nothing to catch up on and would otherwise start with
+    # no episode — announcing a wave already announced, at the quiet interval.
+    warm_from = int(time.time()) - WARM_WINDOW_S
+    warmed = 0
+    for row in conn.execute(
+            "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
+            "WHERE ts >= ? AND text_norm <> '' ORDER BY ts", (warm_from,)):
+        handle(session, row["channel"], row["message_id"], row["ts"],
+               row["text_norm"], row["reply_to"] is not None, time.time(), warm=True)
+        warmed += 1
+    if warmed:
+        state = "ТРИВОГА" if session.tracker.episode is not None else "тихо"
+        print(f"  прогрів: {warmed} повідомлень за останні "
+              f"{WARM_WINDOW_S // 60} хв — стан: {state}")
+
     # Catch up on whatever arrived while the machine was off, silently. The
     # tracker needs it — an alert may already be running — but printing six
     # hours of backlog buries the live feed, and counting its lag would make the
@@ -285,7 +309,7 @@ def main(argv: list[str] | None = None) -> int:
             break
     if caught:
         state = "ТРИВОГА" if session.tracker.episode is not None else "тихо"
-        print(f"  наздогнав {caught} повідомлень з бази — стан: {state}")
+        print(f"  наздогнав {caught} нових — стан: {state}")
     print("  --- далі живий ефір ---", flush=True)
     print()
 

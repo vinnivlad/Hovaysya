@@ -81,17 +81,13 @@ python -m tools.live.run 2>&1 | tee data/live/console.txt
 And to see what actually happened, without scrolling:
 
 ```
-python - <<'PY'
-import json, pathlib
-rows = [json.loads(l) for p in sorted(pathlib.Path("data/live").glob("*.jsonl"))
-        for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
-live = [r for r in rows if not r.get("warm")]
-woke = [r for r in live if r["level"] == "alert"]
-print(f"{len(live)} messages, {len(woke)} would have woken you")
-for r in woke:
-    print(f"  {r['at'][11:19]}  {r['said']}   <- {r['text'][:50]}")
-PY
+python -m tools.live.report            # the newest run
+python -m tools.live.report --all      # every run in data/live
 ```
+
+Read the newest log by default, not all of them: an older run's log can hold
+messages this one caught up on, and mixing them turns the lag figure into
+nonsense — the first attempt reported a median of two and a half hours that way.
 
 ## Undoing it
 

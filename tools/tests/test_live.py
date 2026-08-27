@@ -96,3 +96,22 @@ def test_a_gap_means_the_machine_slept_not_that_the_loop_was_slow():
     threshold = interval_hint(args, session) + SLEEP_GAP_S
     assert 40 * 60 > threshold          # forty minutes is a suspend
     assert 20 < threshold               # twenty seconds is just a slow poll
+
+
+def test_a_restart_mid_alert_must_not_begin_blind():
+    """The failure this guards against was seen live: restarting during a real
+    alert found nothing to catch up on, so the tracker started with no episode —
+    the next place name would re-announce a wave already announced, and the loop
+    polled at the quiet interval right through an attack. The warm-up reads the
+    store rather than relying on the poll."""
+    from tools.live.run import WARM_WINDOW_S
+
+    assert WARM_WINDOW_S >= 45 * 60      # an episode closes after 45 min idle
+
+    session = Session()
+    handle(session, "kievinform_ua1", 1, T0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!",
+           False, T0 + 5, warm=True)
+    assert session.tracker.episode is not None
+    # ...and the first live ring message after that is a repeat, not an opening.
+    handle(session, "kievinform_ua1", 2, T0 + 60, "Жуляни ✈️", False, T0 + 62)
+    assert session.log[-1]["reason"] != "alert declared"

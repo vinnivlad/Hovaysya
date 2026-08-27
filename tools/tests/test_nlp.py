@@ -861,3 +861,14 @@ def test_respublika_belarus_is_not_the_mall_by_teremky():
     assert resolve_scope("❗️2 крилаті ракети на Республіку/Теремки.") == "my-area"
     assert resolve_scope("🔴У Республіці Білорусь запрацювали ретранслятори") == "elsewhere"
     assert resolve_scope("Пуски з Республіки Білорусь") == "elsewhere"
+
+
+def test_a_loop_over_my_area_is_a_live_threat():
+    """Found live, on the first evening of watching: "На Жуляни знову коло" read
+    as `non-threat` — no threat word, no count, no emoji, and `коло` left over
+    after subtracting the place name so it was not a bare toponym list either.
+    A drone circling over his own home, and the app had nothing to say."""
+    for text in ("На Жуляни знову коло.",
+                 "Намотав коло по Києву і знову на Рожни"):
+        assert hints.suggest(text)["modality"] == "live-threat", text
+    assert "movement" in hints.live_shapes("На Жуляни знову коло.")
