@@ -143,6 +143,17 @@
     padding: 8px 9px; font-size: 12.5px; margin-bottom: 12px; line-height: 1.4;
   }
   .ctx .t { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .quick {
+    align-self: flex-start; margin-top: 2px; padding: 2px 8px;
+    font-size: 10.5px; opacity: .45; transition: opacity .1s;
+  }
+  .msg:hover .quick, .msg.sel .quick { opacity: 1; }
+  .quick:hover { border-color: var(--soft); }
+  .req {
+    font-family: var(--mono); font-size: 9px; color: var(--shelter);
+    border: 1px solid var(--shelter); border-radius: 2px; padding: 0 3px;
+    letter-spacing: .04em;
+  }
   .msg.siren { background: #171d24; }
   .msg.siren-alert { border-left-color: var(--shelter); }
   .msg.siren-clear { border-left-color: var(--done); }
@@ -428,6 +439,22 @@ function renderFeed() {
         `<div class="tags">${tags}</div>` +
       `</div>`;
     div.onclick = () => { selIx = ix; openDraft(); renderAll(); };
+
+    if (!lab) {
+      const quick = document.createElement("button");
+      quick.type = "button";
+      quick.className = "quick";
+      quick.textContent = "не буди";
+      quick.title = "зберегти «не буди» з тими ж налаштуваннями, що попереднє";
+      quick.onclick = ev => {
+        ev.stopPropagation();
+        selIx = ix;
+        openDraft("silent");
+        save();
+      };
+      div.querySelector(".bd").appendChild(quick);
+    }
+
     rows.appendChild(div);
 
     // The label is a mark on the timeline placed just after this message
@@ -457,20 +484,30 @@ function selected() {
   return selIx >= 0 && selIx < msgs.length ? msgs[selIx] : null;
 }
 
+// Labelling every post is a supported way to work — it is denser and better
+// data, and the hard part is deciding which moments matter, not clicking. So a
+// new draft starts from the night's most recent label of the same decision:
+// a run of "молчати · вже будив" is then one click each.
+function lastLabelLike(decision) {
+  const same = labelsForNight().filter(l => l.decision === decision);
+  return same.length ? same[same.length - 1] : null;
+}
+
 function openDraft(decision) {
   const m = selected();
   if (!m) return;
   const existing = labelForMessage(m);
   if (existing && !decision) { draft = Object.assign({}, existing); return; }
+  const prev = lastLabelLike(decision || "notify");
   draft = existing ? Object.assign({}, existing) : {
     id: nextLabelId(m),
     night: nightId,
     anchor: m.k,
     at: new Date(m.t * 1000).toISOString().replace(/\.\d+Z$/, "Z"),
     decision: "notify",
-    level: "alert",
+    level: prev && prev.level ? prev.level : "alert",
     alarm: m.al === "none" ? "drone" : m.al,
-    silent_reason: "too-far",
+    silent_reason: prev && prev.silent_reason ? prev.silent_reason : "already-notified",
     // A moment is judged in context, so a message stating no type or place
     // inherits the last one the feed gave. Judging posts in isolation is the
     // mistake the schema opens by warning about.
@@ -582,7 +619,9 @@ function renderForm() {
   html += `<div class="row"><label>певність</label>` +
     pick("certainty", CERTAINTIES, draft.certainty) + `</div>`;
 
-  html += `<div class="row"><label>чому — своїми словами</label>` +
+  html += `<div class="row"><label>чому — своїми словами` +
+    (draft.decision === "notify" ? ` <span class="req">обов'язково</span>` : "") +
+    `</label>` +
     `<textarea data-f="why" placeholder="одна фраза">${esc(draft.why)}</textarea></div>`;
   html += `<div class="row"><label>сумнів (не обов'язково)</label>` +
     `<input type="text" data-f="open_question" value="${esc(draft.open_question)}"></div>`;
@@ -606,15 +645,18 @@ function renderForm() {
   body.querySelectorAll("textarea[data-f], input[data-f]").forEach(el => {
     el.oninput = () => { draft[el.dataset.f] = el.value; };
   });
-  document.getElementById("saveBtn").onclick = save;
+  document.getElementById("saveBtn").onclick = () => save(true);
   document.getElementById("cancelBtn").onclick = () => { draft = null; renderAll(); };
   const delBtn = document.getElementById("delBtn");
   if (delBtn) delBtn.onclick = remove;
 }
 
-function save() {
+function save(advance) {
   if (!draft) return;
-  if (!draft.why.trim()) {
+  // A wake-up decision has to be justified; "nothing here" does not. Requiring
+  // a sentence on every silent label would make labelling a whole night
+  // unbearable, and most of a night is silent.
+  if (draft.decision === "notify" && !draft.why.trim()) {
     const ta = document.querySelector("textarea[data-f=why]");
     if (ta) { ta.focus(); ta.style.borderColor = "var(--shelter)"; }
     return;
@@ -630,7 +672,7 @@ function save() {
   persist();
   draft = null;
   const msgs = visibleMessages();
-  if (selIx < msgs.length - 1) selIx++;
+  if (advance && selIx < msgs.length - 1) selIx++;
   openDraft();
   renderAll();
 }
@@ -699,7 +741,7 @@ document.addEventListener("keydown", e => {
       }
       break;
     }
-    case "Enter": if (draft) { save(); e.preventDefault(); } break;
+    case "Enter": if (draft) { save(true); e.preventDefault(); } break;
     case "Escape": draft = null; document.activeElement.blur(); renderAll(); break;
   }
 });

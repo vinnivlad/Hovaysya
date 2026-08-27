@@ -51,7 +51,7 @@ rewriting, and so a diff shows exactly which labels changed.
 | `certainty` | enum | yes | how well its position is known |
 | `repeat_of` | string \| null | yes | id of the earlier label this repeats, or `null` |
 | `evidence` | array | yes | the messages that justify this label |
-| `why` | string | yes | one line, in your own words |
+| `why` | string | for `notify` | one line, in your own words |
 | `open_question` | string \| null | no | anything you were unsure about |
 | `night` | string | yes | the night this belongs to, `YYYY-MM-DD` of the evening |
 | `anchor` | string | yes | `channel/message_id` of the message the label was placed on |
@@ -481,6 +481,35 @@ Real messages, from the night of 2026-08-27, at the reference location.
 ```
 
 ## How to label
+
+Either way of working is fine, and the second turns out to be easier in
+practice.
+
+**Dense — a label after every post.** More labels, but no decision about *which*
+moments deserve one, and that decision is the tiring part. It also produces
+strictly better data: every message becomes a test case, and episode boundaries
+are pinned exactly ("silent at 10:06 because already woken, notify at 10:35
+because a new wave"), which is precisely what the repeat logic needs. Nothing
+needs cleaning up afterwards — dense labels are a superset of sparse ones.
+
+Three things make it viable:
+
+- **Sticky defaults.** A new label starts from the night's most recent label of
+  the same decision, so a run of `молчати · вже будив` is one click each.
+- **One-click from the feed.** Each unlabelled row carries a `не буди` button
+  that saves with the previous silent settings without opening the form.
+- **`why` is required only for a wake-up.** A decision to wake someone has to be
+  justified; "nothing here" does not. Requiring a sentence on every silent label
+  would make a whole night unbearable, and most of a night is silent.
+
+**Sparse — only the moments that matter.** Fewer labels, but each one is a
+judgement call about significance as well as about the decision.
+
+If you label densely, the harness gets an explicit answer at every arrival and
+scoring becomes stricter rather than harder: there is no longer any moment where
+"no label nearby" has to be interpreted.
+
+### Sparse guidance
 
 Work night by night, not message by message.
 
