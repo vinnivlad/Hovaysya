@@ -709,3 +709,75 @@ def test_a_takeoff_is_structural_evidence_not_a_decoration():
 def test_an_ordinary_bare_place_report_is_still_weak_on_its_emoji():
     """The launch shape must not quietly promote everything else."""
     assert hints.live_strength("Жуляни ⚠️") != "none"
+
+
+# --- landmarks ------------------------------------------------------------
+
+
+def test_a_named_power_plant_is_a_place_in_the_city():
+    """`ТЕЦ-5` is named 44 times in the corpus, more often than most districts,
+    and every one of those messages used to resolve to `unknown` and vanish from
+    the Kyiv view. The user found it: a reply quoting "На ТЕЦ-5! Падає" whose
+    parent was nowhere on the page."""
+    assert resolve_scope("⚠️На ТЕЦ-5! Падає") == "city"
+    assert resolve_scope("⚠️Реактивний шахед на Троєщину/ТЕЦ-6.") == "city"
+    assert resolve_scope("⚠️1 реактивний шахед на ТЦ Проспект.") == "city"
+    assert resolve_scope("Завели ціль Над столицею, Видубичі") == "city"
+
+
+def test_a_settlement_named_beside_a_landmark_outranks_it():
+    """Nearly every city has a ТЕЦ-5. "Залітає у Черкаси курсом на ТЕЦ-5" is
+    about theirs, and without this rule the nearest tier wins and someone
+    else's city reads as ours."""
+    assert resolve_scope("🔴Залітає у Черкаси курсом на ТЕЦ-5, Сади.") == "elsewhere"
+    assert resolve_scope("⚠️1 шахед на Чернігівську ТЕЦ!") == "elsewhere"
+
+
+def test_a_landmark_still_loses_to_a_nearer_district():
+    """The rule is about settlements outranking landmarks, not about landmarks
+    dragging a message down a tier."""
+    assert resolve_scope("ТЕЦ-5, Деміївка, Голосіїв") == "my-area"
+
+
+def test_the_nameless_infrastructure_category_still_works():
+    """`find_infrastructure` answers "is a power plant involved at all", which
+    is a different question from where it is."""
+    assert "ТЕЦ" in find_infrastructure("⚠️На Чернігівську ТЕЦ")
+
+
+# --- a hyphen joins two places, it does not hide one -----------------------
+
+
+def test_the_second_half_of_a_hyphenated_pair_is_found():
+    """Zhurivka was already in the gazetteer and never matched: the hyphen
+    counted as a word character, so every "X-Y" pair lost Y."""
+    assert resolve_scope("2х БПЛА Яготин-Згурівка") == "oblast"
+    assert resolve_scope("1х Обухів-Васильків") == "oblast"
+    assert resolve_scope("Конча-Заспа") == "city"
+
+
+def test_a_hyphenated_name_is_not_two_places():
+    """`шевченків` and `подільськ` are Kyiv districts, and the hyphen fix
+    exposed them inside towns hundreds of kilometres away — Kamianets-Podilskyi
+    read as Podil nine times. Longest match is what keeps them apart."""
+    assert resolve_scope("Корсунь-Шевченківський 3х реактивних БпЛА") == "elsewhere"
+    assert resolve_scope("Шахед на Кам'янець-Подільський") == "elsewhere"
+    assert resolve_scope("Києво-Святошинському районі") == "oblast"
+    # ...while a hyphenated name that really is in Kyiv still is.
+    assert resolve_scope("Києво-Печерська лавра") == "city"
+
+
+def test_launch_origins_resolve_to_a_region_rather_than_nowhere():
+    """Left `unknown` they inherit the night's scope from the feed, which would
+    have made a launch from Russia read as a threat over Kyiv."""
+    for text in ("⚠️Пуски реактивних шахедів з Орла.",
+                 "Запуск реактивних БпЛА з Брянщини",
+                 "з Воронезької області", "з Орловської області"):
+        assert resolve_scope(text) == "elsewhere", text
+
+
+def test_chabanka_is_not_chabany():
+    """One letter apart: a village in Odesa oblast and a neighbour of the
+    user's."""
+    assert resolve_scope("3х реактива у напрямку Південний порт / Чабанка") == "elsewhere"
+    assert resolve_scope("На Чабани, Гатне") == "my-area"

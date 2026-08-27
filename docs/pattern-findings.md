@@ -309,3 +309,42 @@ nearly all the traffic happens.
    useless; a 6-character prefix stem clustered every family correctly here.
 10. **Keep emoji in the text.** They are predicates and disambiguators.
 11. **Start adjacency from co-mention statistics**, not from polygons.
+
+## What the geographic filter was hiding
+
+Found because the user noticed a reply on the page quoting a post that was not
+on the page: `↳ ⚠️На ТЕЦ-5! Падає`, with no parent row anywhere. The parent was
+in the database all along.
+
+Three separate causes, measured on the two labelled nights:
+
+| cause | effect |
+| --- | --- |
+| a place named 44 times was not in the gazetteer (`ТЕЦ-5`) | every mention resolved `unknown` |
+| the page computed an inherited scope and then filtered on the stated one | 31 live messages a night hidden behind a field it had already filled |
+| a launch report names only where it came from | the beginning of every wave hidden |
+
+The Kyiv view went from 346 to 388 of 465 messages on 2026-08-04, and the count
+of live messages hidden while naming no region at all went from 24 to 2 — one
+commentary post and one about Odesa.
+
+A sweep for capitalised words in live messages that resolved to no place at all
+turned up 34 more toponyms, most of them Kyiv-oblast towns the channels track
+routinely: Кагарлик, Ржищів, Козин, Березань, Бородянка, Яготин, Іванків,
+Білогородка, Вишеньки. Adding `oblast` entries carries no wake-up risk — the
+policy silences the tier outright — so the only thing that was ever at stake was
+whether the user gets to see them.
+
+Two structural bugs came out of the same sweep:
+
+- **A hyphen counted as a word character**, so the second half of every joined
+  pair was mid-word and invisible. Згурівка was in the gazetteer and had never
+  once matched, because the channels always write "Яготин-Згурівка".
+- **Fixing that exposed Kyiv district names inside distant towns.** `подільськ`
+  is Podil; Кам'янець-Подільський read as Kyiv nine times. Longest match already
+  handles it, but only once the full hyphenated name is an entry of its own.
+
+And a rule that had no home before: **a settlement named beside a landmark
+outranks it.** Nearly every city has a ТЕЦ-5, so "Залітає у Черкаси курсом на
+ТЕЦ-5" is about theirs. One message in 4.5 months — and exactly the shape that
+wakes somebody at 3 a.m. for another city.

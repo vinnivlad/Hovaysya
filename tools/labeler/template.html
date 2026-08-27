@@ -115,6 +115,9 @@
   .tag.toward { color: var(--urgent); border-color: var(--urgent); font-weight: 600; }
   .tag.away { color: var(--done); border-color: var(--done); }
   .tag.weak { color: var(--soft); border-style: dashed; }
+  /* Inherited from the feed, not stated in the message. Dashed, so a guess
+     never looks like something the channel actually said. */
+  .tag.inherited { border-style: dashed; opacity: .75; }
   .tag.mod-aftermath { color: #c98ad6; border-color: #6a5f8a; }
   .tag.mod-non-threat { color: var(--faint); }
   /* form */
@@ -295,11 +298,29 @@ const STORE_KEY = "hovaysya-labels-v1";
 // Alert-state messages are shown unless they clearly belong to another region.
 const LOCAL = ["my-area", "my-district", "city", "oblast"];
 const frame = m => m.as && m.s !== "elsewhere";
+
+// The scope to filter on is the effective one, not the stated one. "Падає.",
+// "5х РАКЕТ", "На зараз без цілей" name no place and never will, and a quoted
+// parent going missing is how the user found this: the page was already
+// computing the inherited scope from the feed and then filtering on the stated
+// one, hiding 55 live messages a night behind a field it had already filled.
+//
+// A stated scope is never overridden. "Реактивний шахед на Кривий Ріг" says
+// elsewhere and means it; only `unknown` falls back to what the night implies.
+const eff = m => (m.s === "unknown" && m.isc) ? m.isc : m.s;
+
+// A launch report names only where it came from — "Пуски реактивних шахедів з
+// Орла" is Russia by definition, and geography hides it. It is also how a night
+// starts, so hiding it removes the beginning of every wave from the page.
+// Visible, never a reason to make a sound: the policy still silences it, since
+// a drone launch four hours away is not something to be woken for.
+const launch = m => m.sh.includes("launch");
 const FILTERS = [
   { id: "near",     name: "поруч зі мною + країна + тривоги",
-    test: m => m.nw || frame(m) || m.s === "my-area" || m.s === "my-district" },
+    test: m => m.nw || frame(m) || launch(m)
+               || eff(m) === "my-area" || eff(m) === "my-district" },
   { id: "relevant", name: "Київ, область + країна + тривоги",
-    test: m => m.nw || frame(m) || LOCAL.includes(m.s) },
+    test: m => m.nw || frame(m) || launch(m) || LOCAL.includes(eff(m)) },
   { id: "all",      name: "усе", test: () => true },
 ];
 
@@ -544,7 +565,7 @@ function renderFeed() {
     `${msgs.length} з ${nightMessages().length} · ${labelsForNight().length} міток`;
 
   msgs.forEach((m, ix) => {
-    const near = m.s === "my-area" || m.s === "my-district";
+    const near = eff(m) === "my-area" || eff(m) === "my-district";
     const lab = labelForMessage(m);
     const div = document.createElement("div");
     div.className = "msg" + (near ? " near" : "") + (ix === selIx ? " sel" : "") +
@@ -552,7 +573,10 @@ function renderFeed() {
     div.dataset.ix = ix;
 
     let tags = m.as ? tag(m.as === "clear" ? "відбій" : "тривога", "siren-tag " + m.as) : "";
-    tags += tag(m.s, "scope-" + m.s);
+    // Marked with a "?" when it comes from the feed rather than the message —
+    // an inherited scope is the best answer available, not a statement.
+    tags += (eff(m) === m.s) ? tag(m.s, "scope-" + m.s)
+                             : tag(eff(m) + "?", "scope-" + eff(m) + " inherited");
     if (m.m !== "live-threat") tags += tag(m.m, "mod-" + m.m);
     if (m.th !== "none") tags += tag(m.th);
     if (m.cl) tags += tag("відбій: " + (UA.threat[m.cl] || m.cl), "cleared");

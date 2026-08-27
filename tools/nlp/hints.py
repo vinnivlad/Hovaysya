@@ -126,7 +126,7 @@ LIVE_SHAPES: tuple[tuple[str, str], ...] = (
     # Without this, "Виліт винищувача МіГ-31К з аеродрому Саваслейка" matched
     # only `emoji-with-place` and counted as weak — as if the evidence were
     # the ⚠️ rather than the word "Виліт".
-    ("launch", r"\bвиліт|\bвилет|\bвихід|\bзліт|\bстарт"),
+    ("launch", r"\bвиліт|\bвилет|\bвихід|\bзліт|\bстарт|\bпуск|\bзапуск"),
     ("phase-word", r"курсом|на підльоті|підліт|пуск|швидкісн|в укрит|уважно|"
                    r"уважн|загроза|тривог"),
 )

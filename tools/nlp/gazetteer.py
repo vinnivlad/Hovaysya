@@ -46,16 +46,22 @@ class Place:
     name: str  # canonical display form
     tier: str
     stems: tuple[str, ...]  # lowercase prefixes that identify it
+    # A landmark names a thing, not a settlement, so its city is implied rather
+    # than stated. Nearly every city has a ТЕЦ-5; ours is the one meant unless
+    # the message says otherwise. See `resolve_scope`.
+    landmark: bool = False
 
 
-def _p(name: str, tier: str, *stems: str) -> Place:
+def _p(name: str, tier: str, *stems: str, landmark: bool = False) -> Place:
     """Declare a place. Stems are normalised the same way message text is.
 
     Apostrophes are stripped here so an entry can be written the readable way
     (`солом'ян`) while still matching text where the apostrophe is a different
     character, or absent.
     """
-    return Place(name, tier, tuple(_strip_apostrophes(s).lower() for s in stems))
+    return Place(name, tier,
+                 tuple(_strip_apostrophes(s).lower() for s in stems),
+                 landmark)
 
 
 # The near ring — the places whose trouble is the user's trouble.
@@ -143,6 +149,31 @@ CITY = [
 OBLAST = [
     # Also ruled out of the near ring — "Віта Поштова: зовсім далеко".
     _p("Чабани", "oblast", "чабани"),
+    # Found by sweeping the corpus for capitalised words in live messages that
+    # resolved to no place at all. Every one of these is a Kyiv-oblast town the
+    # channels track, and every mention of them was invisible on the page.
+    # `oblast` carries no wake-up risk — the policy silences the tier outright —
+    # so the only thing at stake was whether the user gets to see them.
+    # The raion, not the city district — same reason, the other direction.
+    _p("Києво-Святошинський район", "oblast", "києво-святошин"),
+    _p("Вишеньки", "oblast", "вишеньк"),        # on the approach from the south
+    _p("Білогородка", "oblast", "білогородк"),
+    _p("Кагарлик", "oblast", "кагарлиц", "кагарлик"),
+    _p("Козин", "oblast", "козин"),
+    _p("Ржищів", "oblast", "ржищ"),
+    _p("Миронівка", "oblast", "миронівк", "миронівц"),
+    _p("Богуслав", "oblast", "богуслав"),
+    _p("Бородянка", "oblast", "бородян"),
+    _p("Березань", "oblast", "березан"),
+    _p("Іванків", "oblast", "іванків", "іванков"),
+    _p("Пісківка", "oblast", "пісківк"),
+    _p("Красятичі", "oblast", "красятич"),
+    _p("Яготин", "oblast", "яготин"),
+    _p("Дівички", "oblast", "дівичк"),
+    _p("Тетіїв", "oblast", "тетіїв", "тетієв"),
+    _p("Сквира", "oblast", "сквир"),
+    _p("Чорнобиль", "oblast", "чорнобил"),
+    _p("Десна", "oblast", "десну", "десною", "десни"),
     _p("Віта-Поштова", "oblast", "віта-поштов", "віту-поштов"),
     _p("Віта-Литовська", "oblast", "віта-литовськ"),
     _p("Крушинка", "oblast", "крушинк"),
@@ -187,6 +218,38 @@ OBLAST = [
 
 ELSEWHERE = [
     _p("Одещина", "elsewhere", "одес", "одещин"),
+    # Launch origins. Курська and Брянська were here in their adjectival form
+    # only, so "з Брянщини" resolved to nowhere — and a message resolving to
+    # nowhere now inherits the night's scope, which would have made a launch
+    # from Russia read as a threat over Kyiv.
+    _p("Воронежчина", "elsewhere", "вороне"),
+    _p("Орловщина", "elsewhere", "орловськ", "орловщин", "орла", "орлі"),
+    _p("Брянщина", "elsewhere", "брянщин"),
+    _p("Курщина", "elsewhere", "курщин"),
+    _p("Смоленщина", "elsewhere", "смоленськ", "смоленщин", "шаталово"),
+    _p("Ростовщина", "elsewhere", "ростов", "таганрог"),
+    _p("Білгородщина", "elsewhere", "бєлгород", "білгород"),
+    _p("Білорусь", "elsewhere", "білорус", "мазир", "мозир", "гомел"),
+    # Other regions the channels report on, likewise invisible before.
+    # Hyphenated names whose second half is a Kyiv place. Longest match is what
+    # keeps them apart: `корсунь-шевченків` claims the span before
+    # `шевченків` can, so Cherkasy oblast stops reading as the user's city.
+    # Kamianets-Podilskyi did exactly that nine times, as Podil.
+    _p("Кам'янець-Подільський", "elsewhere", "камянець-подільськ", "камянц"),
+    _p("Корсунь-Шевченківський", "elsewhere", "корсунь-шевченків"),
+    _p("Лубни", "elsewhere", "лубн"),
+    _p("Миргород", "elsewhere", "миргород"),
+    _p("Конотоп", "elsewhere", "конотоп"),
+    _p("Коростень", "elsewhere", "коростен"),
+    _p("Умань", "elsewhere", "умань", "умані"),
+    _p("Старокостянтинів", "elsewhere", "старокостянтин"),
+    _p("Вознесенськ", "elsewhere", "вознесенськ"),
+    _p("Очаків", "elsewhere", "очаків", "очаков"),
+    _p("Татарбунари", "elsewhere", "татарбунар"),
+    _p("Затока", "elsewhere", "затоку", "затоці"),
+    # Not Чабани. A village in Odesa oblast, one letter from a Kyiv-oblast
+    # neighbour of the user's — and the corpus names it beside a southern port.
+    _p("Чабанка", "elsewhere", "чабанк"),
     _p("Дніпропетровщина", "elsewhere", "дніпр", "дніпропетровщин"),
     _p("Харківщина", "elsewhere", "харків", "харківщин"),
     _p("Полтавщина", "elsewhere", "полтав"),
@@ -262,9 +325,31 @@ def _with_alternations(place: Place) -> Place:
     return Place(place.name, place.tier, merged)
 
 
+# Named landmarks with a fixed address. These were missing entirely, and the
+# cost was not theoretical: `ТЕЦ-5` is named 44 times in the corpus, more often
+# than most districts, and every one of those messages resolved to `unknown`
+# and vanished from the Kyiv view. The user found it himself — a reply quoting
+# "На ТЕЦ-5! Падає" whose parent was nowhere on the page.
+#
+# `city` rather than the near ring: ТЕЦ-5 sits in Holosiiv, and the corpus shows
+# it on the approach corridor to the user's home again and again
+# (`З Позняків на ТЕЦ-5` -> `на Деміївку` -> `З Деміївки на Жуляни`), which is
+# an argument for promoting it. That is his call to make, not mine, and `city`
+# keeps the messages visible without turning each one into a wake-up.
+LANDMARKS = [
+    _p("Конча-Заспа", "city", "конча-заспа", "кончі-заспі", "заспа", "заспі"),
+    _p("Нижні Сади", "city", "нижні сади", "нижних сад", "нижні сад"),
+    _p("ТЕЦ-5", "city", "тец-5", "тец5", landmark=True),          # Голосіїв
+    _p("ТЕЦ-6", "city", "тец-6", "тец6", landmark=True),          # Троєщина
+    _p("ТЕЦ-2", "city", "тец-2", "тец2", landmark=True),          # Дарниця
+    _p("ТЦ Проспект", "city", "тц проспект", landmark=True),
+    _p("Видубичі", "city", "видубич"),
+    _p("Залісся", "oblast", "залісся"),
+]
+
 PLACES: tuple[Place, ...] = tuple(
     _with_alternations(p)
-    for p in (MY_AREA + MY_DISTRICT + CITY + OBLAST + ELSEWHERE)
+    for p in (MY_AREA + MY_DISTRICT + CITY + OBLAST + ELSEWHERE + LANDMARKS)
 )
 
 # Named infrastructure. Not a tier of its own: a power plant matters because of
@@ -300,7 +385,15 @@ _WORDCHAR = re.compile(r"[а-яіїєґёa-z0-9'\-]", re.IGNORECASE)
 
 
 def _at_word_start(flat: str, i: int) -> bool:
-    return i == 0 or not _WORDCHAR.match(flat[i - 1])
+    """Whether position i begins a word, treating a hyphen as a separator.
+
+    The channels join neighbours with a hyphen — "Яготин-Згурівка",
+    "Погреби-Троєщина" — and Zhurivka was already in the gazetteer yet never
+    matched, because the hyphen counted as a word character and so the second
+    half of every pair was mid-word. Stems containing their own hyphen (`тец-5`)
+    are unaffected: they start after a space either way.
+    """
+    return i == 0 or flat[i - 1] == "-" or not _WORDCHAR.match(flat[i - 1])
 
 
 def _word_end(flat: str, i: int) -> int:
@@ -380,6 +473,14 @@ def resolve_scope(text: str) -> str:
     found = find_places(text)
     if not found:
         return "unknown"
+    # "Залітає у Черкаси курсом на ТЕЦ-5" is about Cherkasy's plant, not ours.
+    # A landmark carries no city of its own, so a settlement named in the same
+    # message outranks it — otherwise the nearest tier wins and a message about
+    # another region reads as ours. One such message in 4.5 months, but it is
+    # exactly the shape that produces a 3 a.m. wake-up for somebody else's city.
+    settlements = [p for p in found if not p.landmark]
+    if settlements and any(p.landmark for p in found):
+        found = settlements
     tiers = {p.tier for p in found}
     for tier in TIERS:
         if tier in tiers:

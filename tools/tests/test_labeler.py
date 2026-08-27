@@ -266,3 +266,44 @@ def test_social_messages_do_not_inherit():
     ])
     assert m[1]["ith"] is None
     assert m[1]["m"] == "non-threat"
+
+
+# --- the feed filters on the effective scope, not the stated one -----------
+
+
+def test_a_placeless_message_inherits_the_night_s_scope():
+    from tools.labeler.build import carry_context
+
+    """"Падає.", "5х РАКЕТ", "На зараз без цілей" name no place and never will.
+    The only thing that can place them is the feed around them."""
+    msgs = [
+        {"t": 1000, "s": "my-area", "th": "shahed-jet", "hm": "01:19",
+         "x": "⚠️2 реактивні шахеди на Жуляни",
+         "m": "live-threat", "as": None, "ith": None, "isc": None, "ifrom": None},
+        {"t": 1120, "s": "unknown", "th": "none", "hm": "01:21", "x": "⚠️Падає.",
+         "m": "live-threat", "as": None, "ith": None, "isc": None, "ifrom": None},
+    ]
+    carry_context(msgs)
+    assert msgs[1]["isc"] == "my-area"
+
+
+def test_the_page_filters_on_the_inherited_scope():
+    """A regression guard on the template, not on Python: the page was already
+    computing the inherited scope and then filtering on the stated one, which
+    hid 31 live messages a night behind a field it had already filled. The user
+    found it because a reply's quoted parent was missing from the feed."""
+    src = (Path(__file__).resolve().parents[1] / "labeler" / "template.html"
+           ).read_text(encoding="utf-8")
+    assert 'const eff = m =>' in src
+    block = src[src.index("const FILTERS = ["):]
+    block = block[:block.index(chr(10) + "];")]
+    assert "eff(m)" in block
+    # The stated scope must not be consulted directly anywhere in the filters.
+    assert "m.s ===" not in block, block
+
+
+def test_a_stated_scope_is_never_overridden_by_an_inherited_one():
+    """"Реактивний шахед на Кривий Ріг" says elsewhere and means it."""
+    src = (Path(__file__).resolve().parents[1] / "labeler" / "template.html"
+           ).read_text(encoding="utf-8")
+    assert 'const eff = m => (m.s === "unknown" && m.isc) ? m.isc : m.s;' in src
