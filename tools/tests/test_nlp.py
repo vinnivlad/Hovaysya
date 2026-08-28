@@ -917,3 +917,35 @@ def test_a_forecast_siren_is_still_not_a_siren():
     assert hints.alert_state(
         "🔴Київ очікує на повітряну тривогу через 10-15 хвилин.") is None
     assert hints.alert_state("🛑 ТРИВОГА") == "alert"
+
+
+def test_awaiting_a_siren_or_an_all_clear_is_neither():
+    """His rule, from reading the night's log: "там є слово Очікує, інші випадки
+    теж його мали". It holds across the corpus — of 23 messages pairing an
+    awaiting word with `відбій` or `тривога`, not one is a real event.
+
+    The worst of them announced the all-clear during a live alert."""
+    for text in ("⚪️Київ очікує на ймовірний відбій.",
+                 "⚪️Київ очікує на відбій.",
+                 "🔴Київ очікує на повітряну тривогу через 10-15 хвилин.",
+                 "🔴Очікуємо на повітряну тривогу у столиці.",
+                 "⚪️Борти МіГ-31К розвернулись, очікуємо на відбій.",
+                 "Скоро відбій",
+                 "В районі Капустиного Яру активність. Ймовірно випробування"):
+        assert hints.alert_state(text) is None, text
+
+
+def test_the_canonical_formula_is_never_a_forecast():
+    """`ймовірн` is a broad stem, and a real all-clear that happens to say
+    "ймовірно збито" beside it must still be an all-clear."""
+    assert hints.alert_state("💥Ймовірно збито. 🟢 ВІДБІЙ ТРИВОГИ") == "clear"
+    assert hints.alert_state("🟢 ВІДБІЙ ТРИВОГИ") == "clear"
+    assert hints.alert_state("⚠️❗️КИЇВ - ТРИВОГА. В укриття!") == "alert"
+
+
+def test_an_overnight_tally_is_not_an_attack():
+    """It woke him at 02:34: "💥За ніч у Вишневому та Боярка 3 реактивні шахеди
+    влучили у склади"."""
+    assert hints.suggest(
+        "💥За ніч у Вишневому та Боярка 3 реактивні шахеди влучили у склади"
+    )["modality"] == "summary-news"

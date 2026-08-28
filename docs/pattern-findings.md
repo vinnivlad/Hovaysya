@@ -415,3 +415,33 @@ Six of his own labels were brought in line with it, and `ring_rearmed`,
 Worth keeping as a method note: the parameter sweep and the label-gap fit both
 pointed at a threshold, and the threshold did not exist. What was missing was not
 a better fit but a sentence from the person the app is for.
+
+## The first night watched live (2026-08-27 into 08-28)
+
+433 live messages, six separate alerts, 23 wake-ups.
+
+**Detection lag: median 6 s, p90 9 s, worst 43 s.** That settles the question
+polling was opened with — a phone number and MTProto buy nothing here.
+
+Of the 23 wake-ups, 12 were sirens and all-clears, which is the frame of the
+night he asked for outright. Three were bugs:
+
+| what he heard | why it was wrong |
+| --- | --- |
+| "Відбій тривоги." | from "⚪️Київ очікує на **ймовірний** відбій" — announced the all-clear mid-alert |
+| "Тривога. Реактивний шахед. Вишневе." at 02:34 | from "💥**За ніч** у Вишневому 3 реактивні шахеди влучили" — an overnight tally |
+| "Увага." ×3 | audible, and said nothing at all |
+
+The first is the worst thing this app can say, and it was found by reading a log
+rather than by any test. The user supplied the fix himself and it is better than
+the one I wrote: **the word `очікує` is the marker**, not the distance between
+words. Across the whole corpus, of 23 messages pairing an awaiting stem with
+`відбій` or `тривога`, **not one is a real event**. He then added `скоро` and
+`ймовірн`, and the second turned out to fix four more messages that were being
+read as declared alerts: a Russian test range, a forecast for tomorrow, a poll
+about parking, and the author's own commentary.
+
+Same night, a drone looping Nyvky → Sviatoshyn → Borshchahivka → Vyshneve woke
+him five times between 02:18 and 03:09, with twenty-odd messages correctly
+silenced between them. Two of those five were the bugs above. Whether the other
+three are one event or three is the open question the next night decides.

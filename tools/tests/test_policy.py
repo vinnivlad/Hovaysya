@@ -583,3 +583,27 @@ def test_it_is_two_words_wide_and_one_place_wide():
             tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
         o = observe(T0 + 400, text)
         assert decide(o, tr).reason != "falling on Zhuliany", text
+
+
+def test_a_wake_up_always_says_something():
+    """It said "Увага." three times on the first night — the least useful
+    sentence available, because it wakes him and tells him nothing. If the
+    policy decided this is worth waking for, it is a new event, and the class
+    and place are repeated rather than withheld."""
+    from tools.policy.announce import Announcer
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr, ann = Tracker(), Announcer()
+    said = []
+    for off, text in ((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+                      (400, "⚠️Реактивний шахед на Жуляни."),
+                      (1200, "⚠️Реактивний шахед падає на Жуляни.")):
+        o = observe(T0 + off, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        u = ann.announce(o, d)
+        said.append((d.audible, u.text if u else None))
+    assert all(a for a, _t in said), said
+    assert said[-1][1] == "Реактивний шахед. Жуляни."
+    assert "Увага" not in (said[-1][1] or "")

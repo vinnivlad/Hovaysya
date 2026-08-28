@@ -160,7 +160,8 @@ FALLING_TERMS = ("падає", "падають", "падаєт", "падают")
 IMPACT_TERMS = ("вибух", "влучан", "детонац", "приліт")
 
 SUMMARY_TERMS = (
-    "за добу", "протягом ночі", "протягом доби", "протягом 24", "підсумк",
+    "за добу", "за ніч", "за минулу ніч", "протягом ночі", "протягом доби",
+    "протягом 24", "підсумк",
     "станом на", "ворог запустив", "за даними", "всього збито", "зафіксовано за",
     "в ніч на",
     # "У ніч на 05.08.26, згідно зі звітом Повітряних Сил..." — the morning
@@ -386,6 +387,34 @@ def partial_clear(text: str) -> bool:
     return threat_hint(text) != "none"
 
 
+# Waiting for a siren or an all-clear, not having one. His rule and his
+# observation — "там є слово Очікує, інші випадки теж його мали" — and it holds
+# across the whole corpus: of 23 messages pairing an awaiting word with `відбій`
+# or `тривога`, not one is a real event. Every one is a forecast:
+#
+#   ⚪️Київ очікує на ймовірний відбій.       announced the all-clear mid-alert
+#   🔴Київ очікує на повітряну тривогу через 10-15 хвилин.    rang the siren
+#   ⚪️Борти МіГ-31К розвернулись, очікуємо на відбій.
+#
+# A stem rather than a word list, also on his instruction — "очікуваний
+# очікуване очікуємо і тд". My own attempt was a window regex, and it broke the
+# moment a word was inserted between "очікує" and "відбій", which is exactly how
+# the false all-clear got through.
+# `скоро` and `ймовірн` are his additions, and the second is the stronger of the
+# two by a distance: of five messages pairing `ймовірн` with a siren word, four
+# were being read as a declared alert and not one of them is a siren — a Russian
+# test range, a forecast for tomorrow, a poll about parking during an alert, and
+# the author's own commentary.
+AWAITING_TERMS = (
+    "очіку", "чекає", "чекаємо", "чекайте", "чекати",
+    "скоро", "незабаром", "ось-ось", "ймовірн", "імовірн",
+)
+
+# The forms the channels use to state the event itself, never to forecast it.
+CANONICAL_SIREN = ("відбій тривоги", "відбій повітряної тривоги",
+                   "- тривога", "— тривога", "оголошено повітряну тривогу")
+
+
 def alert_state(text: str) -> str | None:
     """`clear`, `alert`, or None — whether this message is about the siren.
 
@@ -397,9 +426,16 @@ def alert_state(text: str) -> str | None:
     # "Київ очікує на відбій" is waiting for one, not having one. Reading it as
     # an all-clear produced a false wake-up telling the user it was over while
     # a drone was still up.
-    if any(t in low for t in ("очікує на відбій", "очікуємо на відбій",
-                              "чекаємо на відбій", "очікуємо відбій")):
-        return "alert" if any(t in low for t in ALERT_ON_TERMS) else None
+    # Waiting for one, not having one. A substring list broke on any inserted
+    # word — "Київ очікує на ймовірний відбій" slipped through and announced
+    # the all-clear during a live alert, which is the worst thing this can say.
+    # ...unless the message also carries the canonical formula, which is never
+    # a forecast. `ймовірн` is a broad stem, and a real "🟢 ВІДБІЙ ТРИВОГИ"
+    # that happens to say "ймовірно збито" beside it must still be an
+    # all-clear. It has not occurred in 4.5 months; it costs one line to make
+    # sure it never matters.
+    if _hits(text, AWAITING_TERMS) and not _hits(text, CANONICAL_SIREN):
+        return None
     # The mirror case, and it woke the user for nothing: "У Києві у найближчі
     # хвилини можуть оголосити повітряну тривогу" is a forecast of a siren, and
     # he wrote "Можуть оголосити! Ще не зрозуміло нічого". A siren that may be

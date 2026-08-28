@@ -138,10 +138,14 @@ class Announcer:
                 parts.append(", ".join(fresh))
 
         if not parts:
-            # Notified, but nothing new to say in words. The lead sound still
-            # plays: he asked for the tone to carry the class.
-            parts.append(CLASS_WORD.get(threat, "загроза").capitalize()
-                         if threat else "Увага")
+            # Nothing new in words, but the policy decided this is worth waking
+            # him for — so a new event, even if every word has been said before.
+            # It said "Увага." three times on the first night, which is the least
+            # useful sentence available: it wakes him and tells him nothing.
+            # So the class and the place are repeated rather than withheld.
+            said = [CLASS_WORD[threat].capitalize()] if threat in CLASS_WORD else []
+            said += list(obs.ring_places)
+            parts.extend(said or ["Увага"])
 
         utterance = Utterance(ts=obs.ts, lead=decision.alarm or "none",
                               text=". ".join(parts) + ".")
