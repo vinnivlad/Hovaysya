@@ -140,3 +140,43 @@ class Notifier:
                     print(f"  ! telegram {chat}: {reply.get('description')}",
                           flush=True)
         return delivered
+
+
+# Every label the policy assigned, in the schema's own words rather than
+# translated: these are the values the labels use, so a post can be compared
+# against `labels/*.jsonl` directly. His reason for wanting them — "так легше
+# потім аналізувати".
+TAG_FIELDS = ("threat", "scope", "modality", "certainty", "heading", "alarm")
+
+
+def format_message(utterance, obs, decision) -> str:
+    """What goes to the channel: the sentence, the labels, and the source.
+
+    The bell marks a message that made a sound. In a Telegram channel every post
+    looks alike afterwards, and telling a wake-up from a status line by scrolling
+    back is exactly the analysis he wants to do.
+    """
+    head = ("🔔 " if decision.audible else "") + utterance.text
+
+    tags = []
+    for field in TAG_FIELDS:
+        value = getattr(obs, field, None)
+        if field == "alarm":
+            value = decision.alarm
+        if value and value not in ("none", "unknown", "position"):
+            tags.append(str(value))
+    if getattr(obs, "official", False):
+        tags.append("official")
+    line = " · ".join(tags)
+
+    source = (obs.text or "").replace(chr(10), " / ")
+    if len(source) > 220:
+        source = source[:217] + "..."
+
+    parts = [head]
+    if line:
+        parts.append(line)
+    if source and source not in utterance.text:
+        parts.append("— " + source)
+    parts.append(decision.reason)
+    return chr(10).join(parts)

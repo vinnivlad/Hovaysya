@@ -164,7 +164,10 @@ def handle(session: Session, channel: str, message_id: int, ts: int, text: str,
     # watch down: a missing notification is a bad night, a crashed watcher is no
     # night at all.
     if utterance is not None and session.notifier is not None:
-        session.notifier.send(utterance.text, audible=decision.audible)
+        from .notify import format_message
+
+        session.notifier.send(format_message(utterance, obs, decision),
+                              audible=decision.audible)
     mark = "!!" if decision.audible else ("..." if decision.notify else "  ")
     # flush on every line: this runs for hours in a terminal, and a buffered
     # alert is not an alert.

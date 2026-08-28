@@ -490,12 +490,13 @@ def test_his_first_example():
     почути що почалась тривога по балістиці і потім що був пуск." """
     said = _speak(["❗️❗Загроза пуску балістичних ракет Іскандер-М.",
                    "‼️ Вихід балістики з Брянська на Київ"])
-    assert said[0] == (False, "Тривога. Балістика.")   # words, no sound
-    # The audible one carries the siren too. Shown is not heard: he never heard
-    # the first sentence, so the one that rings has to say what happened as well
-    # as what is new. Sharing one memory between the two channels is how a real
-    # "🛑 ТРИВОГА" came out as "Увага." on the first watched night.
-    assert said[1] == (True, "Тривога. Пуск: балістика.")
+    # Neither of these is a siren declaration — one is a launch *threat* and the
+    # other a launch. The word "Тривога" belongs to an actual declaration and
+    # nothing else: adding it to whatever rang first meant a drone over Zhuliany
+    # announced an alert that did not exist, and then the official declaration,
+    # the one sentence he acts on, had nothing left to say.
+    assert said[0] == (False, "Загроза: балістика.")   # words, no sound
+    assert said[1] == (True, "Пуск: балістика.")
 
 
 def test_his_second_example():
@@ -769,3 +770,32 @@ def test_a_late_chat_all_clear_is_still_a_duplicate():
     ])
     assert out[1][1], out
     assert not out[2][1], out
+
+
+def test_the_official_siren_arrives_carrying_the_reason():
+    """His idea, from the episode at 10:54 on 2026-08-28: we knew "реактивний
+    шахед, Вишневе" two minutes before the official siren, and when it came it
+    said a bare "Тривога." — "тоді просто тягнемо контекст"."""
+    out = _play([
+        (-3600, "alarm_kyiv", "🟢 м. Київ\nВідбій повітряної тривоги"),
+        (282, "mon1tor_ua", "⚠️2 реактивні шахеди на Київ/Ірпінь/Буча."),
+        (363, "mon1tor_ua", "⚠️2 реактивні шахеди на Вишневе."),
+        (470, "kievinform_ua1", "🛑 ТРИВОГА"),
+        (474, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+    ])
+    assert out[2][3] == "Загроза: реактивний шахед. Вишневе."   # silent, on the status
+    assert not out[3][1], out            # the chat siren stays quiet
+    assert out[4][1], out
+    assert out[4][3] == "Тривога. Реактивний шахед. Вишневе."
+
+
+def test_a_wake_up_before_any_siren_does_not_claim_one():
+    """A drone over Zhuliany with nothing declared: it is worth waking for, and
+    it is not an air-raid alert."""
+    out = _play([
+        (-3600, "alarm_kyiv", "🟢 м. Київ\nВідбій повітряної тривоги"),
+        (300, "kievinform_ua1", "Жуляни ✈️"),
+    ])
+    assert out[1][1], out
+    assert out[1][3] == "Жуляни."
+    assert "Тривога" not in out[1][3]

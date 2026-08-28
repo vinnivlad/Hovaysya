@@ -210,3 +210,28 @@ def test_it_sends_to_everyone_on_the_list(tmp_path):
     assert n.send("Тривога.") is True        # the channel worked
     assert seen == ["-1001234567890", "42"]  # ...and the other was still tried
     assert n.sent == 1 and n.failures == 1
+
+
+def test_the_bell_marks_what_made_a_sound(tmp_path):
+    """In a channel every post looks alike afterwards. "Дзвоник допоміг би" —
+    he had taken a silent status line for a wake-up."""
+    from tools.live.notify import format_message
+    from tools.policy.announce import Announcer
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr, ann = Tracker(), Announcer()
+    said = []
+    for off, channel, text in ((0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+                               (300, "mon1tor_ua", "⚠️2 реактивні шахеди на Вишневе.")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        said.append(format_message(ann.announce(o, d), o, d))
+
+    assert said[0].startswith("🔔 ")
+    assert not said[1].startswith("🔔 ")
+    # ...and every label the policy assigned, in the schema's own words, so a
+    # post can be compared against labels/*.jsonl directly.
+    assert "shahed-jet" in said[1] and "my-area" in said[1]
+    assert "a drone near me, but not my street" in said[1]

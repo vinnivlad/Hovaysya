@@ -110,14 +110,40 @@ class Announcer:
     # without him ever hearing it. A thing shown is not a thing said.
     spoken: dict = field(default_factory=lambda: _blank())
     shown: dict = field(default_factory=lambda: _blank())
+    # What we already know is flying, and where, before the official siren has
+    # been declared. His idea, and it is the moment that matters most: the
+    # official declaration is when he actually gets up, so it should arrive
+    # carrying the reason rather than the bare word.
+    #
+    #   ⚠️2 реактивні шахеди на Вишневе        (we ring, officially nothing yet)
+    #   🚨 м. Київ / Повітряна тривога         -> "Тривога. Реактивний шахед. Вишневе."
+    pending_threat: str | None = None
+    pending_places: list[str] = field(default_factory=list)
     queue: list[Utterance] = field(default_factory=list)
 
     def reset(self) -> None:
         """A full all-clear ends the episode, and with it everything said."""
         self.spoken = _blank()
         self.shown = _blank()
+        self.pending_threat = None
+        self.pending_places = []
+
+    def note(self, obs: Observation) -> None:
+        """Remember the cause, whether or not anything is said about it.
+
+        Called for every observation, including the silent ones — the point is
+        precisely to have an answer ready when the siren finally arrives.
+        """
+        if not obs.live:
+            return
+        if obs.threat not in ("none", "unknown"):
+            self.pending_threat = obs.threat
+        for place in obs.ring_places:
+            if place not in self.pending_places:
+                self.pending_places.append(place)
 
     def announce(self, obs: Observation, decision: Decision) -> Utterance | None:
+        self.note(obs)
         if not decision.notify:
             return None
 
@@ -138,10 +164,23 @@ class Announcer:
             parts.append("Відбій по " + CLASS_BY.get(lifted, "частині загроз")
                          if lifted else "Частковий відбій")
         else:
-            # The siren frames everything, and it is said once.
-            if not said['siren']:
+            # The word belongs to an actual declaration and nothing else. It
+            # used to be added to whatever rang first, so a drone over Zhuliany
+            # said "Тривога" before any siren existed — and then the official
+            # declaration, the one sentence he actually acts on, had nothing
+            # left to say and came out as "Київ."
+            declaring = obs.alert_state == "alert"
+            if declaring and not said['siren']:
                 parts.append("Тривога")
                 said['siren'] = True
+                # It arrives carrying what we already knew, even if those words
+                # have been used before. His idea, and this is the moment for it.
+                if self.pending_threat in CLASS_WORD:
+                    parts.append(CLASS_WORD[self.pending_threat].capitalize())
+                    said['classes'].add(self.pending_threat)
+                if self.pending_places:
+                    parts.append(", ".join(self.pending_places[-3:]))
+                    said['places'].update(self.pending_places)
 
             # A launch names its own class, so the two facts must not both be
             # said: "Загроза: балістика. Пуск: балістика." is one fact twice.
