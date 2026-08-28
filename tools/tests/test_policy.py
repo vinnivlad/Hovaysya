@@ -874,3 +874,43 @@ def test_falling_is_said_out_loud():
         (300, "mon1tor_ua", "⚠️Реактивний шахед падає на Жуляни."),
     ])
     assert out[1][3] == "Падає: реактивний шахед. Жуляни."
+
+
+def test_a_silent_official_channel_is_still_the_official_channel():
+    """It speaks only when the siren changes, so "has it spoken lately" is not
+    the same question as "is it being watched".
+
+    On 2026-08-28 it had last spoken at 16:45, the watcher restarted at 18:34,
+    and the 90-minute warm-up therefore contained nothing official. A chat
+    all-clear at 19:09:53 rang and the real one followed four seconds later —
+    two loud all-clears, which is what he heard."""
+    from tools.policy.announce import Announcer
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr, ann = Tracker(), Announcer()
+    tr.official_source = True          # watched, and silent for hours
+    out = []
+    for off, channel, text in ((0, "kievinform_ua1", "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+                               (9000, "kievinform_ua1", "🟢 ВІДБІЙ ТРИВОГИ"),
+                               (9004, "alarm_kyiv", "🟢 м. Київ\nВідбій повітряної тривоги")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        u = ann.announce(o, d)
+        out.append((d.audible, d.reason, u.text if u else None))
+    assert not out[1][0], out          # the chat all-clear stays quiet
+    assert out[2][0] and out[2][1] == "official all-clear", out
+
+
+def test_without_the_official_channel_the_chats_still_close_the_alert():
+    """The labelled nights predate it, and they have to keep working."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()                     # official_source stays False
+    o = observe(T0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!", False, "kievinform_ua1")
+    d = decide(o, tr)
+    tr.record(o, d.level, d.alarm)
+    d = decide(observe(T0 + 9000, "🟢 ВІДБІЙ ТРИВОГИ", False, "kievinform_ua1"), tr)
+    assert d.audible and d.reason == "all-clear", d

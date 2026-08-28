@@ -288,6 +288,16 @@ class Tracker:
         # ever standing in for it. On the labelled nights it is absent, and they
         # go back to declaring, which is what keeps those nights scoring.
         self.official_seen: int | None = None
+        # Whether the authoritative channel is part of this stream at all. Set
+        # by the caller, which is the only one that knows.
+        #
+        # It used to be inferred from "has it spoken recently", and that is
+        # wrong for a source that speaks only at transitions: on 2026-08-28 the
+        # official channel had last spoken at 16:45, the watcher restarted at
+        # 18:34, and its 90-minute warm-up therefore contained nothing official.
+        # A chat all-clear at 19:09:53 rang, and the real one followed four
+        # seconds later — two loud all-clears, which is what he heard.
+        self.official_source = False
         self.closed: list[Episode] = []
 
     # -- lifecycle ---------------------------------------------------------
@@ -313,6 +323,8 @@ class Tracker:
         A question about the stream, not about ordering: once the official
         channel is being watched, it owns the siren for everything around it.
         """
+        if self.official_source:
+            return True
         if self.official_seen is None:
             return False
         return -self.OUT_OF_ORDER_S <= ts - self.official_seen <= within_s

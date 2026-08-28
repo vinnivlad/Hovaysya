@@ -285,6 +285,11 @@ def main(argv: list[str] | None = None) -> int:
 
     started = time.time()
     session = Session(notifier=Notifier())
+    # The official channel speaks only when the siren changes, so "has it spoken
+    # lately" is not the same question as "is it being watched".
+    from ..policy.episodes import OFFICIAL_CHANNELS
+
+    session.tracker.official_source = bool(OFFICIAL_CHANNELS & set(channels))
     stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
     log_path = LOG_DIR / f"{stamp}.jsonl"
 

@@ -163,7 +163,12 @@ def main(argv: list[str] | None = None) -> int:
         observations = [observe(ts, text, is_reply, key.split("/")[0])
                         for ts, key, text, is_reply in messages]
         keys = [key for _ts, key, _text, _r in messages]
-        decisions = run_policy(observations, Tracker())
+        from ..policy.episodes import OFFICIAL_CHANNELS
+
+        tracker = Tracker()
+        tracker.official_source = any(
+            key.split("/")[0] in OFFICIAL_CHANNELS for key in keys)
+        decisions = run_policy(observations, tracker)
         results = [(o, d, k) for (o, d), k in zip(decisions, keys)]
 
         tally, detail = score(by_anchor, results)
