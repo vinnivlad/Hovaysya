@@ -99,6 +99,16 @@ def _fallback(obs, threat: str | None) -> list[str]:
     return parts
 
 
+def _landed_word(obs) -> str | None:
+    """What to call a thing that has already arrived, or None."""
+    if not getattr(obs, "impact", False) or getattr(obs, "falling", False):
+        return None
+    low = (obs.text or "").lower()
+    if "влучан" in low or "приліт" in low:
+        return "Влучання"
+    return "Вибух"
+
+
 def _blank() -> dict:
     return {"siren": False, "classes": set(), "launches": set(), "places": set()}
 
@@ -195,6 +205,7 @@ class Announcer:
             # left to say and came out as "Київ."
             declaring = obs.alert_state == "alert"
             falling = getattr(obs, "falling", False) and decision.audible
+            landed = _landed_word(obs)
             named_class = False
             named_places: list[str] = []
             if declaring and not said['siren']:
@@ -233,6 +244,10 @@ class Announcer:
                     # was ringing without it ever being said.
                     if falling:
                         parts.append(f"Падає: {word}")
+                    elif landed:
+                        # "Загроза" about something that has already come down
+                        # is simply untrue.
+                        parts.append(f"{landed}: {word}")
                     else:
                         parts.append(word.capitalize() if parts else f"Загроза: {word}")
 

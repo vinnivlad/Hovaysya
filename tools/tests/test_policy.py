@@ -914,3 +914,40 @@ def test_without_the_official_channel_the_chats_still_close_the_alert():
     tr.record(o, d.level, d.alarm)
     d = decide(observe(T0 + 9000, "🟢 ВІДБІЙ ТРИВОГИ", False, "kievinform_ua1"), tr)
     assert d.audible and d.reason == "all-clear", d
+
+
+def test_an_explosion_is_information_never_a_warning():
+    """Of fifteen labels he placed on impact reports, fifteen are silent.
+
+    Found live: "💥Повідомляють про вибухи в районі Вишневого" rang the shelter
+    tone, on a ballistic class carried from a message two minutes earlier. His
+    words: "цілей немає"."""
+    from tools.policy.episodes import Tracker
+
+    tr = Tracker()
+    tr.official_source = True
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+        (200, "mon1tor_ua", "‼️ Вихід балістики з Брянська"),
+        (400, "monitoring_kyiv", "💥Повідомляють про вибухи в районі Вишневого"),
+        (500, "mon1tor_ua", "💥Влучання реактивного шахеду у Вишневому"),
+    ])
+    assert not out[2][1] and out[2][2] == "impact: it has already landed", out
+    assert not out[3][1], out
+    # ...and "Загроза" about a thing that has already come down is untrue.
+    assert out[2][3].startswith("Вибух:")
+    assert out[3][3].startswith("Влучання:")
+
+
+def test_falling_is_not_an_impact():
+    """A thing on its way down, and over his own street it overrides everything.
+    The two vocabularies must not be confused."""
+    from tools.policy.episodes import Tracker
+
+    tr = Tracker()
+    tr.official_source = True
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+        (300, "mon1tor_ua", "⚠️Реактивний шахед падає на Жуляни."),
+    ])
+    assert out[1][1] and out[1][2] == "falling on Zhuliany", out

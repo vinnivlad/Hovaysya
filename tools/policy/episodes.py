@@ -178,6 +178,8 @@ class Observation:
     says_launch: bool = False
     ring_count: int = 0
     falling: bool = False
+    # Already landed, as opposed to `falling`, which is on its way down.
+    impact: bool = False
     # From `alarm_kyiv`, which relays the "Повітряна тривога" app's bot and
     # posts exactly two forms for the city and nothing else.
     official: bool = False
@@ -243,6 +245,7 @@ def observe(ts: int, text: str, is_reply: bool = False,
         says_launch=bool(_LAUNCH.search(text or "")),
         ring_count=stated_count(text),
         falling=hints.falling(text),
+        impact=hints._hits(text, hints.IMPACT_TERMS),
         is_reply=is_reply,
         official=channel in OFFICIAL_CHANNELS,
         partial_clear=hints.partial_clear(text),
