@@ -347,6 +347,24 @@ below. Whether a post describes consequences is a mechanical property of its
 text, not a judgement about your situation, so spending your evenings on it
 would be waste.
 
+### An all-clear is labelled `live-threat`, and that is not a mistake
+
+There are four modality values and an all-clear is none of the other three, so
+it lands here by elimination rather than by meaning. It has to: rule 3 silences
+`aftermath`, `summary-news` and `non-threat` outright, so an all-clear filed as
+any of them would never be heard — and knowing the alert is over was one of the
+five problems this app exists for.
+
+What actually says "this closes something" is the neighbouring field:
+
+    летить=none · де=city · live-threat · clear · clear · official
+                                          ^^^^^^^^^^^^
+                          modality by elimination, certainty=clear
+
+`certainty: clear` and the `clear` tone are the truthful part. A fifth modality
+value would read better and was offered; he chose to leave it, because it would
+rewrite the value in every label already made.
+
 ### `threat`
 
 `recon` · `mig` · `shahed` · `shahed-jet` · `cruise` · `ballistic` · `kab` ·
