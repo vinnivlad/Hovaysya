@@ -28,6 +28,10 @@ LEVELS = ("info", "alert")
 # cost six misses, all of them the plain city siren.
 CITY_OR_NEARER = ("my-area", "my-district", "city", "unknown")
 
+# The tones that mean something slow enough to watch. Ballistic and cruise are
+# absent on purpose: minutes of flight leave no time to find out whose street.
+DRONE_TONES = ("drone", "drone-jet", "recon")
+
 
 @dataclass
 class Decision:
@@ -57,8 +61,10 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     # ballistic wave is that wave, not a new drone — reading it in isolation
     # produced a false wake-up the user annotated "Ця балістика вже розбудила".
     threat = obs.threat
+    inherited = False
     if threat in ("none", "unknown") and ep is not None and ep.threat:
         threat = ep.threat
+        inherited = True
 
     # 1. The siren frames everything: a declaration always notifies and an
     #    all-clear always closes. But only *my* siren — an all-clear for Fastiv
@@ -139,6 +145,15 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
 
     # 6. Ballistic leaves no room for geography: minutes of flight, so a
     #    confirmed launch that could reach us is a shelter call city-wide.
+    # An inherited class does not carry the geography exemption. "Княжичі✈️"
+    # said nothing about ballistic — the episode did — and ringing the shelter
+    # tone for an oblast village on a carried class woke him with "Увага." and
+    # no information. A *stated* ballistic report anywhere still rings, because
+    # minutes of flight leave no time to ask whose district.
+    if (threat == "ballistic" and inherited
+            and obs.scope not in CITY_OR_NEARER):
+        return _silent("too-far: carried class, another district")
+
     if threat == "ballistic" and obs.certainty == "confirmed":
         # Novelty is a launch, not a position — and once a ballistic alert has
         # sounded, a place name over his own area adds nothing. His ruling, and
@@ -176,6 +191,20 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     # 8. Novelty near the user is what the labels say wakes him. Direction only
     #    refines it: a new target *heading into* the ring is the shelter case.
     if obs.near and obs.live:
+        # A drone has to name his own place. The ring was too wide for this
+        # class, and he has the only proof that settles it: "реально — я собі
+        # спав, поки воно там щось намотувало." One drone looping Nyvky →
+        # Sviatoshyn → Borshchahivka → Vyshneve rang five times in fifty
+        # minutes, and he slept through all of it.
+        #
+        # Still `info`, not silence: it belongs on the status line and in the
+        # queue, it just does not ring. Ballistic and cruise keep the ring,
+        # because minutes of flight leave no time to find out whose street.
+        # Keyed on the tone rather than the class name: a bare "🅿️ 1х Нивки →
+        # Вишневе" states no class at all and would ring the drone tone, which
+        # is what makes it a drone for this purpose.
+        if obs.alarm in DRONE_TONES and not obs.at_home:
+            return _notify("info", "none", "a drone near me, but not my street")
         if not tracker.is_new(obs):
             return _silent("already-notified: same target near me")
         if obs.strength == "weak":

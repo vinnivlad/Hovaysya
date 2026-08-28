@@ -61,6 +61,39 @@ CLASS_BY = {
 }
 
 
+SCOPE_WORD = {
+    "my-area": None,          # the place names carry it
+    "my-district": "мій район",
+    "city": "Київ",
+    "oblast": "область",
+}
+
+
+def _fallback(obs, threat: str | None) -> list[str]:
+    """What to say when nothing is new but he is being woken anyway.
+
+    "Увага." was here, and he asked the obvious question: what does that even
+    mean, when there are only two signals? It meant nothing — it was a hole in
+    the wording, not a level.
+
+    His rule, and it is the whole of this function: "тривога є тривога. Якщо є
+    її причина — то добре, а нема — то просто «тривога»." So the class and the
+    place get repeated rather than replaced, the scope stands in when neither is
+    known, and the last resort is the word that is always true.
+    """
+    parts = []
+    if threat in CLASS_WORD:
+        parts.append(CLASS_WORD[threat].capitalize())
+    parts += list(obs.ring_places)
+    if not parts and SCOPE_WORD.get(obs.scope):
+        parts.append(SCOPE_WORD[obs.scope])
+    return parts
+
+
+def _blank() -> dict:
+    return {"siren": False, "classes": set(), "launches": set(), "places": set()}
+
+
 @dataclass
 class Utterance:
     ts: int
@@ -72,23 +105,26 @@ class Utterance:
 class Announcer:
     """Keeps what has already been said, so each utterance can be a delta."""
 
-    siren_said: bool = False
-    classes_said: set[str] = field(default_factory=set)
-    launches_said: set[str] = field(default_factory=set)
-    places_said: set[str] = field(default_factory=set)
+    # What has been said *aloud*, and what has merely appeared on the status
+    # line, are different memories. Sharing one set is how "🛑 ТРИВОГА" came out
+    # without him ever hearing it. A thing shown is not a thing said.
+    spoken: dict = field(default_factory=lambda: _blank())
+    shown: dict = field(default_factory=lambda: _blank())
     queue: list[Utterance] = field(default_factory=list)
 
     def reset(self) -> None:
         """A full all-clear ends the episode, and with it everything said."""
-        self.siren_said = False
-        self.classes_said = set()
-        self.launches_said = set()
-        self.places_said = set()
+        self.spoken = _blank()
+        self.shown = _blank()
 
     def announce(self, obs: Observation, decision: Decision) -> Utterance | None:
         if not decision.notify:
             return None
 
+        # An audible utterance is a delta against what he has heard; a status
+        # update is a delta against what he has seen. Anything said aloud counts
+        # as seen too — he was awake for it.
+        said = self.spoken if decision.audible else self.shown
         parts: list[str] = []
         threat = obs.threat if obs.threat not in ("none", "unknown") else None
 
@@ -97,24 +133,24 @@ class Announcer:
             parts.append("Відбій тривоги")
         elif decision.alarm == "clear-partial":
             lifted = obs.cleared_class
-            self.classes_said.discard(lifted or "")
-            self.launches_said.discard(lifted or "")
+            said['classes'].discard(lifted or "")
+            said['launches'].discard(lifted or "")
             parts.append("Відбій по " + CLASS_BY.get(lifted, "частині загроз")
                          if lifted else "Частковий відбій")
         else:
             # The siren frames everything, and it is said once.
-            if not self.siren_said:
+            if not said['siren']:
                 parts.append("Тривога")
-                self.siren_said = True
+                said['siren'] = True
 
             # A launch names its own class, so the two facts must not both be
             # said: "Загроза: балістика. Пуск: балістика." is one fact twice.
             launching = bool(
                 threat and obs.certainty == "confirmed" and obs.says_launch
-                and threat not in self.launches_said)
+                and threat not in said['launches'])
 
-            if threat and threat not in self.classes_said:
-                self.classes_said.add(threat)
+            if threat and threat not in said['classes']:
+                said['classes'].add(threat)
                 if not launching:
                     word = CLASS_WORD.get(threat, threat)
                     # "Тривога. Балістика." reads as one announcement; a class
@@ -127,25 +163,31 @@ class Announcer:
             # counts as new only when no target is named — so reusing it here
             # lost the word "пуск" from "Вихід балістики з Брянська на Київ".
             if launching:
-                self.launches_said.add(threat)
+                said['launches'].add(threat)
                 parts.append(f"Пуск: {CLASS_WORD.get(threat, threat)}")
 
             # Over his own area, name the place. It is the one fact that changes
             # what he does rather than what he knows.
-            fresh = [p for p in obs.ring_places if p not in self.places_said]
+            fresh = [p for p in obs.ring_places if p not in said['places']]
             if fresh:
-                self.places_said.update(fresh)
+                said['places'].update(fresh)
                 parts.append(", ".join(fresh))
 
         if not parts:
             # Nothing new in words, but the policy decided this is worth waking
-            # him for — so a new event, even if every word has been said before.
-            # It said "Увага." three times on the first night, which is the least
-            # useful sentence available: it wakes him and tells him nothing.
-            # So the class and the place are repeated rather than withheld.
-            said = [CLASS_WORD[threat].capitalize()] if threat in CLASS_WORD else []
-            said += list(obs.ring_places)
-            parts.extend(said or ["Увага"])
+            # Nothing new in words, but the policy decided this is worth
+            # waking him for — so a new event, even if every word has been
+            # said before. "Увага." stood here and he asked the obvious
+            # question: what does that mean, when there are only two
+            # signals? It meant nothing. The class and the place get
+            # repeated rather than replaced by a word carrying none.
+            parts.extend(_fallback(obs, threat) or ["Тривога"])
+
+        if decision.audible:
+            # Heard is also seen.
+            for key in ("classes", "launches", "places"):
+                self.shown[key] |= self.spoken[key]
+            self.shown["siren"] = self.spoken["siren"]
 
         utterance = Utterance(ts=obs.ts, lead=decision.alarm or "none",
                               text=". ".join(parts) + ".")

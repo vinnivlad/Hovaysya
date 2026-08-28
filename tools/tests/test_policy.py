@@ -491,7 +491,11 @@ def test_his_first_example():
     said = _speak(["❗️❗Загроза пуску балістичних ракет Іскандер-М.",
                    "‼️ Вихід балістики з Брянська на Київ"])
     assert said[0] == (False, "Тривога. Балістика.")   # words, no sound
-    assert said[1] == (True, "Пуск: балістика.")
+    # The audible one carries the siren too. Shown is not heard: he never heard
+    # the first sentence, so the one that rings has to say what happened as well
+    # as what is new. Sharing one memory between the two channels is how a real
+    # "🛑 ТРИВОГА" came out as "Увага." on the first watched night.
+    assert said[1] == (True, "Тривога. Пуск: балістика.")
 
 
 def test_his_second_example():
@@ -607,3 +611,70 @@ def test_a_wake_up_always_says_something():
     assert all(a for a, _t in said), said
     assert said[-1][1] == "Реактивний шахед. Жуляни."
     assert "Увага" not in (said[-1][1] or "")
+
+
+def test_a_drone_has_to_name_my_own_place():
+    """The ring was too wide for this class, and he has the proof that settles
+    it: "реально — я собі спав, поки воно там щось намотувало." One drone
+    looping Nyvky → Sviatoshyn → Borshchahivka → Vyshneve rang five times in
+    fifty minutes and he slept through all of it."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    for off, text in ((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+                      (60, "⚠️2 реактивні шахеди на Київ/Бровари.")):
+        o = observe(T0 + off, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+
+    ring_not_home = observe(T0 + 3000, "Київ: / 🅿️ 1х Нивки → Вишневе.")
+    d = decide(ring_not_home, tr)
+    assert d.notify and not d.audible, d          # on the status line, silent
+
+    home = observe(T0 + 3600, "Жуляни")
+    assert decide(home, tr).audible
+
+
+def test_ballistic_keeps_the_whole_ring():
+    """Minutes of flight leave no time to find out whose street."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    for off, text in ((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+                      (60, "‼️ Вихід балістики з Брянська")):
+        o = observe(T0 + off, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+    assert decide(observe(T0 + 3000, "❗2 балістичні ракети на Вишневе."), tr).audible
+
+
+def test_a_carried_class_does_not_carry_the_geography_exemption():
+    """"Княжичі✈️" said nothing about ballistic — the episode did — and the
+    shelter tone rang for an oblast village with nothing to say."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    for off, text in ((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+                      (60, "‼️ Вихід балістики з Брянська")):
+        o = observe(T0 + off, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+    d = decide(observe(T0 + 3000, "Княжичі✈️"), tr)
+    assert not d.audible, d
+
+
+def test_when_there_is_no_reason_it_just_says_alert():
+    """"Тривога є тривога. Якщо є її причина — то добре, а нема — то просто
+    «тривога»." What stood here was "Увага.", and he asked what that could
+    possibly mean when there are only two signals."""
+    from tools.policy.announce import _fallback
+    from tools.policy.episodes import observe
+
+    named = observe(T0, "⚠️Реактивний шахед на Жуляни.")
+    assert _fallback(named, "shahed-jet") == ["Реактивний шахед", "Жуляни"]
+
+    placeless = observe(T0, "Ще ціль")
+    assert _fallback(placeless, None) == []      # ...so the caller says Тривога
