@@ -978,3 +978,20 @@ def test_manoeuvring_over_the_city_is_movement():
     assert hints.suggest(
         "Всі 4 літають та маневрують над/біля столиці."
     )["modality"] == "live-threat"
+
+
+def test_the_terse_channel_is_read(monkeypatch=None):
+    """`monitoring_kyiv` is the most telegraphic source we have — median message
+    length 17 characters — and the style analysis found six things we misread:
+
+        На центр / солому      his own district, read as merely the centre
+        На БЦ з півночі!       Bila Tserkva, abbreviated in every mention
+        Усі збиті 💪💪          a kill, in a form no other channel uses
+        Зник. / Втрата фіксацїі.   a target lost, typo included
+        Заховайтесь краще      a shelter instruction with no place at all
+    """
+    assert resolve_scope("На центр / солому") == "my-area"
+    assert resolve_scope("На БЦ з півночі!") == "oblast"
+    for text in ("Усі збиті 💪💪", "Зник.", "Втрата фіксацїі.",
+                 "Заховайтесь краще", "Мінус!"):
+        assert hints.suggest(text)["modality"] == "live-threat", text

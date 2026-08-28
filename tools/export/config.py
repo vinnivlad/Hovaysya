@@ -19,6 +19,14 @@ CHANNELS = (
     # 08:04 and this channel posted at 08:04:15, while `kievinform_ua1` had
     # already said a bare "🛑 ТРИВОГА" at 07:50 for a district.
     "alarm_kyiv",
+    # A live tracker in conversational Ukrainian, and the only channel measured
+    # to be *first* about his own ring: 26 times in three days, against 41 live
+    # ring mentions total. One of those firsts put a ballistic warning five
+    # minutes ahead of every other source.
+    #
+    # `kyivalarm`, `kyivnow` and `KyivPolitic` were measured the same way and
+    # left out — see docs/pattern-findings.md.
+    "monitoring_kyiv",
 )
 
 DB_PATH = REPO_ROOT / "data" / "messages.db"

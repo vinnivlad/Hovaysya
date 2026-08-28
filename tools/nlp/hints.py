@@ -128,7 +128,7 @@ LIVE_SHAPES: tuple[tuple[str, str], ...] = (
     # the ⚠️ rather than the word "Виліт".
     ("launch", r"\bвиліт|\bвилет|\bвихід|\bзліт|\bстарт|\bпуск|\bзапуск"),
     ("phase-word", r"курсом|на підльоті|підліт|пуск|швидкісн|в укрит|уважно|"
-                   r"уважн|загроза|тривог"),
+                   r"уважн|загроза|тривог|захова|в укритт"),
 )
 _LIVE = tuple((name, re.compile(pat, re.IGNORECASE)) for name, pat in LIVE_SHAPES)
 
@@ -187,8 +187,11 @@ SOCIAL_TERMS = (
     "передплат", "патреон", "реквізит", "прошу допомог",
 )
 
-RESOLUTION_CLOSING = ("чисто", "збито", "збили", "збиття", "мінус", "відбій")
-RESOLUTION_UNKNOWN = ("локаційно втрачено", "без фіксації", "дорозвідка", "втрачено")
+# `збит` covers збито / збили / збиття / збиті — the last of which
+# `monitoring_kyiv` uses and the others do not: "Усі збиті 💪💪".
+RESOLUTION_CLOSING = ("чисто", "збит", "збили", "мінус", "відбій")
+RESOLUTION_UNKNOWN = ("локаційно втрачено", "без фіксації", "дорозвідка",
+                      "втрачено", "втрата фіксац", "зник")
 
 
 def _low(text: str) -> str:
