@@ -115,3 +115,45 @@ def test_a_restart_mid_alert_must_not_begin_blind():
     # ...and the first live ring message after that is a repeat, not an opening.
     handle(session, "kievinform_ua1", 2, T0 + 60, "Жуляни ✈️", False, T0 + 62)
     assert session.log[-1]["reason"] != "alert declared"
+
+
+# --- the phone -------------------------------------------------------------
+
+
+def test_no_token_means_no_notifier_and_no_crash(tmp_path):
+    """The watch has to run identically whether or not a bot is configured."""
+    from tools.live.notify import Notifier
+
+    n = Notifier(tmp_path / "absent.token", tmp_path / "absent.id")
+    assert not n.enabled
+    assert n.send("Тривога.") is False
+    assert n.failures == 0          # not configured is not a failure
+
+
+def test_a_configured_notifier_needs_a_chat_before_it_sends(tmp_path):
+    from tools.live.notify import Notifier
+
+    token = tmp_path / "t"
+    token.write_text("123:fake", encoding="utf-8")
+    n = Notifier(token, tmp_path / "absent.id")
+    assert n.enabled
+    assert n.chat_id is None
+
+
+def test_the_two_levels_map_onto_telegram(tmp_path):
+    """`alert` beeps, `info` arrives silently — which is the whole of what the
+    phone needs to distinguish."""
+    from tools.live.notify import Notifier
+
+    token = tmp_path / "t"
+    token.write_text("123:fake", encoding="utf-8")
+    chat = tmp_path / "c"
+    chat.write_text("42", encoding="utf-8")
+    n = Notifier(token, chat)
+    calls = []
+    n._call = lambda method, **kw: calls.append((method, kw)) or {"ok": True}
+    n.send("Тривога.", audible=True)
+    n.send("Загроза: балістика.", audible=False)
+    assert calls[0][1]["disable_notification"] == "false"
+    assert calls[1][1]["disable_notification"] == "true"
+    assert n.sent == 2

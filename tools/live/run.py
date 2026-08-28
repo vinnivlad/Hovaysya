@@ -51,9 +51,11 @@ from ..labeler.build import kyiv_dt
 from ..policy.announce import Announcer
 from ..policy.episodes import Tracker, observe
 from ..policy.rules import decide
+from .notify import Notifier
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LOG_DIR = REPO_ROOT / "data" / "live"
+TOKEN_HINT = "data/telegram-bot.token"
 
 # Quiet, there is nothing to be quick about: the channels post a few times an
 # hour and a missed minute costs nothing. With an episode open the loop tightens,
@@ -107,6 +109,7 @@ class Watcher:
 @dataclass
 class Session:
     tracker: Tracker = field(default_factory=Tracker)
+    notifier: Notifier | None = None
     announcer: Announcer = field(default_factory=Announcer)
     lags: list[float] = field(default_factory=list)
     decisions: int = 0
@@ -156,6 +159,12 @@ def handle(session: Session, channel: str, message_id: int, ts: int, text: str,
 
     if warm:
         return
+
+    # To the phone, if a bot is configured. A failure here must never take the
+    # watch down: a missing notification is a bad night, a crashed watcher is no
+    # night at all.
+    if utterance is not None and session.notifier is not None:
+        session.notifier.send(utterance.text, audible=decision.audible)
     mark = "!!" if decision.audible else ("..." if decision.notify else "  ")
     # flush on every line: this runs for hours in a terminal, and a buffered
     # alert is not an alert.
@@ -272,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  ! {w.channel}: {exc}")
 
     started = time.time()
-    session = Session()
+    session = Session(notifier=Notifier())
     stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
     log_path = LOG_DIR / f"{stamp}.jsonl"
 
@@ -280,6 +289,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  інтервал: {args.quiet_interval:.0f}s тихо / "
           f"{args.alert_interval:.0f}s під тривогу")
     print(f"  лог: {log_path}")
+    if session.notifier and session.notifier.enabled:
+        who = session.notifier.chat_id or session.notifier.find_chat()
+        print(f"  телефон: telegram → {who or 'напиши боту, щоб він знав куди слати'}")
+    else:
+        print(f"  телефон: вимкнено (нема {TOKEN_HINT})")
 
     # Warm the tracker from what is already stored, before polling at all. A
     # restart mid-alert has nothing to catch up on and would otherwise start with
@@ -342,6 +356,9 @@ def main(argv: list[str] | None = None) -> int:
 
     write_log(session, log_path)
     summarise(session, started)
+    if session.notifier and session.notifier.enabled:
+        print(f"  на телефон надіслано: {session.notifier.sent}"
+              f"   помилок: {session.notifier.failures}")
     print(f"  лог: {log_path}")
     print("  розмітити цю ніч: python -m tools.labeler.build")
     conn.close()

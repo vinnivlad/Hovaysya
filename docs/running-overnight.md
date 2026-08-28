@@ -114,3 +114,28 @@ The machine still has to be on, and a power cut ends the watch. That is what the
 Oracle Cloud stage is for — see [oracle-cloud-setup.md](oracle-cloud-setup.md) —
 and it is worth doing only once a night of this proves the decisions are worth
 delivering.
+
+## Getting it onto the phone
+
+Two steps, both his, and the watcher runs identically without them.
+
+1. In Telegram, write to **@BotFather**: `/newbot`, pick a name, and it hands
+   back a token. Put that token in `data/telegram-bot.token`, one line. That
+   directory is gitignored — the token must not go into the repo or into a chat.
+2. Find the new bot by the username BotFather gave, and send it anything. Until
+   he writes first, a bot is not allowed to message him, and the watcher has no
+   chat id to send to. It picks the id up by itself on the next poll and caches
+   it in `data/telegram-chat.id`.
+
+Then the two levels arrive as two kinds of notification:
+
+    Тривога.                    a normal message — beeps
+    Загроза: балістика.         silent — appears without a sound
+
+Per-chat sound and volume are Telegram's own settings, so a custom tone for this
+bot is set the same way as for any chat.
+
+**What this is not.** There is no persistent status line and no sound that
+overrides silent mode; both of those need the Android client. What it is for is
+the comparison: this bot and the official "Тривога" app on one screen, both
+beeping, and afterwards it is plain which one was worth waking up for.
