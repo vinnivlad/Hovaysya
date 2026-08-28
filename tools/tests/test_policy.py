@@ -610,7 +610,8 @@ def test_a_wake_up_always_says_something():
         u = ann.announce(o, d)
         said.append((d.audible, u.text if u else None))
     assert all(a for a, _t in said), said
-    assert said[-1][1] == "Реактивний шахед. Жуляни."
+    # "Падає" is the word the whole rule exists for, and it was never said.
+    assert said[-1][1] == "Падає. Жуляни."
     assert "Увага" not in (said[-1][1] or "")
 
 
@@ -844,3 +845,26 @@ def test_the_effective_class_is_stamped_on_the_observation():
         tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
     assert o.threat == "unknown"          # the message says nothing
     assert o.effective_threat == "shahed-jet"
+
+
+def test_my_own_place_is_never_dropped_as_already_said():
+    """It woke him at 17:43 on "Жуляни, Вишневе, Теремки" and the sentence came
+    out as "Вишневе, Теремки." — the one name that decides what he does was the
+    one left out, because it had been said seven minutes earlier."""
+    out = _play([
+        (-3600, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+        (0, "kievinform_ua1", "😵‍💫БПЛА на Нивки, Жуляни йде ⚠️✈️"),
+        (420, "kievinform_ua1", "Жуляни, Вишневе, Теремки⚠️"),
+    ])
+    assert out[2][1], out
+    assert out[2][3] == "Жуляни, Вишневе, Теремки."
+
+
+def test_falling_is_said_out_loud():
+    """The strictest rule in the policy exists for that word, and it had been
+    ringing without the word ever being said."""
+    out = _play([
+        (-3600, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+        (300, "mon1tor_ua", "⚠️Реактивний шахед падає на Жуляни."),
+    ])
+    assert out[1][3] == "Падає: реактивний шахед. Жуляни."

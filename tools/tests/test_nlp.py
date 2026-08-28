@@ -962,3 +962,19 @@ def test_a_named_oblast_settles_an_ambiguous_district():
     # Alone, and beside an unambiguous Kyiv district, it is still ours.
     assert resolve_scope("Дніпровський район") == "city"
     assert resolve_scope("Дніпровський район, Березняки") == "city"
+
+
+def test_a_missing_name_takes_the_whole_list_down_with_it():
+    """"Святопетрівське Софіївська Борщага" read as `non-threat` — the
+    bare-toponym-list test needs the whole message to be places, and one unknown
+    name leaves debris. That message names Borshchahivka, which is in his ring."""
+    for text in ("Святопетрівське Софіївська Борщага", "Хотів, Феофанія"):
+        assert hints.suggest(text)["modality"] == "live-threat", text
+    assert resolve_scope("Святопетрівське Софіївська Борщага") == "my-area"
+
+
+def test_manoeuvring_over_the_city_is_movement():
+    """"Всі 4 літають та маневрують над/біля столиці" read as `non-threat`."""
+    assert hints.suggest(
+        "Всі 4 літають та маневрують над/біля столиці."
+    )["modality"] == "live-threat"

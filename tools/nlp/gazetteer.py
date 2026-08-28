@@ -90,7 +90,8 @@ HOME = "Жуляни"
 MY_AREA = [
     _p("Жуляни", "my-area", "жулян", "жушян"),   # home — see HOME below
     _p("Вишневе", "my-area", "вишнев"),
-    _p("Борщагівка", "my-area", "борщагів", "борщаг"),
+    _p("Борщагівка", "my-area", "борщагів", "борщаг", "софіївська борщаг",
+       "соф борщаг"),
     _p("Солом'янка", "my-area", "солом'ян", "соломян", "солома", "соломи"),
     _p("Деміївка", "my-area", "деміїв"),
     _p("Іподром", "my-area", "іподром"),
@@ -191,6 +192,12 @@ OBLAST = [
     # so the only thing at stake was whether the user gets to see them.
     # The raion, not the city district — same reason, the other direction.
     _p("Києво-Святошинський район", "oblast", "києво-святошин"),
+    # Found live: "Святопетрівське Софіївська Борщага" and "Хотів, Феофанія"
+    # both read as `non-threat`, because an unknown name left debris behind and
+    # the bare-toponym-list test needs the whole message to be places. The first
+    # of the two names Borshchahivka, which is in his ring.
+    _p("Святопетрівське", "oblast", "святопетрів"),
+    _p("Хотів", "oblast", "хотів", "хотов"),
     _p("Требухів", "oblast", "требух"),
     _p("Гоголів", "oblast", "гоголів", "гоголев"),
     _p("Дударків", "oblast", "дударків", "дударков"),

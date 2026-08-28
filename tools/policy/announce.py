@@ -81,10 +81,16 @@ def _fallback(obs, threat: str | None) -> list[str]:
     place get repeated rather than replaced, the scope stands in when neither is
     known, and the last resort is the word that is always true.
     """
+    from ..nlp.gazetteer import HOME
+
     parts = []
     if threat in CLASS_WORD:
         parts.append(CLASS_WORD[threat].capitalize())
-    parts += list(obs.ring_places)
+    if obs.ring_places:
+        # One clause, not one sentence each: "Вишневе. Теремки." reads as two
+        # separate reports of two separate things.
+        places = sorted(obs.ring_places, key=lambda p: (p != HOME, p))
+        parts.append(", ".join(places))
     if not parts and SCOPE_WORD.get(obs.scope):
         parts.append(SCOPE_WORD[obs.scope])
     return parts
@@ -170,6 +176,7 @@ class Announcer:
             # declaration, the one sentence he actually acts on, had nothing
             # left to say and came out as "Київ."
             declaring = obs.alert_state == "alert"
+            falling = getattr(obs, "falling", False) and decision.audible
             if declaring and not said['siren']:
                 parts.append("Тривога")
                 said['siren'] = True
@@ -194,7 +201,13 @@ class Announcer:
                     word = CLASS_WORD.get(threat, threat)
                     # "Тривога. Балістика." reads as one announcement; a class
                     # arriving alone later is a change of situation and says so.
-                    parts.append(word.capitalize() if parts else f"Загроза: {word}")
+                    # And a thing coming down is not a threat any more — the
+                    # strictest rule in the policy exists for that word, and it
+                    # was ringing without it ever being said.
+                    if falling:
+                        parts.append(f"Падає: {word}")
+                    else:
+                        parts.append(word.capitalize() if parts else f"Загроза: {word}")
 
             # A confirmed launch is its own event even when the class is known —
             # this is the second half of his first example.
@@ -207,9 +220,21 @@ class Announcer:
 
             # Over his own area, name the place. It is the one fact that changes
             # what he does rather than what he knows.
-            fresh = [p for p in obs.ring_places if p not in said['places']]
+            # His own place is never dropped as "already said". It woke him at
+            # 17:43 on "Жуляни, Вишневе, Теремки" and the sentence came out as
+            # "Вишневе, Теремки." — the one name that decides what he does was
+            # the one left out, because it had been said seven minutes earlier.
+            from ..nlp.gazetteer import HOME
+
+            if falling and not any(part.startswith("Падає") for part in parts):
+                parts.append("Падає")
+
+            fresh = [p for p in obs.ring_places
+                     if p not in said['places'] or (p == HOME and decision.audible)]
             if fresh:
                 said['places'].update(fresh)
+                # Home first when it is there: it is the word he acts on.
+                fresh.sort(key=lambda p: (p != HOME, p))
                 parts.append(", ".join(fresh))
 
         if not parts:
