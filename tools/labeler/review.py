@@ -175,8 +175,13 @@ def check(labels: list[dict], messages: dict[str, dict]) -> list[tuple[str, str,
             # night on "БОРЩАГА" — threat ballistic, alarm drone.
             # `alert` is exempt: the plain siren tone says "the siren went
             # off", which is true whatever is or is not identified as flying.
+            # And an `info` update has no tone at all — it is a line on the
+            # status, not a sound — so `none` is the right answer there.
             expected = ALARM_FOR_THREAT.get(l.get("threat"))
-            if expected and l.get("alarm") not in (None, "alert", expected):
+            exempt = (None, "alert", expected)
+            if l.get("level") == "info":
+                exempt += ("none",)
+            if expected and l.get("alarm") not in exempt:
                 warn(lid, f"alarm {l.get('alarm')!r} on threat "
                           f"{l.get('threat')!r} — expected {expected!r}")
             if l.get("modality") in ("aftermath", "summary-news", "non-threat") \

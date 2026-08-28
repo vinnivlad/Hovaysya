@@ -294,3 +294,11 @@ def test_a_target_abroad_is_still_flagged():
     l = label(scope="elsewhere", threat="ballistic", alarm="ballistic")
     assert ids(check([l], messages)) == [
         "notify on a threat resolved to another region"]
+
+
+def test_a_silent_status_update_has_no_tone():
+    """An `info` label is a line on the status, not a sound, so `alarm: none` is
+    correct there — including on a threat whose class does have a tone."""
+    l = label(level="info", alarm="none", threat="shahed-jet", scope="my-area",
+              why="дрон близько")
+    assert check([l], {}) == []
