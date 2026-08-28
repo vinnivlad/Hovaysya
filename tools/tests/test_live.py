@@ -157,3 +157,56 @@ def test_the_two_levels_map_onto_telegram(tmp_path):
     assert calls[0][1]["disable_notification"] == "false"
     assert calls[1][1]["disable_notification"] == "true"
     assert n.sent == 2
+
+
+def test_only_a_chat_that_said_the_code_is_added(tmp_path):
+    """A bot's username is public. "Whoever wrote last" was the first version,
+    and a stranger who found the bot and wrote before he did would have been
+    cached as the recipient of his alerts."""
+    from tools.live.notify import Notifier
+
+    token = tmp_path / "t"
+    token.write_text("123:fake", encoding="utf-8")
+    n = Notifier(token, tmp_path / "c", code="hovaysya")
+    n._call = lambda method, **kw: {"ok": True, "result": [
+        {"message": {"chat": {"id": 999, "type": "private"}, "text": "привіт"}},
+        {"message": {"chat": {"id": 42, "type": "private"}, "text": "Hovaysya"}},
+    ]}
+    assert n.find_chat() == "42"
+    assert n.chats == ["42"]
+
+
+def test_a_stranger_without_the_code_is_ignored(tmp_path):
+    from tools.live.notify import Notifier
+
+    token = tmp_path / "t"
+    token.write_text("123:fake", encoding="utf-8")
+    n = Notifier(token, tmp_path / "c", code="hovaysya")
+    n._call = lambda method, **kw: {"ok": True, "result": [
+        {"message": {"chat": {"id": 999, "type": "private"}, "text": "/start"}},
+    ]}
+    assert n.find_chat() is None
+    assert n.chats == []
+
+
+def test_it_sends_to_everyone_on_the_list(tmp_path):
+    """A private channel for the few people he wants, or several direct chats —
+    and one failing recipient must not stop the others."""
+    from tools.live.notify import Notifier
+
+    token = tmp_path / "t"
+    token.write_text("123:fake", encoding="utf-8")
+    chats = tmp_path / "c"
+    chats.write_text("-1001234567890\n42\n", encoding="utf-8")
+    n = Notifier(token, chats)
+    seen = []
+
+    def call(method, **kw):
+        seen.append(kw["chat_id"])
+        return {"ok": kw["chat_id"] != "42",
+                "description": "chat not found"}
+
+    n._call = call
+    assert n.send("Тривога.") is True        # the channel worked
+    assert seen == ["-1001234567890", "42"]  # ...and the other was still tried
+    assert n.sent == 1 and n.failures == 1

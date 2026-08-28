@@ -122,10 +122,34 @@ Two steps, both his, and the watcher runs identically without them.
 1. In Telegram, write to **@BotFather**: `/newbot`, pick a name, and it hands
    back a token. Put that token in `data/telegram-bot.token`, one line. That
    directory is gitignored — the token must not go into the repo or into a chat.
-2. Find the new bot by the username BotFather gave, and send it anything. Until
-   he writes first, a bot is not allowed to message him, and the watcher has no
-   chat id to send to. It picks the id up by itself on the next poll and caches
-   it in `data/telegram-chat.id`.
+2. Find the new bot by the username BotFather gave, and send it the word
+   **hovaysya**. A bot may not open a conversation, so he has to write first —
+   and the word is a handshake, not decoration: the bot's username is public,
+   and without it whoever wrote to the bot first would become the recipient of
+   his alerts. The watcher picks the chat up on its next poll and caches it in
+   `data/telegram-chat.id`.
+
+### A bot cannot be made private
+
+There is no such setting. Its username is public and anyone who knows it can
+write to it — they simply receive nothing, because sending goes only to the ids
+in the file.
+
+**For himself and a few close people, a private channel is the better shape.**
+Create a channel, add the bot as an administrator, and put the channel's id in
+`data/telegram-chat.id`. Then:
+
+- people he invites see everything; nobody else can find the channel at all
+- they need no bot, no code word, and no setup — just the invite link
+- it is also the distribution he wanted from the start: himself plus a few
+  others, no app store
+
+The file takes one id per line, so a channel and direct chats can be mixed. A
+recipient that fails does not stop the others.
+
+Two hardening steps in BotFather, both one command: `/setjoingroups` → *Disable*
+stops anyone adding the bot to a group, and `/setdescription` can be left empty
+so the bot says nothing about itself.
 
 Then the two levels arrive as two kinds of notification:
 
