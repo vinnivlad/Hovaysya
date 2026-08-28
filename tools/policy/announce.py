@@ -173,6 +173,12 @@ class Announcer:
                 self.pending_places.append(place)
 
     def announce(self, obs: Observation, decision: Decision) -> Utterance | None:
+        # A full all-clear ends the episode whether or not we said so. Resetting
+        # only when one was announced left the memory of a finished attack
+        # alive: a siren an hour later opened with "Тривога. Балістика. Жуляни."
+        # on a class from before the previous all-clear.
+        if obs.alert_state == "clear" and not obs.partial_clear:
+            self.reset()
         self.note(obs)
         if not decision.notify:
             return None

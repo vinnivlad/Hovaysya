@@ -1012,3 +1012,15 @@ def test_a_standing_risk_level_is_a_state_not_an_event():
     # ...and an actual launch is still an actual launch.
     assert hints.suggest("‼️ Вихід балістики з Брянська")["modality"] == "live-threat"
     assert hints.suggest("⚠️2 реактивні шахеди на Жуляни.")["modality"] == "live-threat"
+
+
+def test_an_awaited_all_clear_lifts_nothing():
+    """"⚪️Київ очікує на відбій" counted as lifting the drone threat: it lowered
+    the escalation ladder, and the next ballistic warning rang as a fresh climb.
+    Waiting for one is not having one, exactly as in `alert_state`."""
+    text = "💥Реактивний шахед збито на околицях столиці!\n⚪️Київ очікує на відбій."
+    assert hints.partial_clear(text) is False
+    assert hints.cleared_class(text) is None
+    # ...and a real partial all-clear still lifts its class.
+    assert hints.partial_clear("⚪️По балістиці відбій.") is True
+    assert hints.cleared_class("⚪️По балістиці відбій.") == "ballistic"

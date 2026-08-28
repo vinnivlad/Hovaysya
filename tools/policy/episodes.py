@@ -451,6 +451,7 @@ class Tracker:
         # Only an announcement *we made* counts. An oblast district's siren set
         # this flag and then silenced the city's, costing four misses.
         if obs.alert_state == "alert":
+            newly = not ep.alert_announced
             if obs.official:
                 ep.official_alert = True
                 ep.alert_announced = True
@@ -459,6 +460,17 @@ class Tracker:
                 ep.alert_announced = True
                 if obs.scope in ("my-area", "my-district", "city"):
                     ep.alert_scope_known = True
+            if newly and ep.alert_announced:
+                # Seeded once, with whatever was already known. A declaration
+                # carries the class with it — "Тривога. Балістика. Жуляни." — so
+                # starting below that made the next ballistic warning ring
+                # seventy-eight seconds later, saying what he had just heard.
+                #
+                # Once, not on every message: recomputing it each time pushed the
+                # ladder straight back up after a partial all-clear had lowered
+                # it, which is the same self-cancelling shape as before.
+                ep.threat_peak = max(ep.threat_peak, 1,
+                                     THREAT_LEVEL.get(ep.threat or "", 0))
         if obs.cleared_class:
             ep.cleared.add(obs.cleared_class)
             # "Тоді знижуємо поточний рівень і в разі підняття знову
@@ -471,9 +483,6 @@ class Tracker:
         # for. Starting the ladder at zero made the first drone report after the
         # siren ring again, saying what "Тривога" had just said. The rungs worth
         # hearing are the ones above it — cruise, then ballistic.
-        if ep.alert_announced:
-            ep.threat_peak = max(ep.threat_peak, 1)
-
         # The ladder only moves once the siren has been declared, which is the
         # whole of "правило має працювати лише після початку тривоги".
         # Not on a partial all-clear. Its own class is carried forward from the

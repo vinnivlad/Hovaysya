@@ -383,6 +383,12 @@ def heading(text: str) -> str:
 
 
 def partial_clear(text: str) -> bool:
+    # Waiting for one is not having one, exactly as in `alert_state`. Without
+    # this, "⚪️Київ очікує на відбій" counted as lifting the drone threat: it
+    # lowered the escalation ladder, and the next ballistic warning rang as a
+    # fresh climb.
+    if _hits(text, AWAITING_TERMS) and not _hits(text, CANONICAL_SIREN):
+        return False
     """An all-clear for one threat class while the alert itself continues.
 
     "⚪️ Відбій загрози МіГ-31К" and "⚪️По балістиці відбій" lift one part of a
