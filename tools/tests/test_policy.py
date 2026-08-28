@@ -934,6 +934,7 @@ def test_an_explosion_is_information_never_a_warning():
     ])
     assert not out[2][1] and out[2][2] == "impact: it has already landed", out
     assert not out[3][1], out
+
     # ...and "Загроза" about a thing that has already come down is untrue.
     assert out[2][3].startswith("Вибух:")
     assert out[3][3].startswith("Влучання:")
@@ -951,3 +952,17 @@ def test_falling_is_not_an_impact():
         (300, "mon1tor_ua", "⚠️Реактивний шахед падає на Жуляни."),
     ])
     assert out[1][1] and out[1][2] == "falling on Zhuliany", out
+
+
+def test_an_impact_elsewhere_is_not_even_context():
+    """"У Києві велика детонація боєприпасів внаслідок влучання" is both the
+    past and somebody else's street. His call: "давай лишаємо тільки коло"."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+        (200, "mon1tor_ua", "⚠️2 реактивні шахеди на Вишневе."),
+        (400, "mon1tor_ua", "💥У Києві велика детонація боєприпасів внаслідок влучання"),
+        (500, "mon1tor_ua", "💥Влучання реактивного шахеду у Вишневому"),
+    ])
+    assert out[2][3] is None, out           # nothing at all, not even a status line
+    assert out[2][2] == "impact: elsewhere, and already over"
+    assert out[3][3] == "Влучання: реактивний шахед. Вишневе."

@@ -176,7 +176,12 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     # `падає` is deliberately not here. That is a thing on its way down, and over
     # his own street it is the one rule that overrides everything.
     if obs.impact and not obs.falling:
-        return _notify("info", "none", "impact: it has already landed")
+        # Only when it landed on his own ring. "У Києві велика детонація
+        # боєприпасів" is both the past and somebody else's street, so it is not
+        # even context — his call: "давай лишаємо тільки коло".
+        if obs.near:
+            return _notify("info", "none", "impact: it has already landed")
+        return _silent("impact: elsewhere, and already over")
 
     # 6. Anticipation is not an event. "Загроза пуску" updates the picture; the
     #    sound belongs to the launch. Straight from the labelled sequence.
