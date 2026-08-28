@@ -295,10 +295,21 @@ class Tracker:
             self.closed.append(self.episode)
             self.episode = None
 
+    # Channels do not arrive in order. The chat all-clear on 2026-08-28 was
+    # stamped two seconds *before* the official one and reached us fifty seconds
+    # after it, so a check that demanded the official message be strictly
+    # earlier let the duplicate through — two "Відбій тривоги." in a row.
+    OUT_OF_ORDER_S = 3600
+
     def official_is_live(self, ts: int, within_s: int = 24 * 3600) -> bool:
-        """Whether the authoritative source is present in this stream."""
-        return (self.official_seen is not None
-                and 0 <= ts - self.official_seen <= within_s)
+        """Whether the authoritative source is present in this stream.
+
+        A question about the stream, not about ordering: once the official
+        channel is being watched, it owns the siren for everything around it.
+        """
+        if self.official_seen is None:
+            return False
+        return -self.OUT_OF_ORDER_S <= ts - self.official_seen <= within_s
 
     def before(self, obs: Observation) -> Episode | None:
         """Advance time, closing a stale episode. Call before deciding."""

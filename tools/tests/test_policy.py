@@ -756,3 +756,16 @@ def test_a_chat_all_clear_never_closes_it_while_the_official_one_is_live():
         (9000, "kievinform_ua1", "🟢 ВІДБІЙ ТРИВОГИ"),
     ])
     assert not out[3][1], out
+
+
+def test_a_late_chat_all_clear_is_still_a_duplicate():
+    """Channels do not arrive in order. On 2026-08-28 the chat all-clear was
+    stamped two seconds before the official one and reached us fifty seconds
+    after it — and he heard "Відбій тривоги." twice."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+        (600, "alarm_kyiv", "🟢 м. Київ\nВідбій повітряної тривоги"),
+        (598, "kievinform_ua1", "🟢 ВІДБІЙ ТРИВОГИ"),      # earlier stamp, later arrival
+    ])
+    assert out[1][1], out
+    assert not out[2][1], out
