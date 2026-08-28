@@ -54,10 +54,14 @@ class Place:
     # Naming one does not mean the target is known — which is the whole test for
     # a country-wide threat, in `hints.nationwide`.
     origin: bool = False
+    # A name that repeats across the country. Kyiv has a Dniprovskyi raion and
+    # so does Dnipro; every second city has a Shevchenkivskyi. Alone it means
+    # ours, but a named oblast in the same message means theirs.
+    ambiguous: bool = False
 
 
 def _p(name: str, tier: str, *stems: str, landmark: bool = False,
-       origin: bool = False) -> Place:
+       origin: bool = False, ambiguous: bool = False) -> Place:
     """Declare a place. Stems are normalised the same way message text is.
 
     Apostrophes are stripped here so an entry can be written the readable way
@@ -66,7 +70,7 @@ def _p(name: str, tier: str, *stems: str, landmark: bool = False,
     """
     return Place(name, tier,
                  tuple(_strip_apostrophes(s).lower() for s in stems),
-                 landmark, origin)
+                 landmark, origin, ambiguous)
 
 
 # The near ring — the places whose trouble is the user's trouble.
@@ -161,9 +165,9 @@ CITY = [
     _p("Соцмісто", "city", "соцміст"),
     _p("Труханів", "city", "труханів"),
     _p("Центр", "city", "центр"),
-    _p("Шевченківський район", "city", "шевченківс"),
+    _p("Шевченківський район", "city", "шевченківс", ambiguous=True),
     _p("Деснянський район", "city", "деснянс"),
-    _p("Дніпровський район", "city", "дніпровськ"),
+    _p("Дніпровський район", "city", "дніпровськ", ambiguous=True),
     _p("Оболонський район", "city", "оболонськ"),
     _p("Дарницький район", "city", "дарницьк"),
     _p("Пуща-Водиця", "city", "пуща-водиц", "пущу-водиц"),
@@ -524,6 +528,13 @@ def resolve_scope(text: str) -> str:
     settlements = [p for p in found if not p.landmark]
     if settlements and any(p.landmark for p in found):
         found = settlements
+    # "3 крилаті ракети з Полтавщини на Дніпропетровщину, Дніпровський район"
+    # read as Kyiv and woke him while the city was officially clear. A raion
+    # name repeats across the country; a named oblast beside it settles whose.
+    elsewhere = [p for p in found if p.tier == "elsewhere"]
+    if elsewhere and all(p.ambiguous for p in found if p.tier != "elsewhere"):
+        if any(p.ambiguous for p in found):
+            found = elsewhere
     tiers = {p.tier for p in found}
     for tier in TIERS:
         if tier in tiers:

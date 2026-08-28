@@ -949,3 +949,16 @@ def test_an_overnight_tally_is_not_an_attack():
     assert hints.suggest(
         "💥За ніч у Вишневому та Боярка 3 реактивні шахеди влучили у склади"
     )["modality"] == "summary-news"
+
+
+def test_a_named_oblast_settles_an_ambiguous_district():
+    """"3 крилаті ракети з Полтавщини на Дніпропетровщину, Дніпровський район"
+    read as Kyiv and woke him while the city was officially clear. Kyiv has a
+    Dniprovskyi raion and so does Dnipro; every second city has a
+    Shevchenkivskyi."""
+    assert resolve_scope("❗️3 крилаті ракети Бандероль з Полтавщини на "
+                         "Дніпропетровщину, Дніпровський район.") == "elsewhere"
+    assert resolve_scope("⚠️Реактивний шахед на Шевченківський район Харкова") == "elsewhere"
+    # Alone, and beside an unambiguous Kyiv district, it is still ours.
+    assert resolve_scope("Дніпровський район") == "city"
+    assert resolve_scope("Дніпровський район, Березняки") == "city"

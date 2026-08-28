@@ -732,3 +732,27 @@ def test_a_chat_siren_still_declares_when_nothing_official_has_spoken():
     source."""
     out = _play([(0, "kievinform_ua1", "⚠️❗️КИЇВ - ТРИВОГА. В укриття!")])
     assert out[0][1] and out[0][2] == "alert declared", out
+
+
+def test_the_chat_channels_stop_declaring_while_the_official_one_is_live():
+    """Two rings two seconds apart, one from each — 09:54:43 "Тривога." from the
+    chat and 09:54:45 "Київ." from the official channel."""
+    out = _play([
+        (0, "alarm_kyiv", "🟢 м. Київ\nВідбій повітряної тривоги"),
+        (600, "kievinform_ua1", "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+        (602, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+    ])
+    assert not out[1][1], out          # the chat report stays quiet
+    assert out[2][1] and out[2][3] == "Тривога.", out
+
+
+def test_a_chat_all_clear_never_closes_it_while_the_official_one_is_live():
+    """It fired at 13:51 on a night the official channel had covered all day —
+    the branch that caught it sat below the one that answered first."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+        (600, "alarm_kyiv", "🟢 м. Київ\nВідбій повітряної тривоги"),
+        (5000, "kievinform_ua1", "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+        (9000, "kievinform_ua1", "🟢 ВІДБІЙ ТРИВОГИ"),
+    ])
+    assert not out[3][1], out

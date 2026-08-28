@@ -277,6 +277,11 @@ class Tracker:
         self.refractory_near_s = refractory_near_s
         self.launch_dedup_s = launch_dedup_s
         self.episode: Episode | None = None
+        # When the official channel was last heard from at all. While it is a
+        # live source the chat channels stop declaring sirens — they were only
+        # ever standing in for it. On the labelled nights it is absent, and they
+        # go back to declaring, which is what keeps those nights scoring.
+        self.official_seen: int | None = None
         self.closed: list[Episode] = []
 
     # -- lifecycle ---------------------------------------------------------
@@ -289,6 +294,11 @@ class Tracker:
         if self.episode is not None:
             self.closed.append(self.episode)
             self.episode = None
+
+    def official_is_live(self, ts: int, within_s: int = 24 * 3600) -> bool:
+        """Whether the authoritative source is present in this stream."""
+        return (self.official_seen is not None
+                and 0 <= ts - self.official_seen <= within_s)
 
     def before(self, obs: Observation) -> Episode | None:
         """Advance time, closing a stale episode. Call before deciding."""
@@ -369,6 +379,8 @@ class Tracker:
 
     def record(self, obs: Observation, level: str | None, alarm: str | None) -> None:
         """Fold one observation, and any notification for it, into the state."""
+        if obs.official:
+            self.official_seen = obs.ts
         # A partial all-clear lifts one threat class, not the alert. Closing the
         # episode here would forget everything the night had established.
         if obs.alert_state == "clear" and not obs.partial_clear:

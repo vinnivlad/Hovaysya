@@ -85,7 +85,10 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     # of them "вся надія на сервіси".
     if obs.alert_state == "clear" and obs.official:
         return _notify("alert", "clear", "official all-clear")
-    if obs.alert_state == "clear" and ep is not None and ep.official_alert:
+    if obs.alert_state == "clear" and tracker.official_is_live(obs.ts):
+        # Whether or not this episode saw an official declaration: while the
+        # authoritative source is in the stream, a chat all-clear is a report
+        # about somebody's district and not the end of his alert.
         return _silent("refinement: the official channel closes the alert")
     if obs.alert_state == "clear" and obs.scope in CITY_OR_NEARER:
         return _notify("alert", "clear", "all-clear")
@@ -99,11 +102,11 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
             return _silent("already-notified: official siren already declared")
         return _notify("alert", "alert", "official siren")
 
-    # A chat channel naming the city still declares — his other half: "ну або
-    # якщо є Київ + тривога". Without a name it only reports, once the official
-    # channel has spoken for this episode.
-    if (obs.alert_state == "alert" and ep is not None and ep.official_alert
-            and obs.scope not in ("my-area", "my-district", "city")):
+    # While the official channel is a live source, the chat channels stop
+    # declaring sirens — they were standing in for it. Two rings two seconds
+    # apart is what happens otherwise, one from each. On the labelled nights it
+    # is absent and they declare as before.
+    if obs.alert_state == "alert" and tracker.official_is_live(obs.ts):
         return _silent("refinement: siren reported, not declared")
 
     if obs.alert_state == "alert" and obs.scope in CITY_OR_NEARER:
