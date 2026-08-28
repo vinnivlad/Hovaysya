@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..nlp import hints
 from .episodes import Observation, Tracker
 
 LEVELS = ("info", "alert")
@@ -65,6 +66,14 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     if threat in ("none", "unknown") and ep is not None and ep.threat:
         threat = ep.threat
         inherited = True
+    # Stamped so the notification, the log and the report all name the class the
+    # decision was actually made on.
+    obs.effective_threat = threat
+    # ...and the tone follows the class the decision was made on. "Жуляни ✈️"
+    # states no class, so its own alarm is the propeller-drone tone — while the
+    # episode knows a jet Shahed is up, which is several times faster and has
+    # its own tone precisely so he knows before opening his eyes.
+    alarm = hints.ALARM_FOR_THREAT.get(threat, obs.alarm) or obs.alarm
 
     # 1. The siren frames everything: a declaration always notifies and an
     #    all-clear always closes. But only *my* siren — an all-clear for Fastiv
@@ -153,7 +162,7 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     #    and a half minutes after the same drone had woken him: defensible as a
     #    repeat, and also the most consequential sentence of the night.
     if obs.falling and obs.at_home and obs.live:
-        return _notify("alert", obs.alarm, "falling on Zhuliany")
+        return _notify("alert", alarm, "falling on Zhuliany")
 
     # 10. Anticipation is not an event. "Загроза пуску" updates the picture; the
     #    sound belongs to the launch. Straight from the labelled sequence.
@@ -235,7 +244,7 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
         # Keyed on the tone rather than the class name: a bare "🅿️ 1х Нивки →
         # Вишневе" states no class at all and would ring the drone tone, which
         # is what makes it a drone for this purpose.
-        if obs.alarm in DRONE_TONES and not obs.at_home:
+        if alarm in DRONE_TONES and not obs.at_home:
             return _notify("info", "none", "a drone near me, but not my street")
         if not tracker.is_new(obs):
             return _silent("already-notified: same target near me")
@@ -247,14 +256,14 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
             # Shelter is ballistic's. Across a whole labelled night the user
             # used it three times and every one was ballistic — a drone heading
             # in is an alert, however close.
-            return _notify("alert", obs.alarm, "new target heading into my area")
+            return _notify("alert", alarm, "new target heading into my area")
         if obs.heading == "away":
             return _notify("info", "none", "leaving my area")
         if obs.heading == "loitering":
             # Circling nearby is not an approach. The user labelled these
             # "ті самі" — worth showing, not worth a second wake-up.
             return _notify("info", "none", "circling nearby")
-        return _notify("alert", obs.alarm, "new target near me")
+        return _notify("alert", alarm, "new target near me")
 
     # 9. In the city but not near: worth knowing, not worth waking twice — and
     #    for a drone, not worth waking at all. His rule from the first
@@ -267,7 +276,7 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
             return _silent("insufficient: city-wide is not enough for a drone")
         if ep is not None and ep.notified:
             return _silent("already-notified: city-level, already awake")
-        return _notify("alert", obs.alarm, "threat over the city")
+        return _notify("alert", alarm, "threat over the city")
 
     if obs.live and obs.scope == "oblast":
         return _silent("too-far: oblast, not the city")

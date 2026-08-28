@@ -146,7 +146,13 @@ class Notifier:
 # translated: these are the values the labels use, so a post can be compared
 # against `labels/*.jsonl` directly. His reason for wanting them — "так легше
 # потім аналізувати".
-TAG_FIELDS = ("threat", "scope", "modality", "certainty", "heading", "alarm")
+# `летить` and `де` are named because they are the two he reads first, and
+# because dropping an empty one shifted everything left — with `threat` unknown
+# the first value became the scope, and he read the rule name as the class. The
+# rest keep the schema's bare values, which is what makes a post comparable to
+# `labels/*.jsonl` by eye.
+NAMED_FIELDS = (("летить", "threat"), ("де", "scope"))
+TAG_FIELDS = ("modality", "certainty", "heading", "alarm")
 
 
 def format_message(utterance, obs, decision) -> str:
@@ -159,10 +165,13 @@ def format_message(utterance, obs, decision) -> str:
     head = ("🔔 " if decision.audible else "") + utterance.text
 
     tags = []
-    for field in TAG_FIELDS:
+    for label, field in NAMED_FIELDS:
         value = getattr(obs, field, None)
-        if field == "alarm":
-            value = decision.alarm
+        if field == "threat":
+            value = obs.effective_threat or value
+        tags.append(f"{label}={value or '?'}")
+    for field in TAG_FIELDS:
+        value = decision.alarm if field == "alarm" else getattr(obs, field, None)
         if value and value not in ("none", "unknown", "position"):
             tags.append(str(value))
     if getattr(obs, "official", False):
@@ -173,10 +182,13 @@ def format_message(utterance, obs, decision) -> str:
     if len(source) > 220:
         source = source[:217] + "..."
 
+    # Both lines are labelled. Unlabelled, they read as one list, and he took
+    # the rule name for the threat class — "це в тексті drone near me but not my
+    # street?" The order inside `мітки` is fixed and the class is always first.
     parts = [head]
     if line:
-        parts.append(line)
+        parts.append("мітки: " + line)
+    parts.append("правило: " + decision.reason)
     if source and source not in utterance.text:
         parts.append("— " + source)
-    parts.append(decision.reason)
     return chr(10).join(parts)

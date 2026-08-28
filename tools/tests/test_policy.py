@@ -799,3 +799,48 @@ def test_a_wake_up_before_any_siren_does_not_claim_one():
     assert out[1][1], out
     assert out[1][3] == "Жуляни."
     assert "Тривога" not in out[1][3]
+
+
+def test_the_tone_follows_the_class_the_decision_was_made_on():
+    """"Жуляни ✈️" states no class, so its own alarm is the propeller-drone
+    tone — while the episode knows a jet Shahed is up. It is several times
+    faster and has its own tone precisely so he knows before opening his eyes,
+    which is the whole reason for separate sounds."""
+    out = _play([
+        (-3600, "alarm_kyiv", "🟢 м. Київ\nВідбій повітряної тривоги"),
+        (300, "mon1tor_ua", "⚠️2 реактивні шахеди на Вишневе."),
+        (900, "kievinform_ua1", "Жуляни ✈️"),
+    ])
+    from tools.policy.announce import Announcer
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr, ann = Tracker(), Announcer()
+    lead = None
+    for off, channel, text in ((-3600, "alarm_kyiv", "🟢 м. Київ\nВідбій повітряної тривоги"),
+                               (300, "mon1tor_ua", "⚠️2 реактивні шахеди на Вишневе."),
+                               (900, "kievinform_ua1", "Жуляни ✈️")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        u = ann.announce(o, d)
+        if u:
+            lead = u.lead
+    assert lead == "drone-jet", lead
+    assert out[2][1], out
+
+
+def test_the_effective_class_is_stamped_on_the_observation():
+    """Everything downstream wants the class the policy decided on, not the
+    message's own: the notification, the log and the report all name it."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    for off, text in ((0, "⚠️2 реактивні шахеди на Київ/Бровари."),
+                      (300, "Жуляни ✈️")):
+        o = observe(T0 + off, text)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+    assert o.threat == "unknown"          # the message says nothing
+    assert o.effective_threat == "shahed-jet"

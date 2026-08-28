@@ -181,6 +181,12 @@ class Observation:
     # From `alarm_kyiv`, which relays the "Повітряна тривога" app's bot and
     # posts exactly two forms for the city and nothing else.
     official: bool = False
+    # The class the policy actually decided on, which is the message's own
+    # unless it stated none and the episode supplied one. Stamped by `decide`,
+    # because the observation cannot know it and everything downstream wants it:
+    # "Жуляни ✈️" states no class at all and reported `unknown` while the policy
+    # was correctly treating it as a jet Shahed.
+    effective_threat: str | None = None
     cleared_class: str | None = None
     is_reply: bool = False
     partial_clear: bool = False
