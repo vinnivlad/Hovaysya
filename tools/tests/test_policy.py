@@ -610,8 +610,11 @@ def test_a_wake_up_always_says_something():
         u = ann.announce(o, d)
         said.append((d.audible, u.text if u else None))
     assert all(a for a, _t in said), said
-    # "Падає" is the word the whole rule exists for, and it was never said.
-    assert said[-1][1] == "Падає. Жуляни."
+    # "Падає" is the word the whole rule exists for, and it was never said. The
+    # class comes with it now that a sentence carries the whole situation rather
+    # than the difference — his call, after a partial one sent him hunting a bug
+    # that was not there.
+    assert said[-1][1] == "Падає: реактивний шахед. Жуляни."
     assert "Увага" not in (said[-1][1] or "")
 
 
@@ -857,7 +860,10 @@ def test_my_own_place_is_never_dropped_as_already_said():
         (420, "kievinform_ua1", "Жуляни, Вишневе, Теремки⚠️"),
     ])
     assert out[2][1], out
-    assert out[2][3] == "Жуляни, Вишневе, Теремки."
+    # The class comes with it: a sentence states the whole situation now, on his
+    # instruction — "думаю краще видавати все" — and it was this very message
+    # that argued for it.
+    assert out[2][3] == "Загроза: шахед. Жуляни, Вишневе, Теремки."
 
 
 def test_falling_is_said_out_loud():

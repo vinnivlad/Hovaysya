@@ -10,11 +10,14 @@ His design, stated outright:
 
 Two things follow, and both are the point.
 
-**An utterance says what changed, not what is true.** The second announcement in
-each of his examples is shorter than the first, because the siren has already
-been announced by then. Re-reading the whole situation aloud every time is how a
-voice channel becomes noise — the same failure the tone channel had when every
-message rang.
+**An utterance says the whole situation.** It used to say only what had changed,
+which reads well and cost him an hour: "Жуляни, Вишневе, Теремки" came out as
+"Вишневе, Теремки." because Zhuliany had been named seven minutes earlier, and he
+went looking for a bug in the rule that had fired correctly. A sentence that
+depends on what he heard earlier is a sentence he cannot check.
+
+The siren is the exception and stays once-only: the word belongs to a declaration,
+and repeating it would claim a new alert each time.
 
 **Nothing is dropped.** A tone that arrives while another is playing is lost; a
 sentence waits its turn. So this is a queue, not a channel, and the policy's
@@ -125,6 +128,17 @@ class Announcer:
     #   🚨 м. Київ / Повітряна тривога         -> "Тривога. Реактивний шахед. Вишневе."
     pending_threat: str | None = None
     pending_places: list[str] = field(default_factory=list)
+    # Say the whole situation every time, rather than only what changed. His
+    # call, and the reason is the best kind: a partial sentence made him doubt a
+    # correct decision. "Жуляни, Вишневе, Теремки" came out as "Вишневе,
+    # Теремки." and he went looking for a bug that was not there.
+    #
+    # Measured before switching: on audible messages it changes almost nothing
+    # (1 of 24 on one night, 1 of 34 on another), because the policy's own
+    # refractory has already removed the repetition. On the silent status lines
+    # it changes 84 of 160 — every one of them becoming self-contained, at the
+    # cost of "Загроза: реактивний шахед. Вишневе." appearing 37 times in a day.
+    always_full: bool = True
     queue: list[Utterance] = field(default_factory=list)
 
     def reset(self) -> None:
@@ -158,7 +172,11 @@ class Announcer:
         # as seen too — he was awake for it.
         said = self.spoken if decision.audible else self.shown
         parts: list[str] = []
-        threat = obs.threat if obs.threat not in ("none", "unknown") else None
+        # The class the decision was made on, not the one this message happens
+        # to state. A bare "Жуляни, Вишневе, Теремки⚠️" names none, and the
+        # sentence came out classless while the policy knew a jet Shahed was up.
+        stated = obs.effective_threat or obs.threat
+        threat = stated if stated not in ("none", "unknown") else None
 
         if decision.alarm == "clear":
             self.reset()
@@ -177,6 +195,8 @@ class Announcer:
             # left to say and came out as "Київ."
             declaring = obs.alert_state == "alert"
             falling = getattr(obs, "falling", False) and decision.audible
+            named_class = False
+            named_places: list[str] = []
             if declaring and not said['siren']:
                 parts.append("Тривога")
                 said['siren'] = True
@@ -185,8 +205,10 @@ class Announcer:
                 if self.pending_threat in CLASS_WORD:
                     parts.append(CLASS_WORD[self.pending_threat].capitalize())
                     said['classes'].add(self.pending_threat)
+                    named_class = True
                 if self.pending_places:
-                    parts.append(", ".join(self.pending_places[-3:]))
+                    named_places = list(self.pending_places[-3:])
+                    parts.append(", ".join(named_places))
                     said['places'].update(self.pending_places)
 
             # A launch names its own class, so the two facts must not both be
@@ -195,7 +217,12 @@ class Announcer:
                 threat and obs.certainty == "confirmed" and obs.says_launch
                 and threat not in said['launches'])
 
-            if threat and threat not in said['classes']:
+            # `named_class` rather than the memory: with the whole situation
+            # being stated every time, the memory no longer suppresses anything,
+            # and the siren block above had already said the class — "Тривога.
+            # Реактивний шахед. Вишневе. Реактивний шахед."
+            if threat and not named_class and (
+                    self.always_full or threat not in said['classes']):
                 said['classes'].add(threat)
                 if not launching:
                     word = CLASS_WORD.get(threat, threat)
@@ -230,7 +257,9 @@ class Announcer:
                 parts.append("Падає")
 
             fresh = [p for p in obs.ring_places
-                     if p not in said['places'] or (p == HOME and decision.audible)]
+                     if p not in named_places and (
+                         self.always_full or p not in said['places']
+                         or (p == HOME and decision.audible))]
             if fresh:
                 said['places'].update(fresh)
                 # Home first when it is there: it is the word he acts on.
