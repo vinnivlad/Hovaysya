@@ -995,3 +995,20 @@ def test_the_terse_channel_is_read(monkeypatch=None):
     for text in ("Усі збиті 💪💪", "Зник.", "Втрата фіксацїі.",
                  "Заховайтесь краще", "Мінус!"):
         assert hints.suggest(text)["modality"] == "live-threat", text
+
+
+def test_a_standing_risk_level_is_a_state_not_an_event():
+    """`mon1tor_ua` publishes one every evening and it was writing a ballistic
+    line onto the status every night: "🔴❗Загроза балістики для столиці стабільно
+    залишається на середньому-високому рівні". `war_monitor` publishes its own,
+    111 such messages in the corpus and not one of them an event."""
+    for text in ("⚪️⚠️Ніч буде без масованого комбінованого удару.\n"
+                 "🔴❗Загроза балістики для столиці стабільно залишається на "
+                 "середньому-високому рівні.",
+                 "🟥 Ймовірність комбінованої атаки на високому рівні.",
+                 "🟨 Ймовірність комбінованої атаки на низькому рівні.",
+                 "Загальна оцінка загроз для України на ніч 24 серпня."):
+        assert hints.suggest(text)["modality"] == "summary-news", text
+    # ...and an actual launch is still an actual launch.
+    assert hints.suggest("‼️ Вихід балістики з Брянська")["modality"] == "live-threat"
+    assert hints.suggest("⚠️2 реактивні шахеди на Жуляни.")["modality"] == "live-threat"

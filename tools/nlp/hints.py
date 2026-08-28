@@ -649,7 +649,15 @@ _FORECAST = re.compile(
     r"\bатака буде\b|"
     r"ймовірні мікрорайони|"
     r"ворог (планує|готує|може завдати)|"
-    r"попередження про (ймовірн|можлив)",
+    r"попередження про (ймовірн|можлив)|"
+    # A standing risk level is a state, not an event. `mon1tor_ua` publishes one
+    # every evening — "🔴❗Загроза балістики для столиці стабільно залишається на
+    # середньому-високому рівні" — and it was writing a ballistic line onto the
+    # status every night.
+    r"на\s+[\w-]*\s*(високому|середньому|низькому)[\w-]*\s+рівні|"
+    r"залишається на[^.!?]{0,30}рівні|"
+    r"оцінка загроз|"
+    r"ніч буде без",
     re.IGNORECASE,
 )
 
