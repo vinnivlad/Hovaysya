@@ -147,6 +147,18 @@ Create a channel, add the bot as an administrator, and put the channel's id in
 The file takes one id per line, so a channel and direct chats can be mixed. A
 recipient that fails does not stop the others.
 
+**Finding the channel's id** without opening an API URL with the token in it:
+
+```
+python -m tools.live.whoami                     # lists every chat it can see
+python -m tools.live.whoami --save -1001234567890
+```
+
+Add the bot to the channel as an administrator **first**, then post anything
+there, then run it — a channel produces no updates at all until the bot is an
+admin, which is the usual reason for an empty list. Telegram hands each update
+over once and then forgets it, so if the list is empty, post again and re-run.
+
 Two hardening steps in BotFather, both one command: `/setjoingroups` → *Disable*
 stops anyone adding the bot to a group, and `/setdescription` can be left empty
 so the bot says nothing about itself.
