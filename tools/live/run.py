@@ -128,7 +128,7 @@ def handle(session: Session, channel: str, message_id: int, ts: int, text: str,
     count towards the lag statistics, where a six-hour-old message would drown
     the number the whole exercise is here to measure.
     """
-    obs = observe(ts, text, is_reply)
+    obs = observe(ts, text, is_reply, channel)
     decision = decide(obs, session.tracker)
     session.tracker.record(obs, decision.level if decision.notify else None,
                            decision.alarm if decision.notify else None)

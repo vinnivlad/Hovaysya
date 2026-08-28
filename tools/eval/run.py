@@ -4,9 +4,16 @@ The headline number is **false wake-ups per night**, not accuracy. An app that
 wakes you twice for nothing gets deleted in a week however good its recall is,
 so that number is printed first and everything else is context.
 
-Scoring compares the label's decision with the policy's at the same moment.
-Both are anchored to message arrivals, so no tolerance window is needed: the
-label and the decision are about the same instant by construction.
+Scoring compares the label's decision with the policy's at the same moment —
+**the moment, not the message.** That distinction was free while every channel
+was a chat channel and a label sat on whichever one said it first. Adding
+`alarm_kyiv`, which declares the siren officially, broke it: the announcement
+moved to a message a few seconds away that carries no label, and twenty-one
+correct wake-ups scored as misses.
+
+So a label asking to be woken is satisfied by an audible decision within
+`TOLERANCE_S`. A false wake-up is still counted per message, because there the
+question really is about this text: nothing else was ringing.
 
     hit          label says notify, policy notifies at the same level or higher
     under        label says notify, policy notifies more quietly
@@ -22,6 +29,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import sqlite3
 from collections import Counter
@@ -36,6 +44,13 @@ DB_PATH = REPO_ROOT / "data" / "messages.db"
 LABELS_PATH = REPO_ROOT / "labels"
 
 RANK = {None: -1, "info": 0, "alert": 1}
+
+# How far from a label an audible decision may sit and still be the same moment.
+# Measured, not chosen: `alarm_kyiv` and the chat channels announce the same
+# siren within seconds of each other, and the largest real gap in the corpus
+# between a chat siren and the official one for the same event is under a
+# minute. Two minutes leaves room without letting a separate event count.
+TOLERANCE_S = 120
 
 
 def load_labels(path: Path) -> list[dict]:
@@ -76,6 +91,14 @@ def score(labels_by_anchor: dict[str, dict], results) -> tuple[Counter, list[dic
     tally: Counter[str] = Counter()
     detail: list[dict] = []
 
+    # When anything rang, so a label can be checked against the moment rather
+    # than against the one message it happens to sit on.
+    rang = sorted(o.ts for o, d, _k in results if d.audible)
+
+    def rang_near(ts: int) -> bool:
+        i = bisect.bisect_left(rang, ts - TOLERANCE_S)
+        return i < len(rang) and rang[i] <= ts + TOLERANCE_S
+
     for obs, decision, key in results:
         label = labels_by_anchor.get(key)
         if label is None:
@@ -92,7 +115,10 @@ def score(labels_by_anchor: dict[str, dict], results) -> tuple[Counter, list[dic
         got_level = decision.level if decision.notify else None
 
         if wants:
-            if not decision.notify or got_level == "info" and want_level != "info":
+            heard = decision.audible or (want_level == "alert" and rang_near(obs.ts))
+            if want_level == "alert" and heard:
+                kind = "hit"
+            elif not decision.notify or got_level == "info" and want_level != "info":
                 kind = "miss"
             elif RANK[got_level] >= RANK[want_level]:
                 kind = "hit"
@@ -134,8 +160,8 @@ def main(argv: list[str] | None = None) -> int:
         by_anchor = {l["anchor"]: l for l in night_labels}
         messages = load_night(conn, night, night_labels)
 
-        observations = [observe(ts, text, is_reply)
-                        for ts, _key, text, is_reply in messages]
+        observations = [observe(ts, text, is_reply, key.split("/")[0])
+                        for ts, key, text, is_reply in messages]
         keys = [key for _ts, key, _text, _r in messages]
         decisions = run_policy(observations, Tracker())
         results = [(o, d, k) for (o, d), k in zip(decisions, keys)]

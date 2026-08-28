@@ -445,3 +445,42 @@ Same night, a drone looping Nyvky → Sviatoshyn → Borshchahivka → Vyshneve 
 him five times between 02:18 and 03:09, with twenty-odd messages correctly
 silenced between them. Two of those five were the bugs above. Whether the other
 three are one event or three is the open question the next night decides.
+
+## The source that declares
+
+Every channel here reports sirens. None of them declares one — and the gap shows
+up exactly where it hurts:
+
+- `🛑 ТРИВОГА` from `kievinform_ua1` at 07:50 on 2026-08-28 was a district. The
+  official app declared Kyiv at **08:04**, and our policy had already spent the
+  announcement, so the real city siren arrived as a repeat. Ten more of these
+  are in the corpus.
+- Two remaining false wake-ups were chat all-clears about other districts. He
+  annotated both "вся надія на сервіси".
+
+He found the answer: the official "Повітряна тривога" app publishes a Telegram
+bot, and public channels relay it. **`alarm_kyiv` posts exactly two forms and
+nothing else** — `🚨 м. Київ / Повітряна тривога` and `🟢 м. Київ / Відбій
+повітряної тривоги` — for the city only, back to 2024-01-08, readable through
+`t.me/s/` with no credentials at all. Its 08:04:15 matches the official app to
+the second.
+
+So the alert API token is off the deferred list without ever being requested.
+
+The policy splits accordingly, which is his phrasing: **the official channel
+declares, the chat channels explain why.** A chat siren still declares when
+nothing official has spoken — which is what keeps the two labelled nights
+working, since the channel was not a source when they were labelled.
+
+### It also broke the metric, which was worth more than the fix
+
+Twenty-one correct wake-ups scored as misses overnight. Not because anything
+went quiet: the announcement moved to the official message a few seconds away,
+and that message carries no label.
+
+The schema always said labels attach to **moments, not messages**. The eval had
+been assuming those were the same thing, and said so in its own docstring —
+"anchored to message arrivals, so no tolerance window is needed". Adding a
+fourth channel is all it took to make that false. Wake-ups are now matched
+within two minutes; false wake-ups stay per-message, because there the question
+really is about this text.

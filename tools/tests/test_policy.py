@@ -678,3 +678,57 @@ def test_when_there_is_no_reason_it_just_says_alert():
 
     placeless = observe(T0, "Ще ціль")
     assert _fallback(placeless, None) == []      # ...so the caller says Тривога
+
+
+# --- the channel that declares --------------------------------------------
+
+
+def _play(seq):
+    from tools.policy.announce import Announcer
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr, ann, out = Tracker(), Announcer(), []
+    for off, channel, text in seq:
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        u = ann.announce(o, d)
+        out.append((text[:26], d.audible, d.reason, u.text if u else None))
+    return out
+
+
+def test_the_official_channel_declares_and_the_chats_report():
+    """His design: "повідомлення з інших каналів для уточнення причини". The
+    official app declared Kyiv at 08:04 while `kievinform_ua1` had already said
+    a bare "🛑 ТРИВОГА" at 07:50 for a district — and that spent the
+    announcement on the wrong siren."""
+    out = _play([
+        (0, "kievinform_ua1", "🛑 ТРИВОГА"),
+        (840, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+        (900, "kievinform_ua1", "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
+    ])
+    assert out[1][1], out          # the official declaration always rings
+    assert out[1][2] == "official siren"
+    assert not out[2][1], out      # ...and the chat repeat does not
+
+
+def test_a_chat_all_clear_does_not_close_the_official_alert():
+    """Two of the last false wake-ups were chat all-clears about somebody else's
+    district, and he wrote on both "вся надія на сервіси"."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+        (600, "kievinform_ua1", "🟢 ВІДБІЙ ТРИВОГИ"),
+        (900, "alarm_kyiv", "🟢 м. Київ\nВідбій повітряної тривоги"),
+    ])
+    assert not out[1][1], out      # the district's all-clear stays quiet
+    assert out[2][1] and out[2][2] == "official all-clear", out
+    assert out[2][3] == "Відбій тривоги."
+
+
+def test_a_chat_siren_still_declares_when_nothing_official_has_spoken():
+    """The other half of his rule — "ну або якщо є Київ + тривога" — and it is
+    what keeps the labelled nights working, where this channel was not yet a
+    source."""
+    out = _play([(0, "kievinform_ua1", "⚠️❗️КИЇВ - ТРИВОГА. В укриття!")])
+    assert out[0][1] and out[0][2] == "alert declared", out

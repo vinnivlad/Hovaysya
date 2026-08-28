@@ -112,6 +112,18 @@ class Episode:
     # isolation is the wrong unit; the policy had not.
     threat: str | None = None
     alert_announced: bool = False
+    # Whether the siren we announced actually named a place. A bare "🛑 ТРИВОГА"
+    # is usually his — 68% of scope-less sirens come from the Kyiv channel — but
+    # not always, and when it is not, the real city siren arrives minutes later
+    # and gets silenced as a repeat. Measured: ten times in the corpus, and once
+    # live, where the official app declared Kyiv at 08:04 and we had already
+    # spent the announcement on a district siren at 07:50.
+    alert_scope_known: bool = False
+    # Whether the official channel has declared the siren for this episode. It
+    # is the only source that *declares* rather than reports, so once it has
+    # spoken the chat channels stop being evidence about the siren and go back
+    # to being evidence about what is flying.
+    official_alert: bool = False
     last_launch: int | None = None
     cleared: bool = False
     sent: list[Sent] = field(default_factory=list)
@@ -166,6 +178,9 @@ class Observation:
     says_launch: bool = False
     ring_count: int = 0
     falling: bool = False
+    # From `alarm_kyiv`, which relays the "Повітряна тривога" app's bot and
+    # posts exactly two forms for the city and nothing else.
+    official: bool = False
     cleared_class: str | None = None
     is_reply: bool = False
     partial_clear: bool = False
@@ -186,7 +201,12 @@ class Observation:
         return self.modality == "live-threat"
 
 
-def observe(ts: int, text: str, is_reply: bool = False) -> Observation:
+# The channels that declare rather than report.
+OFFICIAL_CHANNELS = frozenset({"alarm_kyiv"})
+
+
+def observe(ts: int, text: str, is_reply: bool = False,
+            channel: str | None = None) -> Observation:
     """Read one message into the fields the policy uses.
 
     `is_reply` matters for sirens specifically: a reply saying "По ньому
@@ -218,6 +238,7 @@ def observe(ts: int, text: str, is_reply: bool = False) -> Observation:
         ring_count=stated_count(text),
         falling=hints.falling(text),
         is_reply=is_reply,
+        official=channel in OFFICIAL_CHANNELS,
         partial_clear=hints.partial_clear(text),
         cleared_class=hints.cleared_class(text),
     )
@@ -366,8 +387,15 @@ class Tracker:
             ep.last_live = obs.ts
         # Only an announcement *we made* counts. An oblast district's siren set
         # this flag and then silenced the city's, costing four misses.
-        if obs.alert_state == "alert" and alarm == "alert":
-            ep.alert_announced = True
+        if obs.alert_state == "alert":
+            if obs.official:
+                ep.official_alert = True
+                ep.alert_announced = True
+                ep.alert_scope_known = True
+            elif alarm == "alert":
+                ep.alert_announced = True
+                if obs.scope in ("my-area", "my-district", "city"):
+                    ep.alert_scope_known = True
         if obs.cleared_class:
             ep.cleared.add(obs.cleared_class)
         if obs.threat not in ("none", "unknown"):

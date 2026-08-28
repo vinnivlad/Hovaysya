@@ -78,6 +78,15 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
         # Its own tone: the user asked for the distinction outright — "повний
         # відбій звучить по іншому" — so the two cannot share one.
         return _notify("alert", "clear-partial", "partial all-clear")
+    # The official channel declares; everything else reports. Once it is in the
+    # stream it owns the siren outright — his design: "повідомлення з інших
+    # каналів для уточнення причини". Two of the last false wake-ups were chat
+    # all-clears that were about somebody else's district, and he wrote on both
+    # of them "вся надія на сервіси".
+    if obs.alert_state == "clear" and obs.official:
+        return _notify("alert", "clear", "official all-clear")
+    if obs.alert_state == "clear" and ep is not None and ep.official_alert:
+        return _silent("refinement: the official channel closes the alert")
     if obs.alert_state == "clear" and obs.scope in CITY_OR_NEARER:
         return _notify("alert", "clear", "all-clear")
     if obs.alert_state == "clear":
@@ -85,8 +94,28 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
 
     # 2. A declaration always notifies — that premise is what lets the all-clear
     #    above be unconditional. Only once per episode, though.
+    if obs.alert_state == "alert" and obs.official:
+        if ep is not None and ep.official_alert:
+            return _silent("already-notified: official siren already declared")
+        return _notify("alert", "alert", "official siren")
+
+    # A chat channel naming the city still declares — his other half: "ну або
+    # якщо є Київ + тривога". Without a name it only reports, once the official
+    # channel has spoken for this episode.
+    if (obs.alert_state == "alert" and ep is not None and ep.official_alert
+            and obs.scope not in ("my-area", "my-district", "city")):
+        return _silent("refinement: siren reported, not declared")
+
     if obs.alert_state == "alert" and obs.scope in CITY_OR_NEARER:
-        if ep is not None and ep.alert_announced:
+        # A siren that names the city outranks one that named nowhere. The
+        # scope-less form is a guess — a good one, 68% of the time — and when it
+        # is wrong the real declaration follows minutes later and must not be
+        # swallowed as a repeat. This is the failure he caught live: the
+        # official app declared Kyiv at 08:04 while we had already spent the
+        # announcement on a bare "🛑 ТРИВОГА" at 07:50.
+        explicit = obs.scope in ("my-area", "my-district", "city")
+        if (ep is not None and ep.alert_announced
+                and not (explicit and not ep.alert_scope_known)):
             return _silent("already-notified: siren already announced")
         if obs.is_reply:
             # "По ньому тривога" answers an earlier message; it refines an

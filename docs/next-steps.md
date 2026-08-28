@@ -132,7 +132,7 @@ labels judge.
 
 | Item | Deferred until |
 | --- | --- |
-| Alert API token (`alerts.in.ua` / `api.ukrainealarm.com`) | needed for the realtime gate and for retrospective ground truth — can be requested at any time |
+| ~~Alert API token~~ | **Not needed.** He found the official app's Telegram bot, and `alarm_kyiv` relays it: two forms, city only, `🚨 м. Київ / Повітряна тривога` and `🟢 м. Київ / Відбій`. Читається через `t.me/s/` без жодних облікових даних, історія з 2024-01-08. Checked against the official app to the second. |
 | Oracle Cloud account | production deployment; see `oracle-cloud-setup.md` |
 | Phone number + MTProto | polling latency or invisible edits become a real problem |
 | Android client | after stage 7 shows the decisions are worth pushing |
