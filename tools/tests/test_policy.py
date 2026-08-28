@@ -86,11 +86,12 @@ def test_an_anticipated_launch_does_not_re_alarm():
     sound belongs to the launch."""
     r = play((0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!"),
              (60, "❗️❗❗Загроза пуску балістичних ракет \"Іскандер-М\" з Курської області."))
-    assert levels(r) == ["alert", "info"]
-    # `info` rather than nothing: he asked to hear the class named after the
-    # siren — "Тривога", then "по балістиці" — and silence dropped it. It is
-    # still not a sound, which is what this test is about.
-    assert not r[1][1].audible
+    # It rings, and it did not use to. A ballistic warning after a drone alert
+    # is a rung up his ladder — "на кожне підвищення давати звукове
+    # повідомлення" — and this is the case he gave for it: "тривога по шахеду і
+    # зразу після загроза балістики".
+    assert levels(r) == ["alert", "alert"]
+    assert r[1][1].reason == "threat level rose"
 
 
 def test_ordinals_within_one_volley_do_not_re_alarm():
@@ -506,7 +507,11 @@ def test_his_second_example():
                    "❗️❗Загроза пуску балістичних ракет Іскандер-М.",
                    "‼️ Вихід балістики з Курська"])
     assert said[0] == (True, "Тривога.")
-    assert said[1] == (False, "Загроза: балістика.")
+    # The second one rings now: the ladder went from drone to ballistic. He
+    # asked for exactly this — "почути що почалась тривога, а потім по
+    # балістиці" — and the escalation rule is what finally delivers the second
+    # half aloud rather than as a silent line.
+    assert said[1] == (True, "Загроза: балістика.")
     assert said[2] == (True, "Пуск: балістика.")
 
 
@@ -966,3 +971,60 @@ def test_an_impact_elsewhere_is_not_even_context():
     assert out[2][3] is None, out           # nothing at all, not even a status line
     assert out[2][2] == "impact: elsewhere, and already over"
     assert out[3][3] == "Влучання: реактивний шахед. Вишневе."
+
+
+# --- the ladder -----------------------------------------------------------
+
+
+def test_each_rung_rings_once():
+    """His rule: "дрон (будь-який) -> крилата ракета -> балістика", and every
+    climb makes a sound. The case that prompted it: "тривога по шахеду і зразу
+    після загроза балістики"."""
+    out = _play([
+        (0, "mon1tor_ua", "⚠️2 реактивні шахеди на Київ/Бровари."),
+        (60, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+        (120, "mon1tor_ua", "⚠️Ще реактивні шахеди на Київ."),
+        (200, "mon1tor_ua", "❗️❗Загроза пуску балістичних ракет Іскандер-М."),
+        (400, "mon1tor_ua", "⚠️Ще реактивні шахеди на Київ."),
+    ])
+    assert not out[0][1], out                 # before the siren, nothing rings
+    assert out[1][1], out                     # the siren itself
+    assert not out[2][1], out                 # a drone is the rung it is already on
+    assert out[3][1] and out[3][2] == "threat level rose", out
+    assert not out[4][1], out                 # ...and back down does not ring
+
+
+def test_a_fall_does_not_reset_the_ladder():
+    """"Якщо в середині тривоги рівень знизився, то повторно правило не
+    застосовувати." """
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+        (200, "mon1tor_ua", "❗️❗Загроза пуску балістичних ракет Іскандер-М."),
+        (400, "mon1tor_ua", "⚠️Ще реактивні шахеди на Київ."),
+        (600, "mon1tor_ua", "❗️❗Знову загроза балістики."),
+    ])
+    assert out[1][1] and out[1][2] == "threat level rose", out
+    assert not out[3][1], out                 # the same rung, a second time
+
+
+def test_a_partial_all_clear_lowers_it_and_a_climb_rings_again():
+    """The one exception he made: "коли був частковий відбій по балістиці чи
+    крилатим ракетам — тоді знижуємо поточний рівень"."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+        (200, "mon1tor_ua", "❗️❗Загроза пуску балістичних ракет Іскандер-М."),
+        (400, "mon1tor_ua", "⚪️По балістиці відбій."),
+        (600, "mon1tor_ua", "❗️❗Загроза балістики з Курської області."),
+    ])
+    assert out[1][1] and out[1][2] == "threat level rose", out
+    assert out[2][1] and out[2][2] == "partial all-clear", out
+    assert out[3][1] and out[3][2] == "threat level rose", out
+
+
+def test_the_ladder_does_not_move_before_the_siren():
+    """"Правило має працювати лише після початку тривоги"."""
+    out = _play([
+        (0, "mon1tor_ua", "⚠️2 реактивні шахеди на Київ/Бровари."),
+        (200, "mon1tor_ua", "❗️❗Загроза пуску балістичних ракет Іскандер-М."),
+    ])
+    assert not any(a for _t, a, _r, _s in out), out

@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..nlp import hints
-from .episodes import Observation, Tracker
+from .episodes import THREAT_LEVEL, Observation, Tracker
 
 LEVELS = ("info", "alert")
 
@@ -164,8 +164,8 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     if obs.falling and obs.at_home and obs.live:
         return _notify("alert", alarm, "falling on Zhuliany")
 
-    # An explosion has already happened. It is information, never a warning: of
-    # fifteen labels he placed on impact reports, fifteen are silent, and the two
+    # 6. An explosion has already happened. It is information, never a warning:
+    #    of fifteen labels he placed on impact reports, fifteen are silent, and
     # categories he used are `already-notified` and `insufficient` — either he was
     # awake for it or there was nothing to act on.
     #
@@ -183,7 +183,23 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
             return _notify("info", "none", "impact: it has already landed")
         return _silent("impact: elsewhere, and already over")
 
-    # 6. Anticipation is not an event. "Загроза пуску" updates the picture; the
+    # 7. The threat has climbed a rung since the siren started. His rule: an
+    #    alert for a drone followed by a ballistic warning is a different
+    #    situation, and that warning was arriving silently, because
+    #    anticipation does not ring.
+    # Once per rung. A fall does not lower the ladder, so the same climb cannot
+    # ring twice — "якщо в середині тривоги рівень знизився, то повторно правило
+    # не застосовувати". A partial all-clear is the one exception, and it is the
+    # only thing that moves the ladder down.
+    #
+    # After the impact rule on purpose: an explosion names a class too, and a
+    # thing that has already landed is not a climb.
+    if ep is not None and ep.alert_announced and obs.live:
+        climbed = THREAT_LEVEL.get(threat, 0)
+        if climbed > ep.threat_peak:
+            return _notify("alert", alarm, "threat level rose")
+
+    # 8. Anticipation is not an event. "Загроза пуску" updates the picture; the
     #    sound belongs to the launch. Straight from the labelled sequence.
     # `mig` is excluded on purpose: a takeoff is reported as "виліт ... з
     # аеродрому", which reads as anticipation, but for a MiG-31K the takeoff *is*
@@ -203,7 +219,7 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
         # persistent status get the sentence, nothing rings.
         return _notify("info", "none", "insufficient: threatened, not launched")
 
-    # 7. Ballistic leaves no room for geography: minutes of flight, so a
+    # 9. Ballistic leaves no room for geography: minutes of flight, so a
     #    confirmed launch that could reach us is a shelter call city-wide.
     # An inherited class does not carry the geography exemption. "Княжичі✈️"
     # said nothing about ballistic — the episode did — and ringing the shelter
@@ -227,7 +243,13 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
         # them was measured and failed — see docs/pattern-findings.md. The rule
         # he gave instead needs no threshold at all, and scores better: 7 false
         # wake-ups against 8, with the same six misses.
-        if (ep is not None and ep.notified
+        # A confirmed launch that has not been announced yet always rings, even
+        # when the tone has sounded for a warning about it. The escalation rule
+        # spends the ballistic tone on "Загроза пуску", and without this the
+        # launch itself — the thing the warning was about — went out silent.
+        first_launch = (obs.says_launch and ep is not None
+                        and threat not in ep.launched)
+        if (ep is not None and ep.notified and not first_launch
                 and not tracker.is_fresh_launch(obs)
                 and not tracker.is_new_class("ballistic")):
             return _silent("already-notified: same ballistic wave")
@@ -235,7 +257,7 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
         # a separate loudness level said it twice.
         return _notify("alert", "ballistic", "confirmed ballistic")
 
-    # 8. A MiG-31K in the air alerts the country, but the launch may be an hour
+    # 10. A MiG-31K in the air alerts the country, but the launch may be an hour
     #    away or never come — loud is wrong, silence is worse.
     if threat == "mig":
         # One takeoff, three channels: "Виліт винищувача МіГ-31К з аеродрому
@@ -248,7 +270,7 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
             return _silent("already-notified: MiG already announced")
         return _notify("alert", "mig", "MiG-31K airborne")
 
-    # 9. Novelty near the user is what the labels say wakes him. Direction only
+    # 11. Novelty near the user is what the labels say wakes him. Direction only
     #    refines it: a new target *heading into* the ring is the shelter case.
     if obs.near and obs.live:
         # A drone has to name his own place. The ring was too wide for this
@@ -284,7 +306,7 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
             return _notify("info", "none", "circling nearby")
         return _notify("alert", alarm, "new target near me")
 
-    # 10. In the city but not near: worth knowing, not worth waking twice — and
+    # 12. In the city but not near: worth knowing, not worth waking twice — and
     #    for a drone, not worth waking at all. His rule from the first
     #    conversation: "для дронів «летить на правий берег» ще не досить". The
     #    labels bear it out — of 78 city-scope drone moments he woke for 3, and

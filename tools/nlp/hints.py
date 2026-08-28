@@ -167,6 +167,11 @@ SUMMARY_TERMS = (
     # "У ніч на 05.08.26, згідно зі звітом Повітряних Сил..." — the morning
     # report, which named enough missiles to read as a live ballistic wave.
     "згідно зі звіт", "звітом повітряних сил", "вночі рф", "вночі ворог",
+    # "❗️Вночі було збито 7 балістичних ракет Іскандер-М/KN-23, — ПС." and
+    # "Ну і на рахунок ночі. Максимально уважно до балістичних загроз" — a tally
+    # and a piece of commentary, both of which the escalation rule read as a
+    # ballistic warning the moment it existed.
+    "вночі було", "за ніч було", "на рахунок ночі", "стосовно ночі",
     # Long-range forecasts. They look exactly like an imminent launch threat to
     # every field — "Загроза балістичного удару по Києву протягом 48 годин" is
     # `live-threat`, `probable`, `ballistic` — and the only thing separating

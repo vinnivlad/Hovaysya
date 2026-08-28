@@ -93,6 +93,15 @@ LAUNCH_DEDUP_S = 4 * 60
 
 NEAR_TIERS = ("my-area", "my-district")
 
+# His ladder, in his words: "дрон (будь-який) -> крилата ракета -> балістика".
+# A rung is not about danger in the abstract but about how little time it leaves,
+# which is why a MiG-31K sits with ballistic: it is the thing that launches one.
+THREAT_LEVEL = {
+    "recon": 1, "shahed": 1, "shahed-jet": 1,
+    "cruise": 2, "kab": 2,
+    "ballistic": 3, "mig": 3, "mixed": 3,
+}
+
 
 @dataclass
 class Sent:
@@ -124,6 +133,16 @@ class Episode:
     # spoken the chat channels stop being evidence about the siren and go back
     # to being evidence about what is flying.
     official_alert: bool = False
+    # The highest rung reached since the siren. A rise rings; a fall does not
+    # lower it, so the same rise cannot ring twice — "якщо в середині тривоги
+    # рівень знизився, то повторно правило не застосовувати". Only a partial
+    # all-clear moves it down, which is the one exception he made.
+    threat_peak: int = 0
+    # Classes for which a *confirmed launch* has already been announced, as
+    # opposed to a warning about one. Without the distinction the escalation
+    # rule spent the ballistic tone on "Загроза пуску" and the actual launch two
+    # minutes later went out silently — the warning silencing the event.
+    launched: set[str] = field(default_factory=set)
     last_launch: int | None = None
     cleared: bool = False
     sent: list[Sent] = field(default_factory=list)
@@ -442,12 +461,37 @@ class Tracker:
                     ep.alert_scope_known = True
         if obs.cleared_class:
             ep.cleared.add(obs.cleared_class)
+            # "Тоді знижуємо поточний рівень і в разі підняття знову
+            # застосовуємо правило." A lift of the ballistic threat puts the
+            # ladder back at cruise, and a fresh ballistic warning rings again.
+            lifted = THREAT_LEVEL.get(obs.cleared_class, 0)
+            if lifted:
+                ep.threat_peak = min(ep.threat_peak, lifted - 1)
+        # A declared siren already stands for a drone: it is what the alert is
+        # for. Starting the ladder at zero made the first drone report after the
+        # siren ring again, saying what "Тривога" had just said. The rungs worth
+        # hearing are the ones above it — cruise, then ballistic.
+        if ep.alert_announced:
+            ep.threat_peak = max(ep.threat_peak, 1)
+
+        # The ladder only moves once the siren has been declared, which is the
+        # whole of "правило має працювати лише після початку тривоги".
+        # Not on a partial all-clear. Its own class is carried forward from the
+        # episode, so "По балістиці відбій" climbed the ladder straight back to
+        # ballistic and undid the very thing it announced.
+        if ep.alert_announced and obs.live and not obs.partial_clear:
+            climbed = THREAT_LEVEL.get(obs.effective_threat or obs.threat, 0)
+            ep.threat_peak = max(ep.threat_peak, climbed)
+
         if obs.threat not in ("none", "unknown"):
             ep.threat = obs.threat
             # Named again as flying: whatever was lifted is back.
             ep.cleared.discard(obs.threat)
         if obs.says_new:
             ep.last_launch = obs.ts
+        if (level is not None and level != "info" and obs.says_launch
+                and obs.certainty == "confirmed"):
+            ep.launched.add(obs.effective_threat or obs.threat)
         for place in obs.ring_places:
             ep.ring_seen[place] = obs.ts
         ep.ring_peak = max(ep.ring_peak, obs.ring_count)
