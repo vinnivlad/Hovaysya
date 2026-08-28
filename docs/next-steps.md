@@ -128,6 +128,26 @@ classifier on those labels, deploy the small model. The user's own labels stay
 as the test set and are never mixed into training — LLM labels train, human
 labels judge.
 
+## Adding a channel
+
+Two steps, and skipping the second costs a blind spot. He caught it within
+minutes: the new channel had named Zhuliany at 18:32 and the app said nothing.
+
+1. `tools/export/config.py` — add the username to `CHANNELS`.
+2. **Backfill it**: `python -m tools.export.export --channel <name> --since ...`
+
+Without the backfill a new channel starts blind. `resume_id` is 0, so the watcher
+takes `newest_id` and begins there rather than replaying the whole history — which
+is right for a cold start and wrong for a new source, because the 90-minute
+warm-up then has nothing in the database to warm from either. The channel is
+watched from the restart forward and everything before it is invisible.
+
+Before adding one at all, measure it. `KyivPolitic`, `kyivalarm`, `kyivnow` and
+`monitoring_kyiv` were each exported into a scratch copy of the database and
+scored on one question — **how often is it first to name the near ring, against
+the channels already in place** — see docs/pattern-findings.md. Three of the four
+were left out on the numbers.
+
 ## Deferred, with the trigger that un-defers them
 
 | Item | Deferred until |
