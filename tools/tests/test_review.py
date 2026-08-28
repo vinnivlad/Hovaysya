@@ -156,17 +156,25 @@ def test_already_notified_after_a_notify_is_fine():
 # --- the new-sound rule ---------------------------------------------------
 
 
-def test_a_new_sound_on_an_anticipated_threat_warns():
-    """The rule from a real sequence: "Загроза пуску" must not re-alarm; only a
-    confirmed launch may."""
-    first = label(id="a", at="2026-08-27T19:00:00Z", alarm="alert",
-                  threat="unknown")
-    second = label(id="b", at="2026-08-27T19:01:00Z", alarm="ballistic",
-                   threat="ballistic", certainty="probable",
-                   why="загроза пуску балістики")
-    f = check([first, second], {})
-    assert any("anticipated" in m for m in ids(f, "warning"))
+def test_a_new_sound_on_an_anticipated_drone_still_warns():
+    """The rule this check enforced — a new sound belongs only to a confirmed
+    event — was replaced by his escalation ladder. A warning about a class more
+    urgent than the one already announced now rings by design. A *drone* warning
+    still may not: there is no rung below it to climb from."""
+    night = [label(id="a", at="2026-08-27T20:00:00Z", alarm="alert",
+                   threat="unknown", certainty="confirmed", why="сирена"),
+             label(id="b", at="2026-08-27T20:10:00Z", alarm="drone",
+                   threat="shahed", certainty="probable", why="?")]
+    assert any("new sound" in f[2] for f in check(night, {}))
 
+
+def test_a_climb_to_a_more_urgent_class_does_not_warn():
+    night = [label(id="a", at="2026-08-27T20:00:00Z", alarm="alert",
+                   threat="unknown", certainty="confirmed", why="сирена"),
+             label(id="b", at="2026-08-27T20:10:00Z", alarm="ballistic",
+                   threat="ballistic", certainty="probable",
+                   why="підйом рівня")]
+    assert not any("new sound" in f[2] for f in check(night, {}))
 
 def test_a_new_sound_on_a_confirmed_launch_is_fine():
     first = label(id="a", at="2026-08-27T19:00:00Z", alarm="alert",

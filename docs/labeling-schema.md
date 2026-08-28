@@ -809,6 +809,24 @@ anticipation writes a status line, a two-day forecast would sit there saying
 "Загроза: балістика" all night. Sixty-five such messages are now read as
 summaries.
 
+## The threat level ladder
+
+His rule: **дрон (будь-який) → крилата ракета → балістика**, and every climb
+makes a sound. Only after the siren has been declared; a fall does not lower the
+ladder, so the same climb cannot ring twice; and one exception — a partial
+all-clear for ballistic or cruise moves it down, and a fresh climb rings again.
+
+It replaced a rule this schema used to state, that a new sound belongs only to a
+confirmed event. A warning about a class more urgent than the one already
+announced is now a sound in its own right, because that is a different situation
+and not a refinement of the same one. The case that prompted it: a siren for a
+drone, and a ballistic warning sixty-nine seconds later, arriving silently.
+
+The ladder is seeded with whatever the declaration itself announced — "Тривога.
+Балістика. Жуляни." starts at ballistic, not at drone.
+
+A drone warning still may not raise a new sound: there is no rung below it.
+
 ## The one rule about a single place
 
 Everything else in the policy is about tiers — my area, my district, the city.

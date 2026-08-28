@@ -207,7 +207,15 @@ def check(labels: list[dict], messages: dict[str, dict]) -> list[tuple[str, str,
             if l.get("decision") != "notify" or l.get("level") == "info":
                 continue
             alarm = l.get("alarm")
-            if alarm and alarm != last_alarm and l.get("certainty") == "probable":
+            # A warning about a class more urgent than a drone may raise a new
+            # sound: that is his escalation ladder, "на кожне підвищення давати
+            # звукове повідомлення", and it replaced the rule this check used to
+            # enforce. A drone warning still may not — there is no rung below it
+            # to climb from.
+            climbable = l.get("threat") in ("cruise", "kab", "ballistic", "mig",
+                                            "mixed")
+            if (alarm and alarm != last_alarm and not climbable
+                    and l.get("certainty") == "probable"):
                 warn(l.get("id", "?"),
                      "new sound raised on an anticipated threat — the schema "
                      "reserves a new sound for confirmed events")
