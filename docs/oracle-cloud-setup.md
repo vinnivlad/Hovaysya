@@ -93,7 +93,8 @@ Fallbacks, in order of preference:
 Create a Compute instance with:
 
 - **Shape:** `VM.Standard.A1.Flex` (Ampere ARM), marked *Always Free eligible*
-- **OCPUs:** 2 — **Memory: 6 GB** (deliberately *not* the full 12 GB; see below)
+- **OCPUs:** 1 — **Memory: 1 GB** (deliberately the *smallest* shape, not the
+  largest — see "the idle-reclamation trap" below, which is the whole reason)
 - **Boot volume:** 50 GB (minimum 47 GB; Always Free allows 200 GB total)
 - **Image:** Ubuntu 24.04 LTS (ARM build) or Oracle Linux 9
 - **Networking:** assign a public IPv4. No inbound ports beyond SSH are needed —
