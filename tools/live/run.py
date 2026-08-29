@@ -64,6 +64,20 @@ TOKEN_HINT = "data/telegram-bot.token"
 QUIET_INTERVAL_S = 45.0
 ALERT_INTERVAL_S = 6.0
 
+# The official channel is on its own clock, always. His design, and the corpus
+# agrees with it: over 964 days an episode is open 16% of the time and an
+# official alert 7%, so watching one channel every ten seconds costs about what
+# the old blanket scheme cost in total — while dropping the worst case for
+# seeing a siren from 45 seconds to 10. The siren is the single most urgent
+# message the system can receive, and the one message rule 2 always acts on.
+OFFICIAL_INTERVAL_S = 10.0
+
+# And in between: an episode open with no siren yet. The rules that do not wait
+# for one are live in that window — falling on Zhulyany, a rise in threat class,
+# a ballistic launch, a target over the ring — so it is not the quiet interval.
+# Costs about 4% more requests a day than the siren-only version.
+WATCH_INTERVAL_S = 20.0
+
 # After a fetch error, wait longer each time rather than hammering a channel that
 # is rate-limiting us. The exporter learned this the hard way.
 BACKOFF_START_S = 5.0
@@ -103,6 +117,9 @@ class Watcher:
     channel: str
     last_id: int = 0
     backoff_until: float = 0.0
+    # When this channel is next due. Channels run on separate clocks: the
+    # official one is always close, the rest follow the siren.
+    due_at: float = 0.0
     errors: int = 0
     seen: int = 0
 
@@ -179,12 +196,16 @@ def handle(session: Session, channel: str, message_id: int, ts: int, text: str,
 
 
 def poll_once(client: Client, conn: sqlite3.Connection, watchers: list[Watcher],
-              session: Session, warm: bool = False) -> int:
-    """One pass over every channel. Returns how many new messages arrived."""
+              session: Session, warm: bool = False, args=None) -> int:
+    """One pass over the channels that are due. Returns how many arrived."""
     fresh = []
     for w in watchers:
         if w.backoff_until and time.time() < w.backoff_until:
             continue
+        if args is not None and time.time() < w.due_at:
+            continue
+        if args is not None:
+            w.due_at = time.time() + interval_for(w.channel, session.tracker, args)
         try:
             page = client.page(w.channel, after=w.last_id or None)
         except FetchError as exc:
@@ -241,10 +262,23 @@ def state_word(tracker: Tracker) -> str:
     return "ТРИВОГА" if ep.official_alert else "стежу"
 
 
+def interval_for(channel: str, tracker: Tracker, args) -> float:
+    """How often this channel should be asked, given what is happening."""
+    from ..policy.episodes import OFFICIAL_CHANNELS
+
+    if channel in OFFICIAL_CHANNELS:
+        return args.official_interval
+    ep = tracker.episode
+    if ep is None:
+        return args.quiet_interval
+    return args.alert_interval if ep.official_alert else args.watch_interval
+
+
 def interval_hint(args, session: Session) -> float:
-    """The interval the last sleep was supposed to be."""
-    return (args.alert_interval if session.tracker.episode is not None
-            else args.quiet_interval)
+    """The shortest interval in play — channels are on separate clocks now, so
+    "the loop is late" means late for whichever comes due first."""
+    return min(interval_for("alarm_kyiv", session.tracker, args),
+               interval_for("mon1tor_ua", session.tracker, args))
 
 
 def write_log(session: Session, path: Path) -> None:
@@ -275,6 +309,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="Seconds between polls with no episode open.")
     ap.add_argument("--alert-interval", type=float, default=ALERT_INTERVAL_S,
                     help="Seconds between polls while an episode is open.")
+    ap.add_argument("--official-interval", type=float, default=OFFICIAL_INTERVAL_S,
+                    help="Seconds between polls of the official siren channel, "
+                         "which is never slowed down.")
+    ap.add_argument("--watch-interval", type=float, default=WATCH_INTERVAL_S,
+                    help="Seconds between polls with an episode open but no "
+                         "official siren yet.")
     ap.add_argument("--rps", type=float, default=2.0,
                     help="Requests per second ceiling, shared across channels.")
     ap.add_argument("--channels", action="append", dest="channels",
@@ -329,8 +369,10 @@ def main(argv: list[str] | None = None) -> int:
     log_path = LOG_DIR / f"{stamp}.jsonl"
 
     print(f"Слухаю {len(watchers)} канал(и). Ctrl+C щоб зупинити.")
-    print(f"  інтервал: {args.quiet_interval:.0f}s тихо / "
-          f"{args.alert_interval:.0f}s під тривогу")
+    print(f"  інтервал: офіційний {args.official_interval:.0f}s завжди · "
+          f"решта {args.quiet_interval:.0f}s тихо / "
+          f"{args.watch_interval:.0f}s стежу / "
+          f"{args.alert_interval:.0f}s тривога")
     print(f"  лог: {log_path}")
     if session.notifier and session.notifier.enabled:
         who = session.notifier.chat_id or session.notifier.find_chat()
@@ -392,12 +434,9 @@ def main(argv: list[str] | None = None) -> int:
         if slept:
             print(f"  · машина спала ~{overslept / 60:.0f} хв — "
                   f"наздоганяю тихо", flush=True)
-        poll_once(client, conn, watchers, session, warm=slept)
+        poll_once(client, conn, watchers, session, warm=slept, args=args)
         last_poll = time.time()
         write_log(session, log_path)
-
-        open_episode = session.tracker.episode is not None
-        interval = args.alert_interval if open_episode else args.quiet_interval
 
         if time.time() - last_beat > HEARTBEAT_S:
             last_beat = time.time()
@@ -406,7 +445,8 @@ def main(argv: list[str] | None = None) -> int:
                   f"{session.decisions} повідомлень, {session.audible} побудок",
                   flush=True)
 
-        deadline = time.time() + interval
+        # Until whichever channel comes due first, not a single global tick.
+        deadline = min(max(w.due_at, w.backoff_until) for w in watchers)
         while not _STOP and time.time() < deadline:
             time.sleep(min(0.5, max(0.0, deadline - time.time())))
 

@@ -83,16 +83,16 @@ def test_a_gap_means_the_machine_slept_not_that_the_loop_was_slow():
     missed stretch arrives at once. Printed as live it looks like an attack
     happening now; counted as live it lands in the lag statistics as one
     forty-minute delay, destroying the only number this stage produces."""
-    import argparse
-
     from tools.live.run import SLEEP_GAP_S, interval_hint
 
-    args = argparse.Namespace(quiet_interval=45.0, alert_interval=6.0)
+    args = _args()
     session = Session()
-    assert interval_hint(args, session) == 45.0
-    handle(session, "mon1tor_ua", 1, T0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!",
-           False, T0 + 1)
-    assert interval_hint(args, session) == 6.0     # tighter with an episode open
+    session.tracker.official_source = True
+    # Quiet, the official channel is already the shortest clock running.
+    assert interval_hint(args, session) == 10.0
+    handle(session, "alarm_kyiv", 1, T0,
+           "🚨 м. Київ" + chr(10) + "Повітряна тривога", False, T0 + 1)
+    assert interval_hint(args, session) == 6.0     # everything tightens
     threshold = interval_hint(args, session) + SLEEP_GAP_S
     assert 40 * 60 > threshold          # forty minutes is a suspend
     assert 20 < threshold               # twenty seconds is just a slow poll
@@ -408,3 +408,66 @@ def test_every_place_that_prints_the_state_uses_the_same_word():
     source = inspect.getsource(run)
     assert 'if session.tracker.episode is not None else' not in source
     assert source.count("state_word(") >= 4
+
+
+# --- who gets watched how closely ------------------------------------------
+
+
+def _args(**over):
+    import argparse
+
+    from tools.live.run import (ALERT_INTERVAL_S, OFFICIAL_INTERVAL_S,
+                                QUIET_INTERVAL_S, WATCH_INTERVAL_S)
+
+    base = dict(quiet_interval=QUIET_INTERVAL_S, alert_interval=ALERT_INTERVAL_S,
+                official_interval=OFFICIAL_INTERVAL_S,
+                watch_interval=WATCH_INTERVAL_S)
+    base.update(over)
+    return argparse.Namespace(**base)
+
+
+def test_the_official_channel_is_always_watched_closely():
+    """His design, and the measurement backs it: one channel at ten seconds
+    costs what the old blanket scheme cost in total, and drops the worst case
+    for seeing a siren from 45 seconds to 10. The siren is the single most
+    urgent message the system can receive — rule 2 makes it the one that always
+    notifies — so it is the one worth paying for continuously."""
+    from tools.live.run import interval_for
+
+    session = Session()
+    args = _args()
+    assert interval_for("alarm_kyiv", session.tracker, args) == 10
+    handle(session, "war_monitor", 1, T0, "⚠️❗️КИЇВ - ТРИВОГА. В укриття!",
+           False, T0 + 1)
+    assert interval_for("alarm_kyiv", session.tracker, args) == 10
+
+
+def test_the_other_channels_speed_up_for_a_siren_and_slow_down_after():
+    from tools.live.run import interval_for
+
+    session = Session()
+    session.tracker.official_source = True
+    args = _args()
+    assert interval_for("mon1tor_ua", session.tracker, args) == 45
+
+    # An episode without a siren: the rules that do not need one are still live
+    # — falling on Zhulyany, a rise in threat, a ballistic launch — so this is
+    # not the quiet interval either.
+    handle(session, "war_monitor", 1, T0,
+           "⚠️З Донецька вилетіло від 3 одиниць Реактивних БпЛА", False, T0 + 1)
+    assert session.tracker.episode is not None
+    assert not session.tracker.episode.official_alert
+    assert interval_for("mon1tor_ua", session.tracker, args) == 20
+
+    handle(session, "alarm_kyiv", 2, T0 + 60, "🚨 м. Київ\nПовітряна тривога",
+           False, T0 + 61)
+    assert interval_for("mon1tor_ua", session.tracker, args) == 6
+
+
+def test_the_sleep_gap_measures_against_the_shortest_interval_in_play():
+    """Channels are on different clocks now, so "the loop is late" has to mean
+    late for whichever one comes due first."""
+    from tools.live.run import interval_hint
+
+    session = Session()
+    assert interval_hint(_args(), session) == 10        # the official channel
