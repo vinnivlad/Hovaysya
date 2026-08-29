@@ -172,6 +172,36 @@ classifier on those labels, deploy the small model. The user's own labels stay
 as the test set and are never mixed into training — LLM labels train, human
 labels judge.
 
+### What the model decides, and what it must not
+
+**It labels; the rules decide.** Settled 2026-08-29, and by an argument that
+came from renaming the channel to "Ховайся Жуляни": he wanted the reference
+point to be a parameter one day, and that wish turns out to rule out the other
+design rather than support it.
+
+Two shapes were possible.
+
+*The model reads the message.* It says "shahed-jet, Solomianka, inbound" and
+nothing else; whether that is worth waking anyone stays with `rules.py` and the
+gazetteer. The reference point is then already a parameter — it lives in `HOME`
+and the ring — and moving it needs no new labels at all.
+
+*The model decides.* Then "wake the person at X" makes X an input, and training
+it needs labelled nights from several different X. Every one of his 458 labels
+was made from Zhuliany. There is nothing to train that on, and there will not
+be until somebody else uses this.
+
+His original expectation was the second one, and he changed it himself: "може
+просто розставляти мітки".
+
+The second reason is the one that matters at 3 a.m. anyway. A rule that fires
+wrongly can be read, argued with, and corrected in one line with a comment
+saying why — which is what most of `rules.py` is. A model that fires wrongly
+can only be retrained. The part worth replacing with a model is the part that
+is already guesswork: `hints.py`, where a regex over Ukrainian morphology
+decides what is flying, and where every fault this project has hit so far has
+lived.
+
 ## Adding a channel
 
 Two steps, and skipping the second costs a blind spot. He caught it within
