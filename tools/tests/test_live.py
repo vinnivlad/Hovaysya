@@ -235,3 +235,40 @@ def test_the_bell_marks_what_made_a_sound(tmp_path):
     # post can be compared against labels/*.jsonl directly.
     assert "shahed-jet" in said[1] and "my-area" in said[1]
     assert "a drone near me, but not my street" in said[1]
+
+
+# --- keeping what is not in git -------------------------------------------
+
+
+def test_the_database_is_copied_through_sqlite_not_as_a_file(tmp_path):
+    """It runs in WAL mode, so a plain copy taken while pages still sit in the
+    `-wal` file produces a database that looks fine and is corrupt."""
+    import sqlite3
+
+    from tools.backup import copy_database
+
+    src = tmp_path / "a.db"
+    con = sqlite3.connect(src)
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("CREATE TABLE messages (id INTEGER)")
+    con.executemany("INSERT INTO messages VALUES (?)", [(i,) for i in range(500)])
+    con.commit()          # deliberately left open, with pages still in the WAL
+
+    n = copy_database(src, tmp_path / "b.db")
+    assert n == 500
+    con.close()
+
+
+def test_a_backup_carries_the_night_logs(tmp_path):
+    """These are the part that cannot be recreated: one file per night, every
+    decision and its reason."""
+    from tools.backup import main
+
+    src = tmp_path / "data"
+    (src / "live").mkdir(parents=True)
+    (src / "live" / "20260828T000000.jsonl").write_text('{"a":1}\n', encoding="utf-8")
+    (src / "telegram-bot.token").write_text("123:fake", encoding="utf-8")
+    dst = tmp_path / "keep"
+    assert main(["--from", str(src), "--to", str(dst)]) == 0
+    assert (dst / "live" / "20260828T000000.jsonl").exists()
+    assert (dst / "telegram-bot.token").read_text(encoding="utf-8") == "123:fake"
