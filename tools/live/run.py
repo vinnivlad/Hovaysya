@@ -226,6 +226,21 @@ def poll_once(client: Client, conn: sqlite3.Connection, watchers: list[Watcher],
     return len(fresh)
 
 
+def state_word(tracker: Tracker) -> str:
+    """`тихо` | `стежу` | `ТРИВОГА` — and the last one means the siren.
+
+    An episode opens on any live threat: a drone launched three regions away
+    opens one, and should, because it tightens the polling long before anything
+    arrives. Calling that "ТРИВОГА" was wrong in a way worth fixing rather than
+    explaining — he read it in a restart message with no alert running, and an
+    app that overstates once is discounted afterwards.
+    """
+    ep = tracker.episode
+    if ep is None:
+        return "тихо"
+    return "ТРИВОГА" if ep.official_alert else "стежу"
+
+
 def interval_hint(args, session: Session) -> float:
     """The interval the last sleep was supposed to be."""
     return (args.alert_interval if session.tracker.episode is not None
@@ -335,7 +350,7 @@ def main(argv: list[str] | None = None) -> int:
                row["text_norm"], row["reply_to"] is not None, time.time(), warm=True)
         warmed += 1
     if warmed:
-        state = "ТРИВОГА" if session.tracker.episode is not None else "тихо"
+        state = state_word(session.tracker)
         print(f"  прогрів: {warmed} повідомлень за останні "
               f"{WARM_WINDOW_S // 60} хв — стан: {state}")
 
@@ -350,7 +365,7 @@ def main(argv: list[str] | None = None) -> int:
         if got == 0:
             break
     if caught:
-        state = "ТРИВОГА" if session.tracker.episode is not None else "тихо"
+        state = state_word(session.tracker)
         print(f"  наздогнав {caught} нових — стан: {state}")
 
     # Only now, with everything warmed and caught up, say which version is
@@ -358,7 +373,7 @@ def main(argv: list[str] | None = None) -> int:
     # from here rather than from `update.sh` on purpose: that git pulled says
     # nothing about whether the process came up and reached the live feed, and
     # that is the thing the message is supposed to prove.
-    state = "ТРИВОГА" if session.tracker.episode is not None else "тихо"
+    state = state_word(session.tracker)
     note = startup_note(f"{state} · {len(watchers)} канал(и)")
     if note:
         print(chr(10).join("  " + line for line in note.splitlines()), flush=True)
@@ -386,7 +401,7 @@ def main(argv: list[str] | None = None) -> int:
 
         if time.time() - last_beat > HEARTBEAT_S:
             last_beat = time.time()
-            state = "ТРИВОГА" if open_episode else "тихо"
+            state = state_word(session.tracker)
             print(f"  · {kyiv_dt(int(time.time())):%H:%M} {state}, "
                   f"{session.decisions} повідомлень, {session.audible} побудок",
                   flush=True)

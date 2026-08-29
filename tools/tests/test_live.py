@@ -369,3 +369,42 @@ def test_it_arrives_without_a_sound():
     source = inspect.getsource(run.main)
     assert "startup_note" in source
     assert "audible=False" in source
+
+
+# --- saying what the state actually is -------------------------------------
+
+
+def test_the_state_word_claims_an_alert_only_when_the_siren_is_on():
+    """He read "стан: ТРИВОГА" in a restart message with no alert running.
+
+    An episode opens on any live threat — "З Донецька вилетіло 3 реактивні
+    БпЛА" opens one, and should, because it tightens the polling long before
+    anything arrives. But an episode is not a siren, and saying so loosely is
+    the kind of thing that teaches him to discount the messages that matter.
+    """
+    from tools.live.run import state_word
+
+    session = Session()
+    assert state_word(session.tracker) == "тихо"
+
+    handle(session, "war_monitor", 1, T0,
+           "⚠️З Донецька вилетіло від 3 одиниць Реактивних БпЛА", False, T0 + 1)
+    assert session.tracker.episode is not None      # tracking, on purpose
+    assert state_word(session.tracker) == "стежу"
+
+    session.tracker.official_source = True
+    handle(session, "alarm_kyiv", 2, T0 + 60, "🚨 м. Київ\nПовітряна тривога",
+           False, T0 + 61)
+    assert state_word(session.tracker) == "ТРИВОГА"
+
+
+def test_every_place_that_prints_the_state_uses_the_same_word():
+    """There were four copies of the same ternary, which is how one of them
+    would have kept the wrong answer after the others were fixed."""
+    import inspect
+
+    from tools.live import run
+
+    source = inspect.getsource(run)
+    assert 'if session.tracker.episode is not None else' not in source
+    assert source.count("state_word(") >= 4
