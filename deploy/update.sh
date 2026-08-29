@@ -20,4 +20,17 @@ fi
 
 echo "hovaysya: ${before:0:7} -> ${after:0:7}"
 git log --oneline "$before..$after" | sed 's/^/  /'
-systemctl restart hovaysya
+
+# The timer runs this as the checkout's owner, and an ordinary user may not
+# restart a system unit: systemd answers "Interactive authentication required",
+# which is exactly what the first real deploy hit. The pull had already
+# succeeded, so the machine sat with new code on disk and the old process still
+# running — worse than either failing outright.
+#
+# install.sh grants this one command, passwordless, through sudo. Run as root by
+# hand it needs none of that.
+if [ "$(id -u)" -eq 0 ]; then
+    systemctl restart hovaysya
+else
+    sudo -n systemctl restart hovaysya
+fi

@@ -28,6 +28,26 @@ for unit in hovaysya.service hovaysya-update.service hovaysya-update.timer; do
         "$here/$unit" > "/etc/systemd/system/$unit"
 done
 
+# The update timer runs as $user, who may not restart a system unit. A password
+# prompt is not an option — nobody is at the keyboard at 3 a.m. — so the grant
+# is passwordless, and its narrowness is the whole of its safety: one command,
+# one unit, nothing else. A malformed sudoers file locks the machine out of sudo
+# entirely, so it is validated before being put in place.
+sudoers=$(mktemp)
+cat > "$sudoers" <<SUDO
+# Installed by deploy/install.sh. Lets the update timer restart the watcher
+# after it pulls a new commit.
+$user ALL=(root) NOPASSWD: /usr/bin/systemctl restart hovaysya.service
+SUDO
+if visudo -cf "$sudoers" >/dev/null; then
+    install -m 0440 -o root -g root "$sudoers" /etc/sudoers.d/hovaysya
+else
+    echo "refusing to install a sudoers file that does not parse" >&2
+    rm -f "$sudoers"
+    exit 1
+fi
+rm -f "$sudoers"
+
 systemctl daemon-reload
 systemctl enable hovaysya.service hovaysya-update.timer
 systemctl start hovaysya-update.timer
