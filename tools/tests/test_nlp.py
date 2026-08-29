@@ -1050,3 +1050,29 @@ def test_a_column_is_not_a_report():
     for text in ("📡⚠️⚠️Шахеди:\n⚠️3 реактивні шахеди з Полтавщини на Черкащину",
                  "⚠️Реактивний шахед на Жуляни.", "‼️ Вихід балістики з Брянська"):
         assert hints.suggest(text)["modality"] == "live-threat", text
+
+
+def test_thunder_is_not_an_air_raid():
+    """"⚡️ Вибухи, які ви чуєте — це розкати грому!" read as a declared air-raid
+    alert, which is the most alarming thing in this corpus to get wrong. Found by
+    replaying every night rather than by waiting for a thunderstorm."""
+    text = "⚡️ Вибухи, які ви чуєте — це розкати грому! Гучно через негоду"
+    assert hints.suggest(text)["modality"] == "non-threat"
+    assert hints.alert_state(text) is None
+
+
+def test_the_weather_check_does_not_eat_every_threat():
+    """`гроза` is a substring of `загроза`, and without word boundaries every
+    threat in the corpus read as a thunderstorm. Six tests caught it at once."""
+    for text in ("❗️❗Загроза пуску балістичних ракет Іскандер-М.",
+                 "Загроза балістики", "💥Вибухи у Києві",
+                 "⚠️Реактивний шахед на Жуляни."):
+        assert hints.suggest(text)["modality"] == "live-threat", text
+
+
+def test_a_centre_belongs_to_the_city_that_names_it():
+    """Odesa has one too. "Центр Одеси" and "3х Авіа-ракети у напрямку Одеса
+    центр" both rang for Kyiv."""
+    assert resolve_scope("Центр Одеси.") == "elsewhere"
+    assert resolve_scope("❗️ 3х Авіа-ракети у напрямку Одеса центр") == "elsewhere"
+    assert resolve_scope("Центр❗️") == "city"

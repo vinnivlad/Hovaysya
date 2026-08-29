@@ -168,7 +168,7 @@ CITY = [
     _p("Мінський масив", "city", "мінський масив"),
     _p("Соцмісто", "city", "соцміст"),
     _p("Труханів", "city", "труханів"),
-    _p("Центр", "city", "центр"),
+    _p("Центр", "city", "центр", ambiguous=True),
     _p("Шевченківський район", "city", "шевченківс", ambiguous=True),
     _p("Деснянський район", "city", "деснянс"),
     _p("Дніпровський район", "city", "дніпровськ", ambiguous=True),
@@ -284,6 +284,16 @@ ELSEWHERE = [
     # Kamianets-Podilskyi did exactly that nine times, as Podil.
     _p("Кам'янець-Подільський", "elsewhere", "камянець-подільськ", "камянц"),
     _p("Корсунь-Шевченківський", "elsewhere", "корсунь-шевченків"),
+    # Found by replaying the heaviest ballistic nights rather than by waiting for
+    # one: "❗Балістична ракета на Шостку" named nowhere the gazetteer knew, so
+    # the message counted as country-wide and rang the shelter tone for a town
+    # 300 km away.
+    _p("Шостка", "elsewhere", "шостк"),
+    _p("Бобровиця", "elsewhere", "бобровиц"),
+    # A power station in Dnipro oblast whose name begins with a Kyiv district's.
+    # Longest match settles it, as with Kamianets-Podilskyi.
+    _p("Дніпровська ТЕС", "elsewhere", "дніпровська тес", "дніпровську тес",
+       "дніпровськ тес"),
     _p("Сміла", "elsewhere", "сміл"),
     _p("Лубни", "elsewhere", "лубн"),
     _p("Миргород", "elsewhere", "миргород"),

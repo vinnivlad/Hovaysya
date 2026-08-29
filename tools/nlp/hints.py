@@ -146,6 +146,9 @@ AFTERMATH_TERMS = (
     # Each of these woke the user in the dense night and should not have:
     # "зруйновано Епіцентр біля ДВРЗ", "рф знищила на Київщині склад".
     "зруйнован", "знищила", "знищено склад", "вигорі", "відбудов",
+    # "❗️Понівечено ударом балістики і житловий будинок" rang the shelter tone
+    # on a ballistic night: damage already done, read as a threat in the air.
+    "понівеч", "зазнав удару", "після удару", "місце влучанн",
 )
 
 # Coming down, right now. Narrow on purpose: only this one word, and only over
@@ -175,6 +178,9 @@ SUMMARY_TERMS = (
     # and a piece of commentary, both of which the escalation rule read as a
     # ballistic warning the moment it existed.
     "вночі було", "за ніч було", "на рахунок ночі", "стосовно ночі",
+    # "🌟Русня випустила вночі щонайменше 38 ракет" — a count of the night just
+    # past, and it rang.
+    "випустила вночі", "випустив вночі", "запустила вночі", "щонайменше",
     # Long-range forecasts. They look exactly like an imminent launch threat to
     # every field — "Загроза балістичного удару по Києву протягом 48 годин" is
     # `live-threat`, `probable`, `ballistic` — and the only thing separating
@@ -188,6 +194,13 @@ SUMMARY_TERMS = (
 # Not about an air threat at all: fundraising, channel social, civil news.
 # Checked BEFORE aftermath, because a donation drive for wounded soldiers
 # contains "постраждал" and would otherwise be filed as strike aftermath.
+# Thunder, and the channels say so outright. "⚡️ Вибухи, які ви чуєте — це
+# розкати грому!" read as a declared air-raid alert, which is the most alarming
+# thing in this whole corpus to get wrong.
+# Word boundaries are load-bearing: "гроза" is a substring of "загроза", and
+# without them every threat in the corpus read as a thunderstorm.
+_WEATHER = re.compile(r"\bрозкати грому|\bгрім\b|\bгрозов|\bнегод|\bблискав|\bгроза\b|\bгрози\b", re.IGNORECASE)
+
 SOCIAL_TERMS = (
     "аукціон", "ставка", "задонат", "донат", "monobank", "send.mono", "банк",
     "дякую", "підтримку", "мітинг", "розігру", "картки", "грн", "збір",
@@ -677,7 +690,12 @@ _FORECAST = re.compile(
     # months, and both messages they catch are commentary — a long essay on
     # jet-drone tactics, and "Особисто моя думка: на цьому по балістиці все на
     # цю ніч". The channels never write this way when something is flying.
-    r"на мою думку|моя думка|думок з приводу|як на мене",
+    r"на мою думку|моя думка|думок з приводу|як на мене|"
+    # More of the same voice, found by replaying every night in the corpus:
+    # "Опишу коротко загальну обстановку з балістикою", "⚠️Стосовно загрози від
+    # бомбардувальників", "Ніч на 20 червня пройшла тихо".
+    r"\bопишу\b|стосовно загроз|пройшла тихо|пройшло тихо|"
+    r"загальна обстановка|коротко про",
     re.IGNORECASE,
 )
 
@@ -691,6 +709,12 @@ def modality_hint(text: str) -> str:
     """
     if _hits(text, SUMMARY_TERMS) or _FORECAST.search(text or ""):
         return "summary-news"
+    # Before the impact rule: the message says "Вибухи" and that would
+    # answer first. "⚡️ Вибухи, які ви чуєте — це розкати грому!" read as a
+    # declared air-raid alert, which is the most alarming thing in this
+    # corpus to get wrong.
+    if _WEATHER.search(text or ""):
+        return "non-threat"
     if _hits(text, IMPACT_TERMS):
         return "live-threat"
     # A donation round-up quotes its donors, and one of them wrote "Гепарди по
