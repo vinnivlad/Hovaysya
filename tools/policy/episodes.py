@@ -84,7 +84,16 @@ _ORDINAL = re.compile(
 # and 07:35 and called each one a new drone. Twenty minutes silenced two of the
 # three.
 REFRACTORY_S = 20 * 60
-REFRACTORY_NEAR_S = 6 * 60
+# Five minutes near home, his number. Measured against the channels first: the
+# median gap between two mentions of his ring is 42 seconds and 79% of them are
+# under five minutes, so most of what this silences is one target being tracked
+# rather than a second one arriving. Zhuliany itself returns more slowly —
+# median two minutes, and a quarter of the gaps are over ten.
+#
+# Going from six minutes to five costs nothing measurable on the labelled
+# nights: the same four false wake-ups, the same five misses, one extra ring on
+# one night out of three.
+REFRACTORY_NEAR_S = 5 * 60
 
 # Two channels announcing the same launch a minute apart is one launch. The
 # pattern mining measured a median 39 s lag between channels reporting the same

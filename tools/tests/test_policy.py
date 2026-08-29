@@ -1028,3 +1028,13 @@ def test_the_ladder_does_not_move_before_the_siren():
         (200, "mon1tor_ua", "❗️❗Загроза пуску балістичних ракет Іскандер-М."),
     ])
     assert not any(a for _t, a, _r, _s in out), out
+
+
+def test_the_near_refractory_is_five_minutes():
+    """His number, and the channels agree it is the right order of magnitude:
+    the median gap between two mentions of his ring is 42 seconds and 79% are
+    under five minutes, so most of what it silences is one target being tracked
+    rather than a second one arriving."""
+    from tools.policy.episodes import REFRACTORY_NEAR_S
+
+    assert REFRACTORY_NEAR_S == 300
