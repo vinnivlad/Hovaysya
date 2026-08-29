@@ -229,6 +229,29 @@ reference point will be an approximation — worth knowing before it is promised
 rather than after. His labels are usable as that test precisely because they all
 come from one point.
 
+**First result, 2026-08-29** — on approximate coordinates, so indicative rather
+than settled. Two radii, an inner one for his own microdistrict and an outer one
+for the neighbours, cannot reproduce his rulings. Distances from Zhuliany:
+
+    1.8 km  ring   Іподром          7.1 km  ring   Гатне
+    2.2 km  OUT    Чоколівка        7.3 km  ring   Борщагівка
+    3.2 km  ring   Солом'янка       7.4 km  OUT    Чабани
+    4.2 km  OUT    Караваєві Дачі
+    5.7 km  OUT    Мишоловка
+
+Chokolivka is the nearest place to him of all, and he ruled it out. No radius
+excludes it while keeping Solomianka, Teremky or Gatne, which are farther.
+Karavaievi Dachi and Myshalovka are the same shape of counterexample. Gatne and
+Chabany a radius separates only by 300 m, which is coincidence, not a rule.
+
+So the cost of radii is three of his explicit rulings — which is exactly what he
+warned about in the gazetteer. Radius plus bearing is the candidate that might
+survive: Chokolivka lies north-east, toward the centre and behind him relative
+to the usual approach, while Gatne is south-west and on it. Proving that needs
+real coordinates and a run against every label, not three examples.
+
+Parked on his call: "з моделлю по іншому думаю не вийде. Потім розберемося."
+
 The second reason is the one that matters at 3 a.m. anyway. A rule that fires
 wrongly can be read, argued with, and corrected in one line with a comment
 saying why — which is what most of `rules.py` is. A model that fires wrongly
