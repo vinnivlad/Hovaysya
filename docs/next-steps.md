@@ -194,6 +194,41 @@ be until somebody else uses this.
 His original expectation was the second one, and he changed it himself: "може
 просто розставляти мітки".
 
+### ...but a moving reference point needs geometry, not a deciding model
+
+He pushed back on the above, and rightly: the original idea was an app he could
+carry around the city, with the predictions following him into a new district.
+That is a real requirement and the section above skated past it.
+
+It does not change where the decision lives. What it exposes is a thing this
+project deliberately does not have: **coordinates.** The ring is a list of
+names, so it cannot move with him. From `gazetteer.py`, in his own words:
+
+> "не завжди питання в відстані, а також якою дорогою найчастіше воно летить і
+> які топоніми мелькають в чаті" — Gatne is in and neighbouring Chabany is out;
+> Solomianka is in and Chokolivka is not. Do not "tidy" this into a geometric
+> rule.
+
+So the ring is an approach corridor plus the names that actually recur, hand-
+ruled by him over a labelled night. Three ways to make that follow him:
+
+- **Coordinates and a radius.** Works from anywhere, and throws away the thing
+  he said in the quote above: a radius cannot put Gatne in and Chabany out.
+- **Coordinates and a bearing.** The corridor *is* geometry — the places on the
+  vector between where a threat came from and where he is. A drone from the
+  south-east through Gatne is heading at him; Chabany off that axis is not.
+  This generalises his rule instead of discarding it, and it moves with him.
+- A model taking position as an input. No data: all 458 labels are from one
+  place.
+
+Which gives a test worth running before any of it is built. **Does "distance
+plus bearing from Zhuliany" reproduce his own rulings?** If the geometry puts
+Gatne inside and Chabany outside on its own, the reference point really can
+become a parameter. If it does not, the corridor is idiosyncratic and a moving
+reference point will be an approximation — worth knowing before it is promised
+rather than after. His labels are usable as that test precisely because they all
+come from one point.
+
 The second reason is the one that matters at 3 a.m. anyway. A rule that fires
 wrongly can be read, argued with, and corrected in one line with a comment
 saying why — which is what most of `rules.py` is. A model that fires wrongly
