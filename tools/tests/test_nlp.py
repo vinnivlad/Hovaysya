@@ -591,7 +591,7 @@ def test_the_ring_holds_exactly_what_was_ruled_in():
 
     assert {p.name for p in MY_AREA} == {
         "Жуляни", "Вишневе", "Борщагівка", "Солом'янка", "Деміївка",
-        "Іподром", "Гатне", "Теремки", "Крюківщина",
+        "Іподром", "Гатне", "Теремки",
         # Ruled in later, on his instruction: it contains Демiївка, and two
         # misses in the dense night were `Голос🚀` and `Голос✈️`.
         "Голосіїв",
@@ -605,7 +605,10 @@ def test_places_ruled_out_are_still_recognised_just_not_near():
     """Ruled out of the ring, not out of the gazetteer — they still resolve, so
     a message naming them is still Kyiv-relevant."""
     for name, tier in (("Мишоловка", "city"), ("Караваєві Дачі", "city"),
-                       ("Віта-Поштова", "oblast"), ("Крушинка", "oblast")):
+                       ("Віта-Поштова", "oblast"), ("Крушинка", "oblast"),
+                       # "Крюківщина не в колі" — ruled out 2026-08-29, after
+                       # sitting in the ring on inference alone.
+                       ("Крюківщина", "oblast")):
         assert resolve_scope(name) == tier, name
 
 
@@ -623,13 +626,48 @@ def test_a_destination_in_the_ring_is_toward_me():
 def test_a_place_in_the_ring_with_no_direction_is_only_a_position():
     """The distinction that resolved a apparent contradiction: a drone *in* the
     ring and one *heading into* it are different decisions."""
-    assert hints.heading("Крюківщина") == "position"
+    assert hints.heading("Гатне") == "position"
     assert hints.heading("Деміївка, Мишоловка") == "position"
+
+
+def test_a_list_of_destinations_shares_its_marker():
+    """The channels write "на A / B" and mean both names. Only the first used to
+    carry the direction, which surfaced the day Kriukivshchyna left the ring:
+    "на Крюківщину / Борщагівки" stopped reading as toward, though Borshchahivka
+    is in the ring and is why that message was worth a wake-up."""
+    assert hints.heading("🅿️ 1х реактив на Крюківщину / Борщагівки.") == "toward"
+    assert hints.heading("Курсом на Васильків / Крушинку") == "unknown"
+    # ...but a list is separators and nothing else. This is a destination
+    # followed by a second statement, and flattening it would invert the answer.
+    assert hints.heading("🅿️ 1х реактив Жуляни далі Центр.") == "away"
 
 
 def test_leaving_the_ring_is_away():
     assert hints.heading("⚠️З Теремки на Віта-Литовська.") == "away"
     assert hints.heading("🅿️ 1х реактив Жуляни далі Центр.") == "away"
+
+
+def test_the_loiter_markers_are_words_the_channels_actually_write():
+    """Measured against 18542 messages rather than guessed, after he asked
+    whether the singular forms were missing.
+
+    They were not the problem. `намотув` missed every present-tense form —
+    "намотують кола над Жулянами" read as a mere position — while the two
+    markers he asked about turn out not to mean circling at all: `подовжують`
+    occurs once, in a message `намот` already catches, and every drone use of
+    `вертаються` states a destination ("2х вертаються на Погреби/Трою"). Half
+    its matches are prisoner-exchange news. Returning is a direction, not
+    circling, and `heading` decides direction first anyway.
+    """
+    from tools.nlp.hints import _LOITER_MARKERS
+
+    assert "вертаються" not in _LOITER_MARKERS
+    assert "подовжують" not in _LOITER_MARKERS
+    for t in ("🔄 2х намотують кола над Жулянами.",
+              "Намотав коло по Жулянах і знову на Рожни",
+              "🔄 2х подовжують намотувати кола над Жулянами."):
+        assert hints.heading(t) == "loitering", t
+    assert hints.heading("2х вертаються з Жулян на Погреби.") == "away"
 
 
 def test_circling_nearby_is_loitering():

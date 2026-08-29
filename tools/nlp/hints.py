@@ -334,7 +334,18 @@ _DEST_MARKERS = (
     "у напрямку", "залітає у", "залітає в", "залітають у", "далі", "на",
 )
 _ORIGIN_MARKERS = ("з ", "із ", "від ", "повз ", "через ")
-_LOITER_MARKERS = ("кружля", "намотув", "довкола", "подовжують", "вертаються")
+# `намот`, not `намотув`: the longer stem only caught the past tense, so
+# "намотують кола над Жулянами" — the commonest way to write it — read as a mere
+# position. `подовжують` and `вертаються` were here as loitering and are not:
+# the first occurs once, inside a message `намот` already catches, and every
+# drone use of the second states a destination ("2х вертаються на Погреби"),
+# while half its matches are prisoner-exchange news.
+_LOITER_MARKERS = ("кружля", "намот", "довкола")
+
+# What may sit between two names before they stop being one list: separators and
+# nothing else. "на Жуляни / Борщагівку" is two destinations; "на Жуляни далі
+# Центр" is a destination and then something else, and must not be flattened.
+_LIST_GAP = re.compile(r"[\s/,;]*(?:та|і|й)?[\s/,;]*")
 
 
 def _role_of(flat: str, start: int) -> str:
@@ -369,10 +380,20 @@ def heading(text: str) -> str:
     dests_near = origins_near = near_present = False
     far_dest_at: int | None = None
     near_pos_at: int | None = None
-    for start, _end, place in spans:
+    prev_end, prev_role = 0, ""
+    for start, end, place in spans:
         near = place.tier in NEAR_TIERS
         near_present = near_present or near
         role = _role_of(flat, start)
+        # "на A / B" names two destinations and means both. Only the first name
+        # after the marker used to carry the direction, so once Kriukivshchyna
+        # left the ring, "на Крюківщину / Борщагівки" stopped reading as toward
+        # — even though Borshchahivka is still in the ring and is the whole
+        # reason that message was worth waking up for.
+        if (role == "position" and prev_role in ("dest", "origin")
+                and _LIST_GAP.fullmatch(flat[prev_end:start])):
+            role = prev_role
+        prev_end, prev_role = end, role
         if role == "dest":
             if near:
                 dests_near = True

@@ -113,9 +113,6 @@ MY_AREA = [
     # outranks it.
     _p("Республіка", "my-area", "республіка", "республіки", landmark=True),
     _p("Теремки", "my-area", "теремк"),
-    # Inferred, not ruled: woken for once ("реактив на Крюківщину/Борщагівки"),
-    # marked far once. Left in pending a decision.
-    _p("Крюківщина", "my-area", "крюківщ"),
 ]
 
 MY_DISTRICT = [
@@ -188,6 +185,12 @@ CITY = [
 OBLAST = [
     # Also ruled out of the near ring — "Віта Поштова: зовсім далеко".
     _p("Чабани", "oblast", "чабани"),
+    # Sat in the ring on inference rather than a ruling: woken for once
+    # ("реактив на Крюківщину/Борщагівки"), marked far once. Ruled out by him on
+    # 2026-08-29 — "Крюківщина не в колі". The wake-up that suggested otherwise
+    # names Борщагівка too, which is in the ring and carries that message on its
+    # own, so nothing is lost by moving this one out.
+    _p("Крюківщина", "oblast", "крюківщ"),
     # Found by sweeping the corpus for capitalised words in live messages that
     # resolved to no place at all. Every one of these is a Kyiv-oblast town the
     # channels track, and every mention of them was invisible on the page.
