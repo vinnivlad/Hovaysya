@@ -123,9 +123,18 @@ what you provisioned — which is why asking for *less* memory makes the instanc
 | 6 GB | 1.2 GB | ingest + loaded classifier → **clears it** |
 
 A Python service holding a loaded `xlm-roberta-base`, the toponym gazetteer, and
-a SQLite page cache sits comfortably above 1.2 GB. Until that model exists, keep
-a real in-memory cache in the ingest process rather than discovering one morning
-that the instance is gone.
+a SQLite page cache sits comfortably above 1.2 GB.
+
+**That model does not exist yet, and this advice was written as though it did.**
+Measured: the watcher needs no third-party packages at all and uses a few tens of
+megabytes, which is about 1% of the 6 GB threshold. On the shape this guide
+recommends, the instance would be reclaimed.
+
+So until the classifier arrives, provision **1 OCPU / 1 GB** — the threshold
+scales with what you ask for, so asking for less makes the instance safer, and
+20% of 1 GB is 200 MB. The service holds a stated ballast above that; see
+`deploy/README.md`. Always Free allows up to 4 OCPU and 24 GB, so growing later
+is a resize rather than a rebuild.
 
 Oracle's docs do not promise advance notice before reclamation. Treat the
 instance as replaceable: the server must be reproducible from this repo plus a

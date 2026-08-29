@@ -1,0 +1,25 @@
+[Unit]
+Description=Hovaysya — air-threat watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/hovaysya
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONUTF8=1
+
+# The memory floor is here and not hidden in the code's defaults: it exists to
+# clear Oracle's 20% idle-reclamation threshold on a 1 GB shape, and that is a
+# property of where this runs rather than of the program. See deploy/README.md.
+ExecStart=/usr/bin/python3 -m tools.live.run --memory-floor-mb 260
+
+Restart=always
+RestartSec=10
+# A watcher that dies at 3 a.m. and stays dead is worse than one that never ran,
+# so restart forever rather than giving up after the usual five attempts.
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target

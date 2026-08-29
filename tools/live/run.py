@@ -263,7 +263,26 @@ def main(argv: list[str] | None = None) -> int:
                     help="Requests per second ceiling, shared across channels.")
     ap.add_argument("--channels", action="append", dest="channels",
                     help="Watch only this channel (repeatable).")
+    ap.add_argument("--memory-floor-mb", type=int, default=0,
+                    help="Hold this much memory. See deploy/README.md — it "
+                         "exists to clear a cloud provider's idle threshold.")
     args = ap.parse_args(argv)
+
+    # Held for the life of the process. Stated plainly rather than disguised as
+    # a cache: Oracle reclaims an Always Free instance whose CPU, network *and*
+    # memory all sit under 20% for a week, and this watcher uses a few tens of
+    # megabytes. A cache that exists to fool a monitor is a lie in the code; a
+    # named ballast is at least honest about what it is doing and why.
+    #
+    # It goes away when the classifier arrives and clears the threshold for real.
+    ballast = bytearray(args.memory_floor_mb * 1024 * 1024) if args.memory_floor_mb else None
+    if ballast is not None:
+        # Touch every page, or the kernel never actually commits it and the
+        # reported usage stays at nothing.
+        for offset in range(0, len(ballast), 4096):
+            ballast[offset] = 1
+        print(f"  памʼять: тримаю {args.memory_floor_mb} МБ "
+              f"(поріг простою хмари, див. deploy/README.md)")
 
     signal.signal(signal.SIGINT, _on_signal)
     # Also on SIGTERM, so the log survives being stopped by anything other than
