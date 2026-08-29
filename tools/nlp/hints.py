@@ -429,6 +429,17 @@ def heading(text: str) -> str:
 RECHECK_TERMS = ("дорозвід",)
 
 
+# The other half of a "дорозвідка": the thing came back. Often with no place at
+# all -- "Виліз ще 1, вже 3 залітають", "ще 2 вилізли нові" -- which is exactly
+# why they were invisible: no place means no scope, and the geography veto
+# silenced them.
+REAPPEAR_TERMS = ("виліз", "вилізл", "виповз", "з'явив", "зявив", "виринув")
+
+
+def reappeared(text: str) -> bool:
+    return _hits(text, REAPPEAR_TERMS)
+
+
 def recheck(text: str) -> bool:
     return _hits(text, RECHECK_TERMS)
 

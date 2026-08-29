@@ -216,6 +216,8 @@ class Observation:
     impact: bool = False
     # "Дорозвідка": the alert continues, the cause is probably destroyed.
     recheck: bool = False
+    # ...and its retraction: "знову виліз".
+    reappeared: bool = False
     # From `alarm_kyiv`, which relays the "Повітряна тривога" app's bot and
     # posts exactly two forms for the city and nothing else.
     official: bool = False
@@ -283,6 +285,7 @@ def observe(ts: int, text: str, is_reply: bool = False,
         falling=hints.falling(text),
         impact=hints._hits(text, hints.IMPACT_TERMS),
         recheck=hints.recheck(text),
+        reappeared=hints.reappeared(text),
         is_reply=is_reply,
         official=channel in OFFICIAL_CHANNELS,
         partial_clear=hints.partial_clear(text),
@@ -467,10 +470,21 @@ class Tracker:
         if obs.live or obs.alert_state == "alert":
             ep.last_live = obs.ts
 
-        # Once per class per episode, because the channels repeat it.
+        # Once per class, until the threat comes back. His correction, and the
+        # corpus backs it: 71 of 165 episodes carry more than one "дорозвідка",
+        # and the cycle he described -- recheck, "виліз там і там", recheck --
+        # happens 43 times. The second one is news, not a repeat.
+        #
+        # The reset is gated on our having *said* something about a live threat,
+        # not merely seen one. Otherwise the constant traffic about other places
+        # would re-arm it every few seconds and the dedup would mean nothing.
+        stated = obs.effective_threat or obs.threat
         if obs.recheck and level is not None:
-            stated = obs.effective_threat or obs.threat
             ep.rechecked.add(stated if stated not in ("none", "unknown") else "all")
+        elif ((level is not None and obs.live
+               and stated not in ("none", "unknown"))
+              or (obs.reappeared and obs.scope != "elsewhere")):
+            ep.rechecked.clear()
 
         # Anything we actually said that named both a class and somewhere near
         # enough to matter answers "why is the siren on" -- whichever rule

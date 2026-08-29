@@ -1175,3 +1175,64 @@ def test_the_remembered_cause_goes_stale():
     assert ann.pending_threat == "shahed-jet"
     ann._forget_if_stale(T0 + PENDING_HORIZON_S + 10)
     assert ann.pending_threat is None and ann.pending_places == []
+
+
+def test_a_recheck_after_the_threat_came_back_is_news_again():
+    """His correction: "кажуть дорозвідка, потім пишуть що виліз там і там, а
+    потім можуть знову дорозвідка". Measured — 71 of 165 episodes carry more
+    than one, and that exact cycle happens 43 times. Silencing the second one
+    would hide the only good news the system ever delivers."""
+    tr = Tracker()
+    tr.official_source = True
+    out = []
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (300, "mon1tor_ua", "📡Дорозвідка."),
+            (360, "mon1tor_ua", "📡Дорозвідка."),            # a repeat: silent
+            (420, "mon1tor_ua", "⚠️Реактивний шахед на Шулявку."),
+            (600, "mon1tor_ua", "📡Дорозвідка.")):           # news again
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        out.append(d)
+    assert out[1].reason.startswith("recheck")
+    assert not out[2].notify
+    assert out[3].notify
+    assert out[4].reason.startswith("recheck"), out[4].reason
+
+
+def test_the_retraction_of_a_recheck_is_shown_too():
+    """"Або просто кажуть «знову виліз», навіть без місця." Showing the good
+    news and not its retraction is the worse of the two silences — and with no
+    place named these have no scope, so the geography veto killed every one."""
+    tr = Tracker()
+    tr.official_source = True
+    out = []
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (300, "mon1tor_ua", "📡Дорозвідка."),
+            (400, "mon1tor_ua", "❗️Виліз ще 1, вже 3 залітають."),
+            (600, "mon1tor_ua", "📡Дорозвідка.")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        out.append(d)
+    assert out[1].reason.startswith("recheck")
+    assert out[2].notify and not out[2].audible and out[2].reason == "it is back"
+    # ...and the recheck that follows it is news again, not a repeat.
+    assert out[3].reason.startswith("recheck")
+
+
+def test_a_reappearance_with_nothing_to_retract_stays_quiet():
+    """Before any recheck was announced, "виліз" is just the wave continuing —
+    and the rules that decide whether a wave is worth a sound are the ones
+    below, not this one."""
+    tr = Tracker()
+    tr.official_source = True
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (200, "mon1tor_ua", "❗️Виліз ще 1, вже 3 залітають.")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+    assert d.reason != "it is back"

@@ -163,6 +163,13 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
             return _silent("already-notified: recheck")
         return _notify("info", "none", "recheck: probably gone, alert continues")
 
+    # 4a. "Знову виліз" -- a recheck retracted. Showing the good news and not
+    #     its retraction is the worse of the two silences, and these messages
+    #     name no place at all, so the geography veto below killed every one.
+    if (obs.reappeared and obs.scope != "elsewhere"
+            and ep is not None and ep.rechecked):
+        return _notify("info", "none", "it is back")
+
     # 4. Another region's target is not our business. Checked after modality so
     #    an all-clear or a launch with no target still gets through above.
     if not obs.nationwide and obs.scope in ("elsewhere", "unknown"):
