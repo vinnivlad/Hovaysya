@@ -38,6 +38,9 @@ from .rules import Decision
 
 # What to call each class out loud. Not the internal name: he hears these at
 # three in the morning and has to act on them without thinking.
+# How stale the remembered cause may be before it stops explaining a siren.
+PENDING_HORIZON_S = 5 * 60
+
 CLASS_WORD = {
     "ballistic": "балістика",
     "cruise": "крилаті ракети",
@@ -138,6 +141,12 @@ class Announcer:
     #   🚨 м. Київ / Повітряна тривога         -> "Тривога. Реактивний шахед. Вишневе."
     pending_threat: str | None = None
     pending_places: list[str] = field(default_factory=list)
+    # When the pending memory was last refreshed. Without a horizon it lived
+    # from one full all-clear to the next, so a class named an hour earlier
+    # could arrive as the explanation for a fresh siren. Five minutes is his
+    # number, and the corpus agrees: where the channels explain before the
+    # siren -- 72% of alerts -- the median lead is 102 seconds.
+    pending_at: int = 0
     # Say the whole situation every time, rather than only what changed. His
     # call, and the reason is the best kind: a partial sentence made him doubt a
     # correct decision. "Жуляни, Вишневе, Теремки" came out as "Вишневе,
@@ -157,6 +166,7 @@ class Announcer:
         self.shown = _blank()
         self.pending_threat = None
         self.pending_places = []
+        self.pending_at = 0
 
     def note(self, obs: Observation) -> None:
         """Remember the cause, whether or not anything is said about it.
@@ -166,13 +176,26 @@ class Announcer:
         """
         if not obs.live:
             return
+        self.pending_at = obs.ts
         if obs.threat not in ("none", "unknown"):
             self.pending_threat = obs.threat
         for place in obs.ring_places:
             if place not in self.pending_places:
                 self.pending_places.append(place)
 
+    def _forget_if_stale(self, ts: int) -> None:
+        """The remembered cause explains a siren only while it is fresh.
+
+        Checked when it is read rather than when it is written: a quiet stretch
+        writes nothing, and it was exactly the quiet stretch that let a class
+        named an hour earlier arrive as the explanation for a new siren.
+        """
+        if self.pending_at and ts - self.pending_at > PENDING_HORIZON_S:
+            self.pending_threat = None
+            self.pending_places = []
+
     def announce(self, obs: Observation, decision: Decision) -> Utterance | None:
+        self._forget_if_stale(obs.ts)
         # A full all-clear ends the episode whether or not we said so. Resetting
         # only when one was announced left the memory of a finished attack
         # alive: a siren an hour later opened with "Тривога. Балістика. Жуляни."
@@ -193,6 +216,17 @@ class Announcer:
         # sentence came out classless while the policy knew a jet Shahed was up.
         stated = obs.effective_threat or obs.threat
         threat = stated if stated not in ("none", "unknown") else None
+
+        # "Дорозвідка" is a status, not a threat, and the sentence machinery
+        # below would render it as one -- or, with no class stated, as a bare
+        # "Тривога". It says what it is.
+        if obs.recheck:
+            word = CLASS_BY.get(threat) if threat else None
+            text = f"Дорозвідка по {word}." if word else "Дорозвідка."
+            utterance = Utterance(ts=obs.ts, lead=decision.alarm or "none",
+                                  text=text)
+            self.queue.append(utterance)
+            return utterance
 
         if decision.alarm == "clear":
             self.reset()

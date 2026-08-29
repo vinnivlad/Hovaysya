@@ -154,6 +154,12 @@ class Episode:
     launched: set[str] = field(default_factory=set)
     last_launch: int | None = None
     cleared: bool = False
+    # Classes already reported as "дорозвідка" in this episode. The channels
+    # repeat it, and he asked for it deduped.
+    rechecked: set[str] = field(default_factory=set)
+    # Whether anything has yet said what this siren was about. The official
+    # channel never does.
+    explained: bool = False
     sent: list[Sent] = field(default_factory=list)
     # place name -> last time it was named near the user
     ring_seen: dict[str, int] = field(default_factory=dict)
@@ -208,6 +214,8 @@ class Observation:
     falling: bool = False
     # Already landed, as opposed to `falling`, which is on its way down.
     impact: bool = False
+    # "Дорозвідка": the alert continues, the cause is probably destroyed.
+    recheck: bool = False
     # From `alarm_kyiv`, which relays the "Повітряна тривога" app's bot and
     # posts exactly two forms for the city and nothing else.
     official: bool = False
@@ -274,6 +282,7 @@ def observe(ts: int, text: str, is_reply: bool = False,
         ring_count=stated_count(text),
         falling=hints.falling(text),
         impact=hints._hits(text, hints.IMPACT_TERMS),
+        recheck=hints.recheck(text),
         is_reply=is_reply,
         official=channel in OFFICIAL_CHANNELS,
         partial_clear=hints.partial_clear(text),
@@ -457,6 +466,20 @@ class Tracker:
 
         if obs.live or obs.alert_state == "alert":
             ep.last_live = obs.ts
+
+        # Once per class per episode, because the channels repeat it.
+        if obs.recheck and level is not None:
+            stated = obs.effective_threat or obs.threat
+            ep.rechecked.add(stated if stated not in ("none", "unknown") else "all")
+
+        # Anything we actually said that named both a class and somewhere near
+        # enough to matter answers "why is the siren on" -- whichever rule
+        # produced it. That is what keeps the explanation from arriving twice.
+        if level is not None and not ep.explained:
+            stated = obs.effective_threat or obs.threat
+            if (stated not in ("none", "unknown")
+                    and obs.scope in ("my-area", "my-district", "city")):
+                ep.explained = True
         # Only an announcement *we made* counts. An oblast district's siren set
         # this flag and then silenced the city's, costing four misses.
         if obs.alert_state == "alert":

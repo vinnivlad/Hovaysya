@@ -162,7 +162,15 @@ def format_message(utterance, obs, decision) -> str:
     looks alike afterwards, and telling a wake-up from a status line by scrolling
     back is exactly the analysis he wants to do.
     """
-    head = ("🔔 " if decision.audible else "") + utterance.text
+    # The bell marks a sound; the radar marks a "дорозвідка", which is the one
+    # kind of message that is good news. The channels write it with a premium
+    # emoji whose fallback character is this same 📡, so it reads as theirs.
+    if decision.audible:
+        head = "🔔 " + utterance.text
+    elif getattr(obs, "recheck", False):
+        head = "📡 " + utterance.text
+    else:
+        head = utterance.text
 
     tags = []
     for label, field in NAMED_FIELDS:

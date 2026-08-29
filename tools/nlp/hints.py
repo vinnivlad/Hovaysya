@@ -419,6 +419,20 @@ def heading(text: str) -> str:
     return "unknown"
 
 
+# "Дорозвідка" — the alert is still running, but whatever caused it is probably
+# destroyed. It may come back, or the all-clear may follow shortly, and the
+# channels say it per class: "по ракетах", "по шахедах", "по балістиці".
+#
+# 402 in the corpus, of which the policy silenced 401 outright -- he had never
+# seen one. Written with a premium radar emoji, and the fallback character
+# inside it survives our extraction, which is why the text carries a plain 📡.
+RECHECK_TERMS = ("дорозвід",)
+
+
+def recheck(text: str) -> bool:
+    return _hits(text, RECHECK_TERMS)
+
+
 def partial_clear(text: str) -> bool:
     # Waiting for one is not having one, exactly as in `alert_state`. Without
     # this, "⚪️Київ очікує на відбій" counted as lifting the drone threat: it

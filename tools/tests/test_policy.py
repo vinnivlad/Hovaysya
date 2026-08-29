@@ -1077,3 +1077,101 @@ def test_cruise_rings_on_position_and_ballistic_on_launch():
         got.append((d.audible, d.reason))
     assert not got[1][0], got                  # a launch hours away does not ring
     assert got[2][0], got                      # ...the position over the ring does
+
+
+# --- "дорозвідка": the alert continues, the cause is probably gone -----------
+
+
+def test_a_recheck_is_shown_silently_and_only_once_per_class():
+    """His feature. 402 of these in the corpus and the policy silenced 401, so
+    he had never seen one — yet it is the message that says the thing worth
+    knowing: the alert is still on, but what caused it is probably destroyed."""
+    tr = Tracker()
+    tr.official_source = True
+    said = []
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (300, "mon1tor_ua", "📡Київ — дорозвідка."),
+            (360, "mon1tor_ua", "📡Дорозвідка."),
+            (420, "mon1tor_ua", "📡Дорозвідка по ракетах."),
+    ):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        said.append(d)
+
+    assert said[1].notify and not said[1].audible
+    assert said[1].reason.startswith("recheck")
+    # ...and the channels repeat themselves, so the second one is not a message.
+    assert not said[2].notify
+    # A different class is a different fact.
+    assert said[3].notify and not said[3].audible
+
+
+def test_a_recheck_outside_an_alert_says_nothing():
+    """"Тривога ще триває" is the whole meaning of the word."""
+    tr = Tracker()
+    o = observe(T0, "📡Дніпро та область — дорозвідка.", False, "mon1tor_ua")
+    assert not decide(o, tr).notify
+
+
+def test_a_recheck_says_what_it_is_rather_than_naming_a_threat():
+    """The sentence machinery would render it as a threat, or — with no class
+    stated — as a bare "Тривога", which is the opposite of what it means."""
+    from tools.policy.announce import Announcer
+
+    tr, ann = Tracker(), Announcer()
+    tr.official_source = True
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (300, "mon1tor_ua", "📡Дорозвідка по ракетах.")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        u = ann.announce(o, d)
+    assert u is not None and "Дорозвідка" in u.text
+    assert "Тривога" not in u.text
+
+
+# --- what the siren was about ----------------------------------------------
+
+
+def test_the_first_message_naming_a_class_and_a_place_explains_the_siren():
+    """The official channel has exactly two forms and neither says why. Rule 12
+    silences a city-wide drone outright, which is the commonest cause of all —
+    so the alert arrived with no explanation at all."""
+    tr = Tracker()
+    tr.official_source = True
+    out = []
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (40, "mon1tor_ua", "⚠️Реактивний шахед на Лук'янівку, Шулявку."),
+            (90, "mon1tor_ua", "⚠️Реактивний шахед на Оболонь.")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        out.append(d)
+    assert out[1].notify and not out[1].audible
+    # ...and only the first. The point is an explanation, not a commentary.
+    assert out[2].reason != out[1].reason or not out[2].notify
+
+
+def test_the_remembered_cause_goes_stale():
+    """The announcer keeps the cause so the siren can carry it — "Тривога.
+    Реактивний шахед. Вишневе." — and it used to live from one full all-clear to
+    the next. An hour-old class could therefore explain a fresh siren.
+
+    Note this is not the episode's own class, which also reaches the sentence
+    and is legitimately longer-lived: while an episode is open, what it knows is
+    flying is current by definition. This is the separate memory that outlived
+    everything.
+    """
+    from tools.policy.announce import PENDING_HORIZON_S, Announcer
+
+    ann = Announcer()
+    ann.note(observe(T0, "⚠️2 реактивні шахеди на Вишневе.", False, "mon1tor_ua"))
+    assert ann.pending_threat == "shahed-jet"
+    ann._forget_if_stale(T0 + PENDING_HORIZON_S - 10)
+    assert ann.pending_threat == "shahed-jet"
+    ann._forget_if_stale(T0 + PENDING_HORIZON_S + 10)
+    assert ann.pending_threat is None and ann.pending_places == []

@@ -145,6 +145,24 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     if obs.modality == "non-threat":
         return _silent("not a threat")
 
+    # 4b. "Дорозвідка": the alert is still on, but what caused it is probably
+    #     destroyed -- it may return, or the all-clear may follow. He asked to
+    #     see these, silently. 402 in the corpus and the policy silenced 401,
+    #     so he had never seen one. Once per class per episode, because the
+    #     channels repeat it; and only inside an episode, since "тривога ще
+    #     триває" is the whole meaning of the word.
+    #     Placed before the geography veto on purpose: "📡Дорозвідка." names
+    #     nowhere at all, and under our own siren that silence means us. A
+    #     *named* far region still loses -- "Дніпро та область — дорозвідка"
+    #     is not our news.
+    if obs.recheck and obs.scope != "elsewhere":
+        if ep is None:
+            return _silent("recheck: no alert running")
+        key = threat if threat not in ("none", "unknown") else "all"
+        if key in ep.rechecked:
+            return _silent("already-notified: recheck")
+        return _notify("info", "none", "recheck: probably gone, alert continues")
+
     # 4. Another region's target is not our business. Checked after modality so
     #    an all-clear or a launch with no target still gets through above.
     if not obs.nationwide and obs.scope in ("elsewhere", "unknown"):
@@ -314,6 +332,17 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
             # "ті самі" — worth showing, not worth a second wake-up.
             return _notify("info", "none", "circling nearby")
         return _notify("alert", alarm, "new target near me")
+
+    # 11b. The official siren never says why it sounded. In 72% of alerts the
+    #      channels have already said, and the announcer carries that into the
+    #      siren sentence -- but for the rest the first message naming both a
+    #      class and a place is the answer, and rule 12 below would silence it
+    #      outright for a drone. Measured: 98% of alerts get such a message, a
+    #      median of 35 seconds after the siren.
+    if (ep is not None and ep.official_alert and not ep.explained and obs.live
+            and threat not in ("none", "unknown")
+            and obs.scope in ("my-area", "my-district", "city")):
+        return _notify("info", "none", "what the siren was about")
 
     # 12. In the city but not near: worth knowing, not worth waking twice — and
     #    for a drone, not worth waking at all. His rule from the first
