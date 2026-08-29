@@ -1318,3 +1318,66 @@ def test_the_explanation_is_dropped_when_the_siren_already_said_it():
         out.append((d, ann.announce(o, d)))
     assert "Вишгород" in out[1][1].text            # the siren carries it
     assert out[2][1] is None                       # ...so this says nothing
+
+
+# Verbatim from the night he caught it. Shortened, it stops reading as a
+# summary at all, and the test then passes for the wrong reason. Note it
+# names Zhuliany and ТЕЦ-5 — a forecast about home is still a forecast.
+FORECAST = ('❗️А тепер до поганого, балістика:' + chr(10) + '❗️Цієї ночі висока вірогідність нанесення масованого балістичного удару по Києву:' + chr(10) + '❗️Ворог планує застосувати 34 ракети різних типів, якщо точніше:' + chr(10) + '❗20 балістичних ракет Іскандер-М з Брянської області;' + chr(10) + '⚡️7 Цирконів з Курської області;' + chr(10) + '❗️7 північнокорейських балістичних ракет Кн-23.' + chr(10) + '❗️Підвищена загроза:' + chr(10) + '🔴Жуляни;' + chr(10) + '🔴Оболонь;' + chr(10) + '🔴Дарниця;' + chr(10) + '🔴Почайна;' + chr(10) + '🔴ТЕЦ-5;' + chr(10) + '🔴ТЕЦ-6;' + chr(10) + '🔴Відрадний;' + chr(10) + '🔴Борщагівка;' + chr(10) + '🔴Нивки;' + chr(10) + '🔴Шулявка;' + chr(10) + "🔴Лук'янівка." + chr(10) + '⬆️Чому стільки мікрорайонів на підвищеній небезпеці? Відповідаю, у всіх цих мікрорайонах є складські приміщення/заводи, а як ви бачите — зараз ворога цікавлять тільки складські приміщення, та заводи.')
+
+
+def test_a_forecast_for_the_night_does_not_become_the_episode_class():
+    """The false wake-up he caught. "❗️А тепер до поганого, балістика: цієї ночі
+    висока вірогідність..." was correctly silenced as a summary — and still set
+    the episode's class to ballistic. Two minutes later a message naming nothing
+    inherited it, the ladder read drone → ballistic, and it rang."""
+    tr = Tracker()
+    tr.official_source = True
+    out = []
+    for off, channel, text in (
+            (0, "mon1tor_ua", "⚠️5 реактивних шахедів з Чернігівщини на Київщину."),
+            (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (103, "mon1tor_ua", FORECAST),
+            (222, "kievinform_ua1", "Найближчий в районі Вишгороду маневрує")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        out.append(d)
+    assert not out[2].notify                      # the forecast stays silent
+    assert tr.episode.threat != "ballistic"       # ...and leaves no trace
+    assert not out[3].audible, out[3].reason
+
+
+def test_the_ladder_climbs_only_on_a_class_the_message_states():
+    """"Найближчий в районі Вишгороду маневрює" names nothing at all. Calling
+    that a climb to ballistic is wrong whatever the episode is carrying."""
+    tr = Tracker()
+    tr.official_source = True
+    for off, channel, text in (
+            (0, "mon1tor_ua", "‼️Вихід балістики з Брянська"),
+            (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (300, "kievinform_ua1", "Найближчий в районі Вишгороду маневрує")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+    assert d.reason != "threat level rose"
+
+
+def test_the_siren_names_one_town_not_a_travelogue():
+    """"Тривога. Реактивний шахед. Славутич, Тетіїв, Бровари." went out tonight,
+    and Slavutych is 150 km away. Ring names list; towns say which side."""
+    from tools.policy.announce import Announcer
+
+    tr, ann = Tracker(), Announcer()
+    tr.official_source = True
+    for off, channel, text in (
+            (0, "mon1tor_ua", "3 Реактива повз Славутич в бік Водосховища."),
+            (120, "mon1tor_ua", "БпЛА на Тетіїв"),
+            (240, "mon1tor_ua", "До 5х реактивів від Славутича на Бровари."),
+            (300, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        u = ann.announce(o, d)
+    assert u.text.count(",") == 0, u.text
+    assert "Славутич" not in u.text

@@ -545,7 +545,18 @@ class Tracker:
             climbed = THREAT_LEVEL.get(obs.effective_threat or obs.threat, 0)
             ep.threat_peak = max(ep.threat_peak, climbed)
 
-        if obs.threat not in ("none", "unknown"):
+        # ...but not from a message the policy threw out as not an event. Seen
+        # live: "❗️А тепер до поганого, балістика: цієї ночі висока
+        # вірогідність..." was correctly silenced as a summary and still set the
+        # episode's class to ballistic. Two minutes later "Найближчий в районі
+        # Вишгороду маневрує" named nothing, inherited it, and rang.
+        #
+        # Anticipation is deliberately still allowed through: "Загроза пуску
+        # балістики" is a warning about now, not a forecast for the night, and
+        # rule 8 exists precisely to let it update the picture silently.
+        if (obs.threat not in ("none", "unknown") and obs.live
+                and obs.modality not in ("aftermath", "summary-news",
+                                         "non-threat")):
             ep.threat = obs.threat
             # Named again as flying: whatever was lifted is back.
             ep.cleared.discard(obs.threat)

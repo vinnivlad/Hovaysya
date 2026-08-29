@@ -219,7 +219,11 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     #
     # After the impact rule on purpose: an explosion names a class too, and a
     # thing that has already landed is not a climb.
-    if ep is not None and ep.alert_announced and obs.live:
+    #
+    # Only on a class the message states. "Найближчий в районі Вишгороду
+    # маневрує" names nothing at all; calling that a climb to ballistic is wrong
+    # whatever the episode happens to be carrying, and it is what woke him.
+    if (ep is not None and ep.alert_announced and obs.live and not inherited):
         climbed = THREAT_LEVEL.get(threat, 0)
         if climbed > ep.threat_peak:
             return _notify("alert", alarm, "threat level rose")

@@ -304,9 +304,15 @@ class Announcer:
                     parts.append(CLASS_WORD[self.pending_threat].capitalize())
                     said['classes'].add(self.pending_threat)
                     named_class = True
-                remembered = self.pending_places or self.pending_far
+                # Ring names list; towns do not. Three ring names are three
+                # places he might be near. Three towns are a travelogue --
+                # "Тривога. Реактивний шахед. Славутич, Тетіїв, Бровари." went
+                # out tonight, and Slavutych is 150 km away. What a town is for
+                # is which side it is coming from *now*, so only the newest.
+                remembered = (self.pending_places[-3:] if self.pending_places
+                              else self.pending_far[-1:])
                 if remembered:
-                    named_places = list(remembered[-3:])
+                    named_places = list(remembered)
                     parts.append(", ".join(named_places))
                     said['places'].update(remembered)
 
