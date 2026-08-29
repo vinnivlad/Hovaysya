@@ -1035,3 +1035,18 @@ def test_the_channels_abbreviation_for_a_jet_drone():
         assert hints.suggest(text)["alarm"] == "drone-jet", text
     # ...and a plain one is still a plain one.
     assert hints.threat_hint("БпЛА на Бровари") == "shahed"
+
+
+def test_a_column_is_not_a_report():
+    """A long essay on jet-drone tactics wrote a ballistic line onto the status.
+    Length alone will not separate it — some of the longest messages in the
+    corpus are genuine roll-calls, "📡⚠️⚠️Шахеди: 3 реактивні шахеди з Полтавщини
+    на Черкащину; ..." — so the marker is first person about the situation,
+    which the channels never use while something is flying."""
+    for text in ("Декілька очевидних думок з приводу паралізації міст "
+                 "реактивними БпЛА.\n1. Реактив-Бандероль-Seeker",
+                 "Особисто моя думка:\nНа цьому по балістиці все на цю ніч"):
+        assert hints.suggest(text)["modality"] == "summary-news", text
+    for text in ("📡⚠️⚠️Шахеди:\n⚠️3 реактивні шахеди з Полтавщини на Черкащину",
+                 "⚠️Реактивний шахед на Жуляни.", "‼️ Вихід балістики з Брянська"):
+        assert hints.suggest(text)["modality"] == "live-threat", text

@@ -671,7 +671,13 @@ _FORECAST = re.compile(
     r"на\s+[\w-]*\s*(високому|середньому|низькому)[\w-]*\s+рівні|"
     r"залишається на[^.!?]{0,30}рівні|"
     r"оцінка загроз|"
-    r"ніч буде без",
+    r"ніч буде без|"
+    # First person about the situation is a column, not a report. Narrow on
+    # purpose and measured before adding: each of these appears once in 4.5
+    # months, and both messages they catch are commentary — a long essay on
+    # jet-drone tactics, and "Особисто моя думка: на цьому по балістиці все на
+    # цю ніч". The channels never write this way when something is flying.
+    r"на мою думку|моя думка|думок з приводу|як на мене",
     re.IGNORECASE,
 )
 
