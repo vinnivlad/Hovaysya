@@ -489,10 +489,17 @@ class Tracker:
         # Anything we actually said that named both a class and somewhere near
         # enough to matter answers "why is the siren on" -- whichever rule
         # produced it. That is what keeps the explanation from arriving twice.
-        if level is not None and not ep.explained:
+        # ...but never the siren itself. Seen live: "🚨 м. Київ / Повітряна
+        # тривога" carries scope `city` from its own text and inherits the
+        # episode's class, so it satisfied both halves and closed the slot --
+        # the one message in the stream that explains nothing marking the
+        # question answered. The next line, "1 на Вишгород", then stayed
+        # silent, which is precisely the thing he was waiting for.
+        if level is not None and not ep.explained and not obs.official:
             stated = obs.effective_threat or obs.threat
             if (stated not in ("none", "unknown")
-                    and obs.scope in ("my-area", "my-district", "city")):
+                    and obs.scope in ("my-area", "my-district", "city",
+                                      "oblast")):
                 ep.explained = True
         # Only an announcement *we made* counts. An oblast district's siren set
         # this flag and then silenced the city's, costing four misses.

@@ -1270,3 +1270,28 @@ def test_an_oblast_town_is_still_not_a_wake_up_on_its_own():
     o = observe(T0, "Знову рБПЛА на Вишгород ⚠️✈️", False, "kievinform_ua1")
     d = decide(o, tr)
     assert not d.audible and d.reason != "what the siren was about"
+
+
+def test_the_siren_does_not_count_as_its_own_explanation():
+    """Seen live at 19:38. The siren carries scope `city` from its own text and
+    inherits the episode's class, so it satisfied both halves of "something has
+    explained this" — the one message in the stream that explains nothing,
+    marking the question answered. "1 на Вишгород", twenty-two seconds later,
+    then stayed silent."""
+    from tools.policy.announce import Announcer
+
+    tr, ann = Tracker(), Announcer()
+    tr.official_source = True
+    out = []
+    for off, channel, text in (
+            (0, "mon1tor_ua", "⚠️2 реактивні шахеди на Київ/Вишгород з півночі."),
+            (400, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (422, "kievinform_ua1", "1 на Вишгород")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        u = ann.announce(o, d)
+        out.append((d, u))
+    assert out[1][0].audible                      # the siren still rings
+    assert out[2][0].reason == "what the siren was about"
+    assert "Вишгород" in out[2][1].text
