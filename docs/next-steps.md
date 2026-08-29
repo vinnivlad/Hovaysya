@@ -197,6 +197,29 @@ were left out on the numbers.
 | Item | Deferred until |
 | --- | --- |
 | ~~Alert API token~~ | **Not needed.** He found the official app's Telegram bot, and `alarm_kyiv` relays it: two forms, city only, `🚨 м. Київ / Повітряна тривога` and `🟢 м. Київ / Відбій`. Читається через `t.me/s/` без жодних облікових даних, історія з 2024-01-08. Checked against the official app to the second. |
-| Oracle Cloud account | production deployment; see `oracle-cloud-setup.md` |
-| Phone number + MTProto | polling latency or invisible edits become a real problem |
+| ~~Oracle Cloud account~~ | **Done 2026-08-29.** Running there; `data/runbook.md` has everything. |
+| Phone number + MTProto | **Deferred on the measurement, 2026-08-29**, and see below |
 | Android client | after stage 7 shows the decisions are worth pushing |
+
+### Why MTProto is not happening yet, and how it would arrive
+
+The lag it would remove has been measured rather than guessed: median 6 s, p90
+9 s. Against a ballistic flight of four or five minutes that is about 2% of the
+warning; against a drone it is invisible. It buys less than the model does.
+
+The price is not the work, it is the credential. **An MTProto session file is
+full access to the Telegram account that created it** — not a bot token, not a
+channel key: whoever takes it from the machine signs in as him. The machine is
+a free VM in France that the provider may reclaim without notice, and today the
+worst it holds is a bot token. So the condition is not "when there is time" but
+**a separate account on a separate number that does nothing else**; his own
+account does not go on that box.
+
+His call on the shape, and the right one: an alternative to polling with an
+easy switch, not a rewrite. The seam already exists and does not need building
+in advance — `poll_once` is the only thing that knows how messages arrive.
+Everything downstream of `handle(session, channel, id, ts, text, ...)` is
+transport-agnostic already, and a push-based source would call exactly that.
+What would need care is the two things polling gives for free: the catch-up
+pass after downtime, and `lag_s`, which is the number that justified this
+decision in the first place.
