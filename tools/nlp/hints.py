@@ -24,7 +24,10 @@ THREAT_RULES: tuple[tuple[str, str], ...] = (
     # крилата ракета that way, and without them it also matches Крушинка,
     # кружляють, and Крим.
     ("cruise", r"крилат|калібр|х-?101|х-?59|х-?55|бандерол|\bкр\b|\bкрів\b"),
-    ("shahed-jet", r"реактив"),
+    # `рБпЛА` is the channels' own abbreviation for a jet drone, and it matched
+    # nothing at all — 26 messages read as "nothing is flying". The bare `бпла`
+    # rule below cannot catch it: there is no word boundary inside `рбпла`.
+    ("shahed-jet", r"реактив|\bрбпла\b"),
     ("kab", r"\bкаб\b|\bкар\b|керован(а|их|ої)\s+авіабомб"),
     # Any other aviation is not a threat class. A bomber taking off triggers no
     # alert — the alert arrives with the cruise missiles it launches, and those

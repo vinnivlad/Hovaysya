@@ -1024,3 +1024,14 @@ def test_an_awaited_all_clear_lifts_nothing():
     # ...and a real partial all-clear still lifts its class.
     assert hints.partial_clear("⚪️По балістиці відбій.") is True
     assert hints.cleared_class("⚪️По балістиці відбій.") == "ballistic"
+
+
+def test_the_channels_abbreviation_for_a_jet_drone():
+    """"бпла - дрон, рбпла - реактивний дрон", his words. `рБпЛА` matched
+    nothing at all — 26 messages read as "nothing is flying" — because the bare
+    `бпла` rule cannot see inside `рбпла`, there being no word boundary."""
+    for text in ("1х рБПЛА повз Гореничі на Борщагівку", "2х рбпла з півночі"):
+        assert hints.threat_hint(text) == "shahed-jet", text
+        assert hints.suggest(text)["alarm"] == "drone-jet", text
+    # ...and a plain one is still a plain one.
+    assert hints.threat_hint("БпЛА на Бровари") == "shahed"
