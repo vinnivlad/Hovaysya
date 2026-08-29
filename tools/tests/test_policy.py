@@ -1236,3 +1236,37 @@ def test_a_reappearance_with_nothing_to_retract_stays_quiet():
         d = decide(o, tr)
         tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
     assert d.reason != "it is back"
+
+
+def test_the_explanation_may_name_a_town_outside_the_city():
+    """Seen live the first evening this shipped: the siren sounded for Kyiv and
+    everything that followed was Вишгород, Хотянівка, Бровари — all oblast, all
+    silenced, and he was left with a siren and no reason.
+
+    A threat approaching Kyiv is outside Kyiv until it is not. His reason for
+    wanting it: "це мені дає інформацію з якої сторони загроза" — so the place
+    name is the content, and the ring filter was dropping exactly it."""
+    from tools.policy.announce import Announcer
+
+    tr, ann = Tracker(), Announcer()
+    tr.official_source = True
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (60, "kievinform_ua1", "Знову рБПЛА на Вишгород ⚠️✈️")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        u = ann.announce(o, d)
+    assert d.reason == "what the siren was about"
+    assert d.notify and not d.audible
+    assert "Вишгород" in u.text
+    assert "реактивний шахед" in u.text.lower()
+
+
+def test_an_oblast_town_is_still_not_a_wake_up_on_its_own():
+    """Widened for the explanation and nowhere else — without a siren to
+    explain, Vyshhorod is another district's trouble."""
+    tr = Tracker()
+    o = observe(T0, "Знову рБПЛА на Вишгород ⚠️✈️", False, "kievinform_ua1")
+    d = decide(o, tr)
+    assert not d.audible and d.reason != "what the siren was about"

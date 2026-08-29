@@ -346,9 +346,15 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     #      class and a place is the answer, and rule 12 below would silence it
     #      outright for a drone. Measured: 98% of alerts get such a message, a
     #      median of 35 seconds after the siren.
+    #      Oblast counts here and nowhere else. Seen live on the first evening
+    #      this shipped: the siren sounded for the city and everything that
+    #      followed was Vyshhorod, Khotianivka, Brovary -- all oblast, all
+    #      silenced, and he was left with a siren and no reason. A threat
+    #      approaching Kyiv is *outside* Kyiv until it is not, so the answer to
+    #      "why is this on" usually names a town rather than a district.
     if (ep is not None and ep.official_alert and not ep.explained and obs.live
             and threat not in ("none", "unknown")
-            and obs.scope in ("my-area", "my-district", "city")):
+            and obs.scope in ("my-area", "my-district", "city", "oblast")):
         return _notify("info", "none", "what the siren was about")
 
     # 12. In the city but not near: worth knowing, not worth waking twice — and

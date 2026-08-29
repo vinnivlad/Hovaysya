@@ -311,7 +311,19 @@ class Announcer:
             if falling and not any(part.startswith("Падає") for part in parts):
                 parts.append("Падає")
 
-            fresh = [p for p in obs.ring_places
+            # The message that explains a siren is the one place an outside
+            # town has to be named. His reason: "це мені дає інформацію з якої
+            # сторони загроза" — a threat approaching Kyiv is outside Kyiv
+            # until it is not, so "Вишгород" is the whole content, and the ring
+            # filter was dropping exactly it.
+            speakable = obs.ring_places
+            if decision.reason == "what the siren was about" and not speakable:
+                from ..nlp.gazetteer import find_places
+
+                speakable = tuple(dict.fromkeys(
+                    pl.name for pl in find_places(obs.text) if not pl.origin))
+
+            fresh = [p for p in speakable
                      if p not in named_places and (
                          self.always_full or p not in said['places']
                          or (p == HOME and decision.audible))]
