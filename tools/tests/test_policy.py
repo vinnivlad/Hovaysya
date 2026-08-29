@@ -1038,3 +1038,42 @@ def test_the_near_refractory_is_five_minutes():
     from tools.policy.episodes import REFRACTORY_NEAR_S
 
     assert REFRACTORY_NEAR_S == 300
+
+
+def test_cruise_rings_on_position_and_ballistic_on_launch():
+    """A physical difference, and it decides which machinery each class uses.
+
+    A cruise missile flies for hours, so its launch says nothing about when it
+    arrives or whether it is coming here — "крилаті ракети нема сенсу дзвонити
+    на пуск, воно летить кілька годин. Крилаті — тільки позиція." Ballistic is
+    minutes, so the launch is the whole event and a position adds nothing."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    # Ballistic: the launch rings, and a position over the ring afterwards does not.
+    tr = Tracker()
+    tr.official_source = True
+    got = []
+    for off, channel, text in ((0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+                               (200, "war_monitor", "‼️ Вихід балістики з Брянська"),
+                               (400, "kievinform_ua1", "Жуляни🚀")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        got.append((d.audible, d.reason))
+    assert got[1][0], got                      # the launch rings
+    assert not got[2][0], got                  # ...the position after it does not
+
+    # Cruise: the launch is hours away, so the position is what rings.
+    tr = Tracker()
+    tr.official_source = True
+    got = []
+    for off, channel, text in ((0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
+                               (200, "mon1tor_ua", "❗️Пуск крилатих ракет з Ту-95МС."),
+                               (900, "mon1tor_ua", "❗2 крилаті ракети на Жуляни.")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        got.append((d.audible, d.reason))
+    assert not got[1][0], got                  # a launch hours away does not ring
+    assert got[2][0], got                      # ...the position over the ring does

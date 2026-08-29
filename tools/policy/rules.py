@@ -230,6 +230,15 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
             and obs.scope not in CITY_OR_NEARER):
         return _silent("too-far: carried class, another district")
 
+    # Cruise deliberately does not join this rule, and the reason is physical:
+    # a cruise missile flies for hours, so its launch says nothing about when it
+    # arrives or whether it is coming here at all. What matters is where it is
+    # now — "крилаті ракети нема сенсу дзвонити на пуск, воно летить кілька
+    # годин. Крилаті — тільки позиція."
+    #
+    # So cruise stays on the position path with its five-minute refractory, and
+    # ballistic stays here on the launch path with none. Moving cruise across
+    # was proposed and refused; do not propose it again.
     if threat == "ballistic" and obs.certainty == "confirmed":
         # Novelty is a launch, not a position — and once a ballistic alert has
         # sounded, a place name over his own area adds nothing. His ruling, and
