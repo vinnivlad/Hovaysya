@@ -1284,14 +1284,37 @@ def test_the_siren_does_not_count_as_its_own_explanation():
     tr.official_source = True
     out = []
     for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            # States its own class: with nothing said before the siren there is
+            # no episode class to inherit, and a bare "1 на Вишгород" explains
+            # nothing on its own.
+            (22, "kievinform_ua1", "⚠️Реактивний шахед на Вишгород.")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        u = ann.announce(o, d)
+        out.append((d, u))
+    assert out[0][0].audible                      # the siren still rings
+    assert out[1][0].reason == "what the siren was about"
+    assert "Вишгород" in out[1][1].text
+
+
+def test_the_explanation_is_dropped_when_the_siren_already_said_it():
+    """With a ten-minute memory the siren usually carries the cause itself, and
+    the message written to supply it then arrives a second later saying the same
+    words. His rule: "глушимо, якщо загроза і місце однакові"."""
+    from tools.policy.announce import Announcer
+
+    tr, ann = Tracker(), Announcer()
+    tr.official_source = True
+    out = []
+    for off, channel, text in (
             (0, "mon1tor_ua", "⚠️2 реактивні шахеди на Київ/Вишгород з півночі."),
             (400, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
             (422, "kievinform_ua1", "1 на Вишгород")):
         o = observe(T0 + off, text, False, channel)
         d = decide(o, tr)
         tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
-        u = ann.announce(o, d)
-        out.append((d, u))
-    assert out[1][0].audible                      # the siren still rings
-    assert out[2][0].reason == "what the siren was about"
-    assert "Вишгород" in out[2][1].text
+        out.append((d, ann.announce(o, d)))
+    assert "Вишгород" in out[1][1].text            # the siren carries it
+    assert out[2][1] is None                       # ...so this says nothing

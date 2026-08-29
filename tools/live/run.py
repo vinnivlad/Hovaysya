@@ -49,7 +49,7 @@ from ..export.config import CHANNELS, DB_PATH
 from ..export.tme import Client, FetchError
 from ..labeler.build import kyiv_dt
 from ..policy.announce import Announcer
-from ..policy.episodes import Tracker, observe
+from ..policy.episodes import OFFICIAL_CHANNELS, Tracker, observe
 from ..policy.rules import decide
 from .notify import Notifier
 from .version import startup_note
@@ -242,6 +242,8 @@ def poll_once(client: Client, conn: sqlite3.Connection, watchers: list[Watcher],
         rows.append((msg.channel, msg.message_id, row["ts"], row["text_norm"],
                      row["reply_to"] is not None))
 
+    # Stable sort on the timestamp alone: equal seconds keep the order the
+    # channels were polled in, which is why the official one is asked last.
     for channel, message_id, ts, text, is_reply in sorted(rows, key=lambda r: r[2]):
         handle(session, channel, message_id, ts, text, is_reply, now, warm=warm)
     return len(fresh)
@@ -348,7 +350,14 @@ def main(argv: list[str] | None = None) -> int:
 
     conn = store.connect(args.db)
     client = Client(rps=args.rps)
+    # The official channel goes last, on purpose. The page timestamps have
+    # seconds and no finer, and three messages sharing a second is ordinary --
+    # so at equal times the order is decided by the order channels were asked,
+    # and `sorted` is stable. Asking the siren last means a chat message from
+    # the same second is folded in first, and the siren then arrives already
+    # knowing what it is about. His idea.
     channels = args.channels or list(CHANNELS)
+    channels.sort(key=lambda c: c in OFFICIAL_CHANNELS)
     watchers = [Watcher(channel=c, last_id=store.resume_id(conn, c)) for c in channels]
 
     for w in watchers:
@@ -362,8 +371,6 @@ def main(argv: list[str] | None = None) -> int:
     session = Session(notifier=Notifier())
     # The official channel speaks only when the siren changes, so "has it spoken
     # lately" is not the same question as "is it being watched".
-    from ..policy.episodes import OFFICIAL_CHANNELS
-
     session.tracker.official_source = bool(OFFICIAL_CHANNELS & set(channels))
     stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
     log_path = LOG_DIR / f"{stamp}.jsonl"
@@ -387,7 +394,8 @@ def main(argv: list[str] | None = None) -> int:
     warmed = 0
     for row in conn.execute(
             "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
-            "WHERE ts >= ? AND text_norm <> '' ORDER BY ts", (warm_from,)):
+            "WHERE ts >= ? AND text_norm <> '' "
+            "ORDER BY ts, channel IN ('alarm_kyiv')", (warm_from,)):
         handle(session, row["channel"], row["message_id"], row["ts"],
                row["text_norm"], row["reply_to"] is not None, time.time(), warm=True)
         warmed += 1

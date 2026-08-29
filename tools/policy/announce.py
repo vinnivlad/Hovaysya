@@ -38,8 +38,20 @@ from .rules import Decision
 
 # What to call each class out loud. Not the internal name: he hears these at
 # three in the morning and has to act on them without thinking.
+def _all_places(text: str):
+    from ..nlp.gazetteer import find_places
+
+    return [p for p in find_places(text) if not p.origin]
+
+
 # How stale the remembered cause may be before it stops explaining a siren.
-PENDING_HORIZON_S = 5 * 60
+#
+# Five minutes was his first number and covered 67% of the alerts where the
+# channels spoke first. Ten covers 77%, and takes in the case that prompted the
+# change: seven minutes before a siren the channels said "2 реактивні шахеди на
+# Київ/Вишгород з півночі" and the siren still came out without a place. The
+# median lead is 2.1 minutes; the mean is 5.7, because the tail is long.
+PENDING_HORIZON_S = 10 * 60
 
 CLASS_WORD = {
     "ballistic": "балістика",
@@ -141,6 +153,10 @@ class Announcer:
     #   🚨 м. Київ / Повітряна тривога         -> "Тривога. Реактивний шахед. Вишневе."
     pending_threat: str | None = None
     pending_places: list[str] = field(default_factory=list)
+    # Towns outside the ring, kept separately and used only when the ring has
+    # said nothing. A name he acts on outranks one that merely tells him the
+    # direction: "Вишневе" beats "Буча, Вишневе".
+    pending_far: list[str] = field(default_factory=list)
     # When the pending memory was last refreshed. Without a horizon it lived
     # from one full all-clear to the next, so a class named an hour earlier
     # could arrive as the explanation for a fresh siren. Five minutes is his
@@ -166,6 +182,7 @@ class Announcer:
         self.shown = _blank()
         self.pending_threat = None
         self.pending_places = []
+        self.pending_far = []
         self.pending_at = 0
 
     def note(self, obs: Observation) -> None:
@@ -179,9 +196,25 @@ class Announcer:
         self.pending_at = obs.ts
         if obs.threat not in ("none", "unknown"):
             self.pending_threat = obs.threat
+        # Not only ring names. Seen live: seven minutes before a siren the
+        # channels said "2 реактивні шахеди на Київ/Вишгород з півночі" and the
+        # siren still came out as "Тривога. Реактивний шахед." with no place --
+        # because Вишгород is not in the ring, so it never entered the memory
+        # at all. A threat approaching Kyiv is outside Kyiv until it is not.
+        #
+        # Two guards, both learned by breaking tests: the siren's own text says
+        # "м. Київ" and contributes nothing, and "Київ" as a place name is noise
+        # in a sentence that is already about Kyiv.
         for place in obs.ring_places:
             if place not in self.pending_places:
                 self.pending_places.append(place)
+        if not obs.ring_places and not obs.official and obs.scope in ("city", "oblast"):
+            from ..nlp.gazetteer import find_places
+
+            for pl in find_places(obs.text):
+                if (not pl.origin and pl.tier in ("city", "oblast")
+                        and pl.name != "Київ" and pl.name not in self.pending_far):
+                    self.pending_far.append(pl.name)
 
     def _forget_if_stale(self, ts: int) -> None:
         """The remembered cause explains a siren only while it is fresh.
@@ -193,6 +226,7 @@ class Announcer:
         if self.pending_at and ts - self.pending_at > PENDING_HORIZON_S:
             self.pending_threat = None
             self.pending_places = []
+            self.pending_far = []
 
     def announce(self, obs: Observation, decision: Decision) -> Utterance | None:
         self._forget_if_stale(obs.ts)
@@ -216,6 +250,19 @@ class Announcer:
         # sentence came out classless while the policy knew a jet Shahed was up.
         stated = obs.effective_threat or obs.threat
         threat = stated if stated not in ("none", "unknown") else None
+
+        # The siren now often carries the cause itself, so the message that was
+        # written to supply it can arrive a second later saying the same words.
+        # His rule: "глушимо, якщо загроза і місце однакові". This lives here
+        # rather than in the rules because the announcer is the only thing that
+        # knows what was actually said aloud.
+        if decision.reason == "what the siren was about":
+            spoken_places = self.spoken["places"]
+            here = set(obs.ring_places) or {
+                pl.name for pl in _all_places(obs.text)}
+            if (stated in self.spoken["classes"]
+                    and here and here <= spoken_places):
+                return None
 
         # "Дорозвідка" is a status, not a threat, and the sentence machinery
         # below would render it as one -- or, with no class stated, as a bare
@@ -257,10 +304,11 @@ class Announcer:
                     parts.append(CLASS_WORD[self.pending_threat].capitalize())
                     said['classes'].add(self.pending_threat)
                     named_class = True
-                if self.pending_places:
-                    named_places = list(self.pending_places[-3:])
+                remembered = self.pending_places or self.pending_far
+                if remembered:
+                    named_places = list(remembered[-3:])
                     parts.append(", ".join(named_places))
-                    said['places'].update(self.pending_places)
+                    said['places'].update(remembered)
 
             # A launch names its own class, so the two facts must not both be
             # said: "Загроза: балістика. Пуск: балістика." is one fact twice.
