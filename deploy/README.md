@@ -75,3 +75,31 @@ Commit and push to `main`. Within the timer's period the instance pulls, and
 restarts only if the working tree actually changed. To force it:
 
     sudo systemctl start hovaysya-update
+
+## How you find out it worked
+
+The watcher sends a **silent** message to the same chat as it reaches the live
+feed:
+
+    🔧 Оновлено і перезапущено.
+    версія: af814ab — Leave an orientation for whoever picks this up
+    · Keep what is not in git
+    стан: тихо · 5 канал(и)
+
+`update.sh` could send that itself and it would be cheaper, but it would be
+answering the wrong question: that git pulled says nothing about whether the
+process came up, found its token, warmed its tracker and started polling. Sent
+from `tools/live/version.py` at the end of startup, the message exists only if
+all of that actually happened — which is also what makes it the answer to "чи
+запрацював спостерігач на ораклі", on a machine that has never run it before:
+
+    ▶️ Спостерігач запущено.
+
+A restart on the **same** commit says `🔁 Перезапуск.` and is rate-limited to
+once every half hour. `Restart=always` with `RestartSec=10` means a watcher that
+cannot start would otherwise send six messages a minute forever, and the deploy
+note would become the thing waking him up.
+
+The last announcement is recorded in `data/live-version.json`, which is
+gitignored along with the rest of `data/`. Deleting it makes the next start
+announce itself as a first start.

@@ -52,6 +52,7 @@ from ..policy.announce import Announcer
 from ..policy.episodes import Tracker, observe
 from ..policy.rules import decide
 from .notify import Notifier
+from .version import startup_note
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LOG_DIR = REPO_ROOT / "data" / "live"
@@ -351,6 +352,19 @@ def main(argv: list[str] | None = None) -> int:
     if caught:
         state = "ТРИВОГА" if session.tracker.episode is not None else "тихо"
         print(f"  наздогнав {caught} нових — стан: {state}")
+
+    # Only now, with everything warmed and caught up, say which version is
+    # watching — silently, because a deploy is never worth waking up for. Sent
+    # from here rather than from `update.sh` on purpose: that git pulled says
+    # nothing about whether the process came up and reached the live feed, and
+    # that is the thing the message is supposed to prove.
+    state = "ТРИВОГА" if session.tracker.episode is not None else "тихо"
+    note = startup_note(f"{state} · {len(watchers)} канал(и)")
+    if note:
+        print(chr(10).join("  " + line for line in note.splitlines()), flush=True)
+        if session.notifier and session.notifier.enabled:
+            session.notifier.send(note, audible=False)
+
     print("  --- далі живий ефір ---", flush=True)
     print()
 

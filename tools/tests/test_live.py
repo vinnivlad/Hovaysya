@@ -272,3 +272,100 @@ def test_a_backup_carries_the_night_logs(tmp_path):
     assert main(["--from", str(src), "--to", str(dst)]) == 0
     assert (dst / "live" / "20260828T000000.jsonl").exists()
     assert (dst / "telegram-bot.token").read_text(encoding="utf-8") == "123:fake"
+
+
+# --- saying that a new version is up ---------------------------------------
+
+
+def _version(sha="af814ab", subject="Leave an orientation"):
+    from tools.live.version import Version
+
+    return Version(commit=sha, subject=subject)
+
+
+def test_a_first_start_says_it_started(tmp_path):
+    """The Oracle case: nothing has ever run here, and the only proof the
+    instance works is a message arriving from it."""
+    from tools.live.version import startup_note
+
+    note = startup_note("тихо · 5 каналів", _version(),
+                        state_path=tmp_path / "v.json", now=T0)
+    assert note is not None
+    assert "запущено" in note
+    assert "af814ab" in note
+    assert "тихо · 5 каналів" in note
+
+
+def test_a_new_commit_says_it_was_improved(tmp_path):
+    """What he asked for: a deploy announces itself, in the same chat, without
+    a sound."""
+    from tools.live.version import remember, startup_note
+
+    state = tmp_path / "v.json"
+    remember(state, "2a5020c", T0 - 3600)
+    note = startup_note("тихо", _version("af814ab", "Leave an orientation"),
+                        state_path=state, now=T0)
+    assert "Оновлено" in note
+    assert "Leave an orientation" in note
+
+
+def test_a_restart_on_the_same_commit_is_quiet_for_a_while(tmp_path):
+    """systemd restarts forever with a ten-second gap, so a crash loop would
+    otherwise send six messages a minute. Rare enough to still be a signal that
+    something is wrong, quiet enough not to be the alarm itself."""
+    from tools.live.version import RESTART_COOLDOWN_S, remember, startup_note
+
+    state = tmp_path / "v.json"
+    remember(state, "af814ab", T0)
+    assert startup_note("тихо", _version(), state_path=state,
+                        now=T0 + 60) is None
+    later = startup_note("тихо", _version(), state_path=state,
+                         now=T0 + RESTART_COOLDOWN_S + 1)
+    assert later is not None and "Перезапуск" in later
+
+
+def test_the_state_is_written_only_when_something_was_said(tmp_path):
+    """Or a crash loop would keep pushing the timestamp forward and the restart
+    would never be reported at all."""
+    from tools.live.version import last_seen, remember, startup_note
+
+    state = tmp_path / "v.json"
+    remember(state, "af814ab", T0)
+    startup_note("тихо", _version(), state_path=state, now=T0 + 60)
+    assert last_seen(state) == ("af814ab", T0)
+
+
+def test_several_commits_are_listed_but_not_all_of_them(tmp_path):
+    """A deploy that carries a week of work must not arrive as a wall of text
+    on a phone at three in the morning."""
+    from tools.live.version import startup_note
+
+    subjects = [f"commit number {i}" for i in range(9)]
+    note = startup_note("тихо", _version("af814ab", subjects[0]),
+                        changes=subjects, state_path=tmp_path / "v.json",
+                        now=T0)
+    assert note.count(chr(10)) <= 6
+    assert "ще 5" in note
+
+
+def test_a_checkout_without_git_still_announces(tmp_path):
+    """A tarball, a container, a `git` that is not installed — none of those are
+    a reason for the instance to stay silent about being alive."""
+    from tools.live.version import describe, startup_note
+
+    version = describe(tmp_path)          # not a repository
+    assert version.commit == ""
+    note = startup_note("тихо", version, state_path=tmp_path / "v.json", now=T0)
+    assert note is not None
+    assert "запущено" in note
+
+
+def test_it_arrives_without_a_sound():
+    """He is asleep. A deploy is not worth waking up for, ever."""
+    import inspect
+
+    from tools.live import run
+
+    source = inspect.getsource(run.main)
+    assert "startup_note" in source
+    assert "audible=False" in source
