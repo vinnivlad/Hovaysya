@@ -376,7 +376,13 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
 
     # 10. A MiG-31K in the air alerts the country, but the launch may be an hour
     #    away or never come — loud is wrong, silence is worse.
-    if threat == "mig":
+    #    And on some evidence of flight, like ballistic and the ladder. "Загалом
+    #    до атаки готові 6 Ту-95мс та 7 Ту-160" is a readiness report -- no
+    #    count, no place, no movement, no phase word -- and it rang as a takeoff
+    #    because it names the aircraft. His remark that a MiG alerts the whole
+    #    country is what sent me looking: of five "MiG episodes" in the corpus,
+    #    two were not takeoffs at all.
+    if threat == "mig" and obs.strength != "none":
         # One takeoff, three channels: "Виліт винищувача МіГ-31К з аеродрому
         # Саваслейка", then "Зліт МіГ-31К ВПС рф" a minute later and again two
         # minutes after that. He woke for the first and called both others

@@ -1674,3 +1674,20 @@ def test_a_partial_all_clear_after_the_full_one_is_not_news():
         tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
                   d.reason)
     assert not d.audible, d.reason
+
+
+def test_a_readiness_report_is_not_a_takeoff():
+    """"Загалом до атаки готові 6 Ту-95мс та 7 Ту-160" rang as a MiG takeoff
+    because it names the aircraft — no count, no place, no movement, no phase
+    word. The third rule today to need the same guard, after ballistic and the
+    climb."""
+    tr = Tracker()
+    tr.official_source = True
+    d = decide(observe(T0, "Загалом до атаки готові 6 Ту-95мс та 7 Ту-160 "
+                       "на аеродромах базування.", False, "mon1tor_ua"), tr)
+    assert not d.audible, d.reason
+    tr2 = Tracker()
+    tr2.official_source = True
+    d2 = decide(observe(T0, "❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка.",
+                        False, "mon1tor_ua"), tr2)
+    assert d2.audible and d2.alarm == "mig"
