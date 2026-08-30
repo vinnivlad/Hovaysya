@@ -1640,7 +1640,10 @@ def test_a_climb_says_where_it_is_climbing_from():
     for off, channel, text in (
             (0, "mon1tor_ua", "⚠️5 реактивних шахедів з Чернігівщини на Київщину."),
             (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
-            (600, "mon1tor_ua", "❗️ 3 групи КР від Конотопа у напрямку Ніжина."),
+            # The second line is what makes it ours; without it the message is
+            # about Sumshchyna and is correctly none of our business.
+            (600, "mon1tor_ua", "❗️ 3 групи КР від Конотопа у напрямку Ніжина."
+                                + chr(10) + "Далі рух на Київщину."),
             (1200, "mon1tor_ua", "🔴2 ракети бандероль на Оболонський район Києва.")):
         o = observe(T0 + off, text, False, channel)
         d = decide(o, tr)
