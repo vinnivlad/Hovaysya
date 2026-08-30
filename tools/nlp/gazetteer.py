@@ -111,7 +111,7 @@ MY_AREA = [
     # Teremky, and the corpus writes them together: "2 крилаті ракети на
     # Республіку/Теремки". A landmark, so a settlement named beside it still
     # outranks it.
-    _p("Республіка", "my-area", "республіка", "республіки", landmark=True),
+    _p("Республіка", "my-area", "республік", landmark=True),
     _p("Теремки", "my-area", "теремк"),
 ]
 
@@ -121,6 +121,12 @@ MY_DISTRICT = [
 
 # The rest of Kyiv, including the informal "масив" areas the channels use.
 CITY = [
+    # Found 2026-08-30 by sweeping live messages for words standing in a place
+    # slot that resolved to nothing — the same method that found forty oblast
+    # towns before. Both are ordinary nouns as well, and in these channels they
+    # are never used as ordinary nouns.
+    _p("Берковець", "city", "берковец", "берковц"),
+    _p("Вокзал", "city", "вокзал", landmark=True),
     # Ruled out of the near ring by the user after the first night: in Kyiv,
     # but not on the corridor that matters to them.
     _p("Чоколівка", "city", "чоколів"),
@@ -165,7 +171,9 @@ CITY = [
     _p("Лівобережний масив", "city", "лівобережн"),
     _p("Харківський масив", "city", "харківський масив"),
     _p("Дарницький масив", "city", "дарницький масив"),
-    _p("Мінський масив", "city", "мінський масив"),
+    # `мінський масив` missed the instrumental — "над Мінським масивом". Bare
+    # Minsk never occurs in these channels.
+    _p("Мінський масив", "city", "мінськ"),
     _p("Соцмісто", "city", "соцміст"),
     _p("Труханів", "city", "труханів"),
     _p("Центр", "city", "центр", ambiguous=True),
@@ -237,23 +245,42 @@ OBLAST = [
     _p("Вишгород", "oblast", "вишгород"),
     _p("Бориспіль", "oblast", "бориспіл", "борисполь", "борисполя"),
     _p("Обухів", "oblast", "обухів", "обухов"),
-    _p("Васильків", "oblast", "васильків", "василькова"),
+    # "Васік" is what the channels call it — six times, and it matched nothing.
+    _p("Васильків", "oblast", "васильків", "василькова", "васік"),
     _p("Ірпінь", "oblast", "ірпін"),
-    _p("Буча", "oblast", "буча", "бучі"),
+    # The accusative was missing: "Бандероль курсом на Бучу", 21 times. `буч`
+    # alone would also catch "буча" the noun, so the forms are listed.
+    _p("Буча", "oblast", "буча", "бучі", "бучу", "бучан"),
     _p("Гостомель", "oblast", "гостомел"),
     _p("Фастів", "oblast", "фастів"),
-    _p("Переяслав", "oblast", "переяслав"),
+    _p("Переяслав", "oblast", "переясл"),
     _p("Славутич", "oblast", "славутич"),
     _p("Жукин", "oblast", "жукин"),
     _p("Згурівка", "oblast", "згурівк"),
     _p("Баришівка", "oblast", "баришівк"),
     _p("Макарів", "oblast", "макарів"),
     _p("Боярка", "oblast", "боярк"),
+    # Same sweep. Approach waypoints the channels name and we could not read:
+    # the reservoir north of the city, and towns on the Brovary, Obukhiv,
+    # Vyshhorod and Cherkasy corridors.
+    _p("Водосховище", "oblast", "водосховищ", landmark=True),
+    _p("Калита", "oblast", "калит"),
+    _p("Канів", "oblast", "канів", "канева", "каневом"),
+    # Only the nominative: `щаслив` would also take "щасливого шляху", which
+    # does not occur in the corpus but costs nothing to exclude.
+    _p("Щасливе", "oblast", "щасливе"),
+    _p("Кіпті", "oblast", "кіпт"),
+    _p("Трипілля", "oblast", "трипілл"),
+    _p("Рожівка", "oblast", "рожівк"),
+    _p("Лебедівка", "oblast", "лебедівк"),
     # Prefix, not full forms: the accusative is Українку. Dropping "українц"
     # on purpose — it would match "українців" in ordinary prose.
     _p("Українка", "oblast", "українк"),
     _p("Димер", "oblast", "димер"),
-    _p("Велика Димерка", "oblast", "велика димерк", "великої димерк"),
+    # `димерк` and not just the two-word forms: "на Велику Димерку" resolved to
+    # Dymer, a different village in a different raion, because `димер` matched
+    # first. Longest match now sends every Dymerka form here.
+    _p("Велика Димерка", "oblast", "димерк", "велика димерк", "великої димерк"),
     _p("Погреби", "oblast", "погреб"),
     _p("Зазим'я", "oblast", "зазим"),
     _p("Коцюбинське", "oblast", "коцюбинс"),
@@ -401,7 +428,8 @@ def _with_alternations(place: Place) -> Place:
 # an argument for promoting it. That is his call to make, not mine, and `city`
 # keeps the messages visible without turning each one into a wake-up.
 LANDMARKS = [
-    _p("Конча-Заспа", "city", "конча-заспа", "кончі-заспі", "заспа", "заспі"),
+    # `конча` covers the accusative too: "2х Реактивні БпЛА курсом на Конча-Заспу".
+    _p("Конча-Заспа", "city", "конча", "кончі-заспі", "заспа", "заспі"),
     _p("Нижні Сади", "city", "нижні сади", "нижних сад", "нижні сад"),
     # `kievinform_ua1` writes "ТЕЦ 5" with a space, `mon1tor_ua` writes "ТЕЦ-5".
     # Six occurrences went missing on the space form alone — including the one

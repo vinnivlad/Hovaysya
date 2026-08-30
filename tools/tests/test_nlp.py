@@ -1114,3 +1114,43 @@ def test_a_centre_belongs_to_the_city_that_names_it():
     assert resolve_scope("Центр Одеси.") == "elsewhere"
     assert resolve_scope("❗️ 3х Авіа-ракети у напрямку Одеса центр") == "elsewhere"
     assert resolve_scope("Центр❗️") == "city"
+
+
+def test_the_cases_the_stems_used_to_miss():
+    """Found 2026-08-30 by sweeping live messages for words standing in a place
+    slot that resolved to nothing. Each of these names a place the gazetteer
+    already held, in a case its stem did not cover — so the place vanished from
+    the sentence, silently."""
+    for text, want in (("Бандероль курсом на Бучу", "Буча"),
+                       ("2х Реактивні БпЛА курсом на Конча-Заспу", "Конча-Заспа"),
+                       ("над Мінським масивом", "Мінський масив"),
+                       ("у Переяслова", "Переяслав"),
+                       ("на Республіку", "Республіка"),
+                       ("Васік", "Васильків")):
+        assert want in {p.name for p in find_places(text)}, text
+
+
+def test_velyka_dymerka_is_not_dymer():
+    """Worse than a miss: "на Велику Димерку" resolved to Dymer, a different
+    village in a different raion, so a message about the Brovary corridor read
+    as one about Vyshhorod."""
+    assert [p.name for p in find_places("на Велику Димерку")] == ["Велика Димерка"]
+    assert [p.name for p in find_places("1х на Димер")] == ["Димер"]
+
+
+def test_the_places_the_sweep_found_missing():
+    for text, want in (("з Берковець на Ірпінь", "Берковець"),
+                       ("⚠️ Реактивний шахед на Вокзал.", "Вокзал"),
+                       ("З Чернігівської 1х на Водосховище", "Водосховище"),
+                       ("курсом на Калиту", "Калита"),
+                       ("повз Канів на південь", "Канів"),
+                       ("повз Бровари далі Щасливе", "Щасливе"),
+                       ("на Кіпті", "Кіпті"),
+                       ("курсом на Трипілля", "Трипілля"),
+                       ("курсом на Рожівку", "Рожівка"),
+                       ("Бандероль повз Лебедівку на Київ", "Лебедівка")):
+        assert want in {p.name for p in find_places(text)}, text
+    # ...and the one deliberately left out: "Південне" is also the adjective,
+    # and 88 of its 156 corpus occurrences are "південним курсом", "південніше
+    # Борисполя", "Південним мостом".
+    assert not find_places("південним курсом")
