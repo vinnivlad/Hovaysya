@@ -471,3 +471,51 @@ def test_the_sleep_gap_measures_against_the_shortest_interval_in_play():
 
     session = Session()
     assert interval_hint(_args(), session) == 10        # the official channel
+
+
+# --- what arrives during a restart -----------------------------------------
+
+
+def test_something_that_arrived_seconds_ago_is_not_backlog(tmp_path):
+    """An all-clear was published at 15:36:57 and the watcher restarted at
+    15:37:01. The catch-up pass is silent by design — it exists so six hours of
+    backlog do not arrive as six hours of alerts — and it swallowed a message
+    four seconds old. Every deploy restarts the process, so this is a risk we
+    create ourselves."""
+    from tools.live.run import FRESH_ON_RESTART_S
+
+    session = Session()
+    now = T0 + 4
+    # Old enough to be backlog: silent, and it still warms the tracker.
+    handle(session, "alarm_kyiv", 1, T0 - FRESH_ON_RESTART_S - 60,
+           "🚨 м. Київ" + chr(10) + "Повітряна тривога", False, now, warm=True)
+    assert session.decisions == 0
+    assert session.tracker.episode is not None
+    # Four seconds old: this is now.
+    handle(session, "alarm_kyiv", 2, T0,
+           "🟢 м. Київ" + chr(10) + "Відбій повітряної тривоги", False, now,
+           warm=False)
+    assert session.decisions == 1
+    assert session.audible == 1
+
+
+def test_a_restart_does_not_repeat_what_the_last_run_announced(tmp_path):
+    """The freshness window alone would say it twice: the old process announces
+    at 15:36:57 and dies, the new one starts four seconds later and sees a
+    four-second-old message. Its predecessor's log says what it had said."""
+    from tools.live.run import already_said
+
+    old = tmp_path / "20260830T120000.jsonl"
+    old.write_text(
+        json.dumps({"anchor": "alarm_kyiv/2", "warm": None}, ensure_ascii=False)
+        + "\n"
+        + json.dumps({"anchor": "alarm_kyiv/1", "warm": True}, ensure_ascii=False)
+        + "\n", encoding="utf-8")
+    said = already_said(tmp_path, skip=tmp_path / "current.jsonl")
+    assert said == {"alarm_kyiv/2"}          # the caught-up one does not count
+
+
+def test_no_previous_log_is_not_an_error(tmp_path):
+    from tools.live.run import already_said
+
+    assert already_said(tmp_path, skip=tmp_path / "current.jsonl") == set()

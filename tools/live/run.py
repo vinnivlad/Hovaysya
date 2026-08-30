@@ -101,6 +101,15 @@ SLEEP_GAP_S = 120.0
 # relying on the poll, and an hour and a half comfortably spans an episode.
 WARM_WINDOW_S = 90 * 60
 
+# ...but a message that arrived seconds ago is not backlog, it is now. An
+# all-clear was published at 15:36:57 and the watcher restarted at 15:37:01,
+# four seconds later, so the catch-up swallowed it and he never heard it. Every
+# deploy restarts the process, which makes this a risk we create ourselves.
+#
+# One minute, his bound. Anything the previous run already announced is skipped
+# by anchor, so a restart cannot say the same thing twice.
+FRESH_ON_RESTART_S = 60
+
 _STOP = False
 
 
@@ -196,8 +205,26 @@ def handle(session: Session, channel: str, message_id: int, ts: int, text: str,
         print(f"{'':<21}   -> «{utterance.text}»   [{utterance.lead}]", flush=True)
 
 
+def already_said(log_dir: Path, skip: Path) -> set[str]:
+    """Anchors the previous run announced out loud, from its own log."""
+    logs = sorted((p for p in log_dir.glob("*.jsonl") if p != skip),
+                  key=lambda p: p.stat().st_mtime, reverse=True)
+    if not logs:
+        return set()
+    seen = set()
+    try:
+        for line in logs[0].read_text(encoding="utf-8").splitlines():
+            row = json.loads(line)
+            if not row.get("warm"):
+                seen.add(row["anchor"])
+    except (OSError, ValueError):
+        return set()
+    return seen
+
+
 def poll_once(client: Client, conn: sqlite3.Connection, watchers: list[Watcher],
-              session: Session, warm: bool = False, args=None) -> int:
+              session: Session, warm: bool = False, args=None,
+              fresh_from: float | None = None, said: set[str] | None = None) -> int:
     """One pass over the channels that are due. Returns how many arrived."""
     fresh = []
     for w in watchers:
@@ -246,7 +273,10 @@ def poll_once(client: Client, conn: sqlite3.Connection, watchers: list[Watcher],
     # Stable sort on the timestamp alone: equal seconds keep the order the
     # channels were polled in, which is why the official one is asked last.
     for channel, message_id, ts, text, is_reply in sorted(rows, key=lambda r: r[2]):
-        handle(session, channel, message_id, ts, text, is_reply, now, warm=warm)
+        quiet = warm
+        if quiet and fresh_from is not None and ts >= fresh_from:
+            quiet = f"{channel}/{message_id}" in (said or ())
+        handle(session, channel, message_id, ts, text, is_reply, now, warm=quiet)
     return len(fresh)
 
 
@@ -392,18 +422,25 @@ def main(argv: list[str] | None = None) -> int:
     # restart mid-alert has nothing to catch up on and would otherwise start with
     # no episode — announcing a wave already announced, at the quiet interval.
     warm_from = int(time.time()) - WARM_WINDOW_S
-    warmed = 0
+    fresh_from = time.time() - FRESH_ON_RESTART_S
+    said = already_said(LOG_DIR, log_path)
+    warmed = spoken = 0
     for row in conn.execute(
             "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
             "WHERE ts >= ? AND text_norm <> '' "
             "ORDER BY ts, channel IN ('alarm_kyiv')", (warm_from,)):
+        anchor = f"{row['channel']}/{row['message_id']}"
+        quiet = row["ts"] < fresh_from or anchor in said
         handle(session, row["channel"], row["message_id"], row["ts"],
-               row["text_norm"], row["reply_to"] is not None, time.time(), warm=True)
+               row["text_norm"], row["reply_to"] is not None, time.time(),
+               warm=quiet)
         warmed += 1
+        spoken += not quiet
     if warmed:
         state = state_word(session.tracker)
+        note = f", з них {spoken} свіжих — озвучено" if spoken else ""
         print(f"  прогрів: {warmed} повідомлень за останні "
-              f"{WARM_WINDOW_S // 60} хв — стан: {state}")
+              f"{WARM_WINDOW_S // 60} хв{note} — стан: {state}")
 
     # Catch up on whatever arrived while the machine was off, silently. The
     # tracker needs it — an alert may already be running — but printing six
@@ -411,7 +448,8 @@ def main(argv: list[str] | None = None) -> int:
     # one measurement here meaningless.
     caught = 0
     for _ in range(200):
-        got = poll_once(client, conn, watchers, session, warm=True)
+        got = poll_once(client, conn, watchers, session, warm=True,
+                         fresh_from=fresh_from, said=said)
         caught += got
         if got == 0:
             break
