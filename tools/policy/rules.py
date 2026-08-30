@@ -410,6 +410,19 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
         if obs.heading == "loitering":
             # Circling nearby is not an approach. The user labelled these
             # "ті самі" — worth showing, not worth a second wake-up.
+            #
+            # Revisited 2026-08-30 and kept, deliberately. "✈️✈️Кружляє
+            # Жуляни/Шулявка/КарДачі" was silent and he asked why: "але ж це
+            # наче перша згадка". It was — this branch sits *after* the novelty
+            # check, so everything reaching it is new, and calling it "ті самі"
+            # is a claim about the shape of the flight rather than about
+            # repetition. A drone circling over Zhuliany and one heading into
+            # them are different things, and the first is exactly what he slept
+            # through and did not want waking for.
+            #
+            # There is nothing to decide it from either way: circling that names
+            # Zhuliany happens once in the whole corpus, plus the case above.
+            # His call — "тут мабуть більше за лишаємо як є".
             return _notify("info", "none", "circling nearby")
         return _notify("alert", alarm, "new target near me")
 
