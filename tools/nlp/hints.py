@@ -66,7 +66,10 @@ _THREAT = tuple((kind, re.compile(pat, re.IGNORECASE)) for kind, pat in THREAT_R
 # one of these: "Здавалося б що загроза балістики, але ні! Попередження на
 # наступні 2 дні просто."
 _ANTICIPATED = re.compile(
-    r"загроз\w*\s+(пуск|застосув|використ|удар|атак)|"
+    # Words may sit between: "підвищена загроза масованого ракетного удару" is
+    # a risk level, not an event, and read as a confirmed cruise report over
+    # Bila Tserkva. His words: "це не про загрозу в моменті".
+    r"загроз\w*\s+(?:\w+\s+){0,3}(пуск|застосув|використ|удар|атак)|"
     r"можлив\w*\s+(пуск|застосув|удар)|"
     r"може\s+атакувати|можуть\s+атакувати|"
     r"ризик\w*\s+(пуск|застосув)|"
@@ -444,6 +447,15 @@ REAPPEAR_TERMS = ("виліз", "вилізл", "виповз", "з'явив", "
 
 def reappeared(text: str) -> bool:
     return _hits(text, REAPPEAR_TERMS)
+
+
+_SPECIFIC_CRUISE = re.compile(
+    r"крилат|калібр|х-?101|х-?59|х-?55|бандерол|кр|крів", re.IGNORECASE)
+
+
+def generic_rocket(text: str) -> bool:
+    """True when the cruise class rests on a bare "ракета" and nothing else."""
+    return not _SPECIFIC_CRUISE.search(text or "")
 
 
 def recheck(text: str) -> bool:

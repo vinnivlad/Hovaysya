@@ -16,8 +16,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..nlp import hints
-from .episodes import (SILENT_DEDUP_S, THREAT_LEVEL, Observation, Tracker,
-                       silent_signature)
+from .episodes import (GEO_STEP, REFRACTORY_NEAR_S, SILENT_DEDUP_S,
+                       THREAT_LEVEL, Observation, Tracker, silent_signature)
 
 LEVELS = ("info", "alert")
 
@@ -84,6 +84,16 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     inherited = False
     if threat in ("none", "unknown") and ep is not None and ep.threat:
         threat = ep.threat
+        inherited = True
+    # A bare "ракета" is a guess, not a class. `ракет` is the last rule in the
+    # list, there precisely because the specific names failed -- and during a
+    # ballistic wave it is that wave. Seen in the labelled night: mon1tor_ua
+    # wrote "❗Балістична ракета на Київ." and kievinform_ua1 wrote "РАКЕТА НА
+    # КИЇВ" two seconds later; the second read as cruise, escaped the ballistic
+    # dedup and rang again for the same missile.
+    elif (threat == "cruise" and hints.generic_rocket(obs.text)
+            and ep is not None and ep.threat == "ballistic"):
+        threat = "ballistic"
         inherited = True
     # Stamped so the notification, the log and the report all name the class the
     # decision was actually made on.
@@ -419,6 +429,25 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             and threat not in ("none", "unknown")
             and obs.scope in ("my-area", "my-district", "city", "oblast")):
         return _notify("info", "none", "what the siren was about")
+
+    # 11c. Cruise gets a ladder of its own, made of distance rather than class.
+    #      Waking only when they reach the city is late -- "якщо вона коли ракети
+    #      залітають у місто, то це пізнувато" -- and the corpus agrees: where
+    #      the channels report the oblast first, that is a median of 6 minutes
+    #      of warning, p90 16.
+    #
+    #      One ring per rung, so a wave crossing the oblast does not ring for
+    #      every town it passes.
+    #      On a stated class only. Most oblast-scope "cruise" turns out to be a
+    #      bare place inheriting the episode's class -- "Обухів.", "Броварський
+    #      район - повітряна тривога!", even a news item about a grenade left in
+    #      the street. Nineteen such moments against one real wave.
+    if (threat in ("cruise", "kab") and obs.live and not inherited
+            and obs.certainty != "probable"
+            and ep is not None and ep.alert_announced):
+        step = GEO_STEP.get(obs.scope, 0)
+        if step > ep.cruise_geo:
+            return _notify("alert", alarm, "cruise coming closer")
 
     # 12. In the city but not near: worth knowing, not worth waking twice — and
     #    for a drone, not worth waking at all. His rule from the first

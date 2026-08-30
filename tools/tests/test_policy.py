@@ -1502,3 +1502,58 @@ def test_a_strike_that_landed_does_not_become_the_sirens_place():
                   d.reason)
         u = ann.announce(o, d)
     assert "Труханів" not in u.text
+
+
+def test_cruise_rings_on_the_oblast_before_it_rings_on_the_city():
+    """Waking only when they reach the city is late — "якщо вона коли ракети
+    залітають у місто, то це пізнувато". Where the channels report the oblast
+    first that is a median of six minutes of warning, p90 sixteen."""
+    tr = _alerted()
+    out = []
+    for off, text in ((60, "❗️Крилата ракета залітає у Бровари."),
+                      (120, "❗️Крилата ракета залітає у Бровари."),
+                      (400, "🔴Крилата ракета на Київ.")):
+        o = observe(T0 + off, text, False, "mon1tor_ua")
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+                  d.reason)
+        out.append(d)
+    assert out[0].audible             # the oblast rung, whichever rule rings it
+    assert not out[1].notify          # one ring per rung, not per town
+    assert out[2].audible             # ...and again when it reaches the city
+
+
+def test_a_bare_rocket_during_a_ballistic_wave_is_that_wave():
+    """`\bракет` is the last rule in the list, there because the specific names
+    failed. In the labelled night mon1tor_ua wrote "❗Балістична ракета на Київ."
+    and kievinform_ua1 wrote "РАКЕТА НА КИЇВ" two seconds later; the second read
+    as cruise, escaped the ballistic dedup and rang again for the same missile.
+
+    And the class the decision was made on is what the episode stores — storing
+    the word instead turned a whole ballistic wave into a cruise one."""
+    tr = Tracker()
+    tr.official_source = True
+    out = []
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (22, "war_monitor", "☄ Вихід у напрямку Києва"),
+            (29, "mon1tor_ua", "❗Балістична ракета на Київ."),
+            (31, "kievinform_ua1", "РАКЕТА НА КИЇВ"),
+            (33, "kievinform_ua1", "Святошин!!")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+                  d.reason)
+        out.append((o, d))
+    assert out[3][0].effective_threat == "ballistic"
+    assert not out[3][1].audible                 # the same missile, not a new one
+    assert tr.episode.threat == "ballistic"      # ...and the wave stays ballistic
+    assert out[4][0].effective_threat == "ballistic"
+
+
+def test_a_risk_level_is_not_an_event():
+    """"Біла Церква — підвищена загроза масованого ракетного удару" read as a
+    confirmed cruise report. His words: "це не про загрозу в моменті"."""
+    o = observe(T0, "❗️Біла Церква — підвищена загроза масованого ракетного удару.",
+                False, "mon1tor_ua")
+    assert o.certainty == "probable"

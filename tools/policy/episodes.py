@@ -101,6 +101,9 @@ REFRACTORY_NEAR_S = 5 * 60
 # later the same place is news again, because it means the thing is still there.
 SILENT_DEDUP_S = 60
 
+# Geographic rungs for the cruise ladder.
+GEO_STEP = {"oblast": 1, "city": 2, "my-district": 3, "my-area": 3}
+
 # Two channels announcing the same launch a minute apart is one launch. The
 # pattern mining measured a median 39 s lag between channels reporting the same
 # event, p90 167 s, so a window of four minutes covers it.
@@ -160,6 +163,10 @@ class Episode:
     launched: set[str] = field(default_factory=set)
     last_launch: int | None = None
     cleared: bool = False
+    # How close a cruise missile has been reported in this episode: 0 none,
+    # 1 oblast, 2 city, 3 the ring. A rise rings once, the way the threat ladder
+    # does -- his rule, because waking only when they reach the city is late.
+    cruise_geo: int = 0
     # Whether a ballistic launch in this episode has been given a destination.
     ballistic_located: bool = False
     # signature of a silent line -> when it was last sent
@@ -487,6 +494,11 @@ class Tracker:
         if obs.live or obs.alert_state == "alert":
             ep.last_live = obs.ts
 
+        # Any audible cruise report marks the rung, not only the one the
+        # geographic ladder itself produced -- the class ladder or the near
+        # rules may have rung first, and the rung is about how close it got.
+        if level == "alert" and (obs.effective_threat or obs.threat) in ("cruise", "kab"):
+            ep.cruise_geo = max(ep.cruise_geo, GEO_STEP.get(obs.scope, 0))
         if reason == "where the ballistic is going":
             ep.ballistic_located = True
         if level == "info" and reason:
@@ -576,12 +588,16 @@ class Tracker:
         # Anticipation is deliberately still allowed through: "Загроза пуску
         # балістики" is a warning about now, not a forecast for the night, and
         # rule 8 exists precisely to let it update the picture silently.
+        # The class the decision was made on, not the word in the message. A
+        # bare "2 ракети Київ." during a ballistic wave is decided as ballistic
+        # and used to be *stored* as cruise -- so the next bare place name
+        # inherited cruise, and the whole wave turned into one.
         if (obs.threat not in ("none", "unknown") and obs.live
                 and obs.modality not in ("aftermath", "summary-news",
                                          "non-threat")):
-            ep.threat = obs.threat
+            ep.threat = obs.effective_threat or obs.threat
             # Named again as flying: whatever was lifted is back.
-            ep.cleared.discard(obs.threat)
+            ep.cleared.discard(ep.threat)
         if obs.says_new:
             ep.last_launch = obs.ts
         if (level is not None and level != "info" and obs.says_launch
