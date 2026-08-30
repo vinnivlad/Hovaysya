@@ -269,10 +269,13 @@ Two things to get right before building it:
   Obolon, one coming at the city from Vasylkiv in the south -- the nearest name
   is the harmless one. The choice has to be the nearest *of what this message is
   about*, not of everything remembered.
-- **Coverage will be partial.** The channels use informal names the gazetteers
-  do not have: КарДачі, Троя, Голос, Нижні Сади, Мінський масив. Whatever
-  supplies coordinates will miss those, so the current behaviour has to remain
-  the fallback rather than being replaced.
+- **Coverage is a smaller problem than it looks.** The worry was that the
+  channels' informal names would not geocode -- but the gazetteer already *is*
+  the synonym dictionary, and it resolves them: "Троя" to Троєщина, "Голос" to
+  Голосіїв, "КарДачі" to Караваєві Дачі. What needs coordinates is the 122
+  canonical names in the near tiers, every one a real place. The failure mode is
+  therefore a *missing synonym* rather than an ungeocodable name, and that shows
+  up as a place going unrecognised today, long before any coordinate work.
 
 The second reason is the one that matters at 3 a.m. anyway. A rule that fires
 wrongly can be read, argued with, and corrected in one line with a comment

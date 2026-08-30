@@ -125,7 +125,10 @@ CITY = [
     # but not on the corridor that matters to them.
     _p("Чоколівка", "city", "чоколів"),
     _p("Мишоловка", "city", "мишолов"),
-    _p("Караваєві Дачі", "city", "караваєв"),
+    # The channels shorten it, and the short forms matched nothing: "На
+    # КарДачі", "Кардачі", "Відрадний, Шулявка, Кар Дачі". `кар` alone would be
+    # far too greedy, so both halves are required.
+    _p("Караваєві Дачі", "city", "караваєв", "кардач", "кар дач"),
     _p("Совки", "city", "совки"),
     _p("Троєщина", "city", "троєщ", "троєща", "троя", "трою"),
     _p("Оболонь", "city", "оболон"),
