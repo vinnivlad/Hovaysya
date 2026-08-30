@@ -352,6 +352,11 @@ def main(argv: list[str] | None = None) -> int:
                     help="Requests per second ceiling, shared across channels.")
     ap.add_argument("--channels", action="append", dest="channels",
                     help="Watch only this channel (repeatable).")
+    ap.add_argument("--no-telegram", action="store_true",
+                    help="Decide and print, but send nothing. For trying a "
+                         "change locally without posting into the real channel "
+                         "-- which a smoke test did twice, and both times the "
+                         "message looked to him like the server misbehaving.")
     ap.add_argument("--memory-floor-mb", type=int, default=0,
                     help="Hold this much memory. See deploy/README.md — it "
                          "exists to clear a cloud provider's idle threshold.")
@@ -399,7 +404,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  ! {w.channel}: {exc}")
 
     started = time.time()
-    session = Session(notifier=Notifier())
+    session = Session(notifier=None if args.no_telegram else Notifier())
     # The official channel speaks only when the siren changes, so "has it spoken
     # lately" is not the same question as "is it being watched".
     session.tracker.official_source = bool(OFFICIAL_CHANNELS & set(channels))
