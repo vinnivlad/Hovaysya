@@ -1154,3 +1154,25 @@ def test_the_places_the_sweep_found_missing():
     # and 88 of its 156 corpus occurrences are "південним курсом", "південніше
     # Борисполя", "Південним мостом".
     assert not find_places("південним курсом")
+
+
+def test_a_promised_all_clear_is_not_one():
+    """His rule: "дадуть це не дали... от як реально дадуть, то буде і інше
+    повідомлення з твердженням".
+
+    Not a rare slip. 21 messages in the corpus predict an all-clear and 17 were
+    read as one, so "Буде відбій." announced that the alert was over and closed
+    the episode while it was still running. The message that prompted it says
+    the opposite outright: "У Києві навряд чи дадуть відбій, на півночі +2
+    реактивні шахеди" rang as a partial all-clear."""
+    for text in ("Буде відбій.",
+                 "Буде відбій впродовж 20 хвилин.",
+                 "Наразі триває дорозвідка, після неї дадуть Відбій.",
+                 "Буде відбій, БпЛА знищено.",
+                 "❗️У Києві навряд чи дадуть відбій, на півночі +2 реактивні шахеди"):
+        assert hints.alert_state(text) != "clear", text
+        assert not hints.partial_clear(text), text
+    # ...and the ones that state it still do.
+    assert hints.alert_state("🟢 м. Київ" + chr(10) + "Відбій повітряної тривоги") == "clear"
+    assert hints.alert_state("🟢 ВІДБІЙ ТРИВОГИ у м. Києві") == "clear"
+    assert hints.partial_clear("⚪️По балістиці відбій.")

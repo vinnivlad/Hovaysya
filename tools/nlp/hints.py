@@ -502,6 +502,12 @@ def partial_clear(text: str) -> bool:
 AWAITING_TERMS = (
     "очіку", "чекає", "чекаємо", "чекайте", "чекати",
     "скоро", "незабаром", "ось-ось", "ймовірн", "імовірн",
+    # The future tense of the announcement, which is his rule: "дадуть це не
+    # дали... от як реально дадуть, то буде і інше повідомлення з твердженням".
+    # It is not a rare slip — 21 messages predict an all-clear and 17 of them
+    # were read as one, so "Буде відбій." closed the episode and announced that
+    # the alert was over while it was still running.
+    "дадут", "буде відбій", "оголосят",
 )
 
 # The forms the channels use to state the event itself, never to forecast it.
