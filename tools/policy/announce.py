@@ -44,6 +44,12 @@ def _all_places(text: str):
     return [p for p in find_places(text) if not p.origin]
 
 
+# Names that answer nothing when the alert is already about Kyiv. "Загроза:
+# реактивний шахед. Вишгород, Київ, Київщина." -- of the three only the first
+# says anything, and the other two make the sentence look like a list rather
+# than an answer.
+HERE_ALREADY = frozenset({"Київ", "Київщина"})
+
 # How stale the remembered cause may be before it stops explaining a siren.
 #
 # Five minutes was his first number and covered 67% of the alerts where the
@@ -384,7 +390,8 @@ class Announcer:
                 from ..nlp.gazetteer import find_places
 
                 speakable = tuple(dict.fromkeys(
-                    pl.name for pl in find_places(obs.text) if not pl.origin))
+                    pl.name for pl in find_places(obs.text)
+                    if not pl.origin and pl.name not in HERE_ALREADY))
 
             fresh = [p for p in speakable
                      if p not in named_places and (

@@ -1606,3 +1606,22 @@ def test_a_message_that_said_nothing_leaves_no_trace_in_the_ring_memory():
     tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
               d.reason)
     assert tr.episode is None or "Жуляни" not in tr.episode.ring_seen
+
+
+def test_the_explanation_does_not_name_kyiv_back_at_him():
+    """"Загроза: реактивний шахед. Вишгород, Київ, Київщина." — of the three
+    only the first says anything when the alert is already about Kyiv."""
+    from tools.policy.announce import Announcer
+
+    tr, ann = Tracker(), Announcer()
+    tr.official_source = True
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (34, "mon1tor_ua", "Київщина:" + chr(10) + "🅿️2х реактиви на Київ повз Вишгород")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+                  d.reason)
+        u = ann.announce(o, d)
+    assert "Вишгород" in u.text
+    assert "Київщина" not in u.text and "Київ." not in u.text
