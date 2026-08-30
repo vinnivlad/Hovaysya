@@ -252,6 +252,28 @@ real coordinates and a run against every label, not three examples.
 
 Parked on his call: "з моделлю по іншому думаю не вийде. Потім розберемося."
 
+### A smaller, safer use for coordinates — his idea, 2026-08-30
+
+Separate from the ring question above, and much cheaper. Coordinates would not
+decide anything; they would only choose **which of several named places to say**.
+The ring stays the hand-ruled list. A wrong choice costs a worse sentence, not a
+missed wake-up, which is the whole difference from redefining the ring.
+
+The case that prompted it: the siren said Obolon and the explanation said
+Vyshhorod, both true, and the pair read as a contradiction. Obolon is nearer, so
+"say the nearest" would have produced one answer instead of two.
+
+Two things to get right before building it:
+
+- **"Nearest" is not always the right one.** With two threats up -- one over
+  Obolon, one coming at the city from Vasylkiv in the south -- the nearest name
+  is the harmless one. The choice has to be the nearest *of what this message is
+  about*, not of everything remembered.
+- **Coverage will be partial.** The channels use informal names the gazetteers
+  do not have: КарДачі, Троя, Голос, Нижні Сади, Мінський масив. Whatever
+  supplies coordinates will miss those, so the current behaviour has to remain
+  the fallback rather than being replaced.
+
 The second reason is the one that matters at 3 a.m. anyway. A rule that fires
 wrongly can be read, argued with, and corrected in one line with a comment
 saying why — which is what most of `rules.py` is. A model that fires wrongly
