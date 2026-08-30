@@ -451,6 +451,13 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     #
     #      One ring per rung, so a wave crossing the oblast does not ring for
     #      every town it passes.
+    #
+    #      If this ever turns out to be too much, the rung to drop is **city**,
+    #      not oblast. His reasoning, and it is the same as the ballistic rule's:
+    #      "область мене вже розбудить і я навряд буду спати поки всі ракети не
+    #      прилетять або їх не зіб'ють. Тому повідомлення по місту мають
+    #      найменший сенс." The early one is the one that buys something; the
+    #      middle one arrives when he is already awake.
     #      On a stated class only. Most oblast-scope "cruise" turns out to be a
     #      bare place inheriting the episode's class -- "Обухів.", "Броварський
     #      район - повітряна тривога!", even a news item about a grenade left in
