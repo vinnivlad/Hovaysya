@@ -384,7 +384,12 @@ class Announcer:
             # filter was dropping exactly it.
             # Both of these exist to answer "where", so the ring filter -- which
             # would drop every name outside it -- must not apply to them.
-            EXPLAINS = ("what the siren was about", "where the ballistic is going")
+            # Every rule whose job is "where is it now" — the ring filter would
+            # drop the answer. The climb rings and the geographic rungs are
+            # exactly the moments he asked about: "це мені дає інформацію з якої
+            # сторони загроза", and they were saying only the class.
+            EXPLAINS = ("what the siren was about", "where the ballistic is going",
+                        "threat level rose", "cruise coming closer")
             speakable = obs.ring_places
             if decision.reason in EXPLAINS and not speakable:
                 from ..nlp.gazetteer import find_places

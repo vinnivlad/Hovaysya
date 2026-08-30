@@ -1625,3 +1625,27 @@ def test_the_explanation_does_not_name_kyiv_back_at_him():
         u = ann.announce(o, d)
     assert "Вишгород" in u.text
     assert "Київщина" not in u.text and "Київ." not in u.text
+
+
+def test_a_climb_says_where_it_is_climbing_from():
+    """Cruise will usually be flying inside an alert that drones started, so the
+    ring that matters is the one when they reach the oblast — and it was saying
+    "Загроза: крилаті ракети." and nothing else. The place is the content: "це
+    мені дає інформацію з якої сторони загроза"."""
+    from tools.policy.announce import Announcer
+
+    tr, ann = Tracker(), Announcer()
+    tr.official_source = True
+    said = []
+    for off, channel, text in (
+            (0, "mon1tor_ua", "⚠️5 реактивних шахедів з Чернігівщини на Київщину."),
+            (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (600, "mon1tor_ua", "❗️ 3 групи КР від Конотопа у напрямку Ніжина."),
+            (1200, "mon1tor_ua", "🔴2 ракети бандероль на Оболонський район Києва.")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+                  d.reason)
+        said.append((d, ann.announce(o, d)))
+    assert said[2][0].audible and "Конотоп" in said[2][1].text
+    assert said[3][0].audible and "Оболонський" in said[3][1].text
