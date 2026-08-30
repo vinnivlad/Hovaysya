@@ -1176,3 +1176,24 @@ def test_a_promised_all_clear_is_not_one():
     assert hints.alert_state("🟢 м. Київ" + chr(10) + "Відбій повітряної тривоги") == "clear"
     assert hints.alert_state("🟢 ВІДБІЙ ТРИВОГИ у м. Києві") == "clear"
     assert hints.partial_clear("⚪️По балістиці відбій.")
+
+
+def test_a_statement_about_habit_is_not_an_event():
+    """"По балістиці для Києва загроза зберігається. Найчастіше балістичні
+    ракети у серпні пускають о 23:40-1:10." rang as a launch, because
+    "пускають" is the launch word — while the sentence is about when launches
+    usually happen.
+
+    Keyed on the habitual marker, not the verb: of 24 messages using
+    пускають/пускали several are real reports ("пускають нові і нові. По 1-2
+    шт"), so the verb discriminates nothing."""
+    assert hints.modality_hint(
+        "По балістиці для Києва загроза зберігається." + chr(10)
+        + "Найчастіше балістичні ракети у серпні пускають о 23:40-1:10."
+    ) == "summary-news"
+    # The safety boilerplate war_monitor posts beside sirens is the same shape.
+    assert hints.modality_hint(
+        "Не знаходьтесь, за можливості, на відкритому повітрі після оголошення "
+        "загрози балістики — зазвичай уламки падають саме там.") == "summary-news"
+    # ...and a real launch is untouched.
+    assert hints.modality_hint("‼️ Вихід балістики з Брянська") == "live-threat"

@@ -753,6 +753,13 @@ _FORECAST = re.compile(
     # status every night.
     r"на\s+[\w-]*\s*(високому|середньому|низькому)[\w-]*\s+рівні|"
     r"залишається на[^.!?]{0,30}рівні|"
+    # Habit is not an event. "По балістиці для Києва загроза зберігається.
+    # Найчастіше балістичні ракети у серпні пускають о 23:40-1:10." rang as a
+    # launch, because "пускають" is the launch word — but the sentence is about
+    # when launches usually happen. Keyed on the habitual marker and not on the
+    # verb: of 24 messages using пускають/пускали, several are real reports
+    # ("пускають нові і нові. По 1 - 2 шт"), so the verb is no discriminator.
+    r"найчастіше|зазвичай|[ув]\s+середньому|статистик|"
     r"оцінка загроз|"
     r"ніч буде без|"
     # First person about the situation is a column, not a report. Narrow on
