@@ -77,6 +77,8 @@ _ANTICIPATED = re.compile(
     re.IGNORECASE,
 )
 
+_OURS = re.compile(r"наш\w*\s+(бпла|дрон|безпілотн)", re.IGNORECASE)
+
 _MIG = re.compile(r"м[іi]г-?\s?31", re.IGNORECASE)
 _LAUNCHED = re.compile(r"пуск|запуск|стартув|випустив|відпрац", re.IGNORECASE)
 
@@ -426,7 +428,11 @@ def heading(text: str) -> str:
 # 402 in the corpus, of which the policy silenced 401 outright -- he had never
 # seen one. Written with a premium radar emoji, and the fallback character
 # inside it survives our extraction, which is why the text carries a plain 📡.
-RECHECK_TERMS = ("дорозвід",)
+# `чисто`, `без фіксац` and `не фіксу` say the same thing in different words:
+# nothing is being tracked any more. Measured over the corpus -- 342, 64 and 46
+# messages, and every one of them means exactly that. He asked for the second
+# after "На зараз без фіксації БпЛА✈️" went by in silence at 05:08.
+RECHECK_TERMS = ("дорозвід", "чисто", "без фіксац", "не фіксу")
 
 
 # The other half of a "дорозвідка": the thing came back. Often with no place at
@@ -760,6 +766,13 @@ def modality_hint(text: str) -> str:
     # declared air-raid alert, which is the most alarming thing in this
     # corpus to get wrong.
     if _WEATHER.search(text or ""):
+        return "non-threat"
+    # Our own strikes on Russia are not a threat to Kyiv, and they carry every
+    # threat word. "По балістиці — над Брянською областю (рф) дуже багато наших
+    # БпЛА, ворог може не ризикувати" is good news, and it read as a ballistic
+    # report because "балістиці" is in it. Seven such messages in the corpus,
+    # all unmistakable.
+    if _OURS.search(text or ""):
         return "non-threat"
     if _hits(text, IMPACT_TERMS):
         return "live-threat"

@@ -1381,3 +1381,124 @@ def test_the_siren_names_one_town_not_a_travelogue():
         u = ann.announce(o, d)
     assert u.text.count(",") == 0, u.text
     assert "Славутич" not in u.text
+
+
+# --- the night of 2026-08-29, eight findings ------------------------------
+
+
+def _alerted():
+    tr = Tracker()
+    tr.official_source = True
+    o = observe(T0, "🚨 м. Київ" + chr(10) + "Повітряна тривога", False, "alarm_kyiv")
+    d = decide(o, tr)
+    tr.record(o, d.level, d.alarm, d.reason)
+    return tr
+
+
+def test_clean_and_no_contact_are_rechecks_too():
+    """"📡По балістиці станом на зараз чисто." is the answer he waits for through
+    a ballistic alert and read as a news summary. "На зараз без фіксації БпЛА✈️"
+    went by in silence at 05:08. Measured: 342 and 64 messages in the corpus,
+    every one meaning nothing is being tracked."""
+    tr = _alerted()
+    for text in ("📡По балістиці станом на зараз чисто.",
+                 "На зараз без фіксації БпЛА✈️"):
+        o = observe(T0 + 300, text, False, "mon1tor_ua")
+        d = decide(o, tr)
+        assert d.notify and not d.audible, text
+        assert d.reason.startswith("recheck"), (text, d.reason)
+
+
+def test_a_recheck_needs_an_alert_not_merely_an_episode():
+    """"Дорозвідка по БпЛА по областях" arrived at 06:19, forty-six minutes
+    after the all-clear, into an episode passing traffic had reopened — and
+    announced that a threat already called off was probably destroyed."""
+    tr = Tracker()
+    tr.official_source = True
+    o = observe(T0, "⚠️Реактивний шахед на Бровари.", False, "mon1tor_ua")
+    d = decide(o, tr)
+    tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+              d.reason)
+    assert tr.episode is not None and not tr.episode.alert_announced
+    d = decide(observe(T0 + 60, "Дорозвідка по БпЛА по областях.", False,
+                       "mon1tor_ua"), tr)
+    assert not d.notify
+
+
+def test_commentary_about_ballistics_is_not_a_ballistic_report():
+    """"Поки чекаємо, розпишу нічні плани: по балістиці 🔴" rang at 00:32 on
+    nothing but the word — no count, no place, no movement, no phase word."""
+    tr = _alerted()
+    d = decide(observe(T0 + 300, "Поки чекаємо, розпишу нічні плани: по балістиці 🔴"
+                       + chr(10) + "Тушок не буде.", False, "mon1tor_ua"), tr)
+    assert not d.audible, d.reason
+
+
+def test_good_news_from_across_the_border_does_not_ring():
+    """"По балістиці — над Брянською областю (рф) дуже багато наших БпЛА, ворог
+    може не ризикувати" is good news about somewhere else. Geography is ignored
+    for Ukrainian districts, not for Russia — a launch from there still rings."""
+    tr = _alerted()
+    d = decide(observe(T0 + 300, "По балістиці — над Брянською областю (рф) дуже "
+                       "багато наших БпЛА, ворог може не ризикувати.", False,
+                       "mon1tor_ua"), tr)
+    assert not d.audible, d.reason
+    tr2 = _alerted()
+    d2 = decide(observe(T0 + 300, "‼️ Вихід балістики з Брянська", False,
+                        "mon1tor_ua"), tr2)
+    assert d2.audible
+
+
+def test_the_same_silent_line_twice_in_seconds_is_one_line():
+    """"Вишневе - увага." at 04:55:28 and "Вишневе!" at 04:55:35."""
+    tr = _alerted()
+    out = []
+    for off, text in ((300, "Вишневе - увага."), (307, "Вишневе!")):
+        o = observe(T0 + off, text, False, "kievinform_ua1")
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+                  d.reason)
+        out.append(d)
+    assert out[0].notify and not out[0].audible
+    assert not out[1].notify
+
+
+def test_a_ballistic_launch_gets_a_destination_later():
+    """A launch names where it came from, never where it is going. "Балістична
+    ракета повз Полтаву на Дніпро/Кам'янське" was silenced as another region's
+    business, so the answer to "is it coming here" never arrived."""
+    from tools.policy.announce import Announcer
+
+    tr, ann = _alerted(), Announcer()
+    said = []
+    for off, text in (
+            (60, "❗️❗Є інформація про пуск балістичної ракети з Курської області."),
+            (150, "❗Балістична ракета повз Полтаву на Дніпро/Кам'янське.")):
+        o = observe(T0 + off, text, False, "mon1tor_ua")
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+                  d.reason)
+        said.append((d, ann.announce(o, d)))
+    assert said[0][0].audible
+    assert said[1][0].reason == "where the ballistic is going"
+    assert not said[1][0].audible
+    assert "Дніпропетровщина" in said[1][1].text or "Полтавщина" in said[1][1].text
+
+
+def test_a_strike_that_landed_does_not_become_the_sirens_place():
+    """"💥Влучання реактивного шахеду було у Труханів острів" at 23:14 put
+    Trukhaniv into the memory, and the siren ten minutes later opened with it —
+    pointing him at a place the threat had already left."""
+    from tools.policy.announce import Announcer
+
+    tr, ann = Tracker(), Announcer()
+    tr.official_source = True
+    for off, channel, text in (
+            (0, "kievinform_ua1", "💥Влучання реактивного шахеду було у Труханів острів."),
+            (600, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+                  d.reason)
+        u = ann.announce(o, d)
+    assert "Труханів" not in u.text

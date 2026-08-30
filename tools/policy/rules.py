@@ -16,7 +16,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..nlp import hints
-from .episodes import THREAT_LEVEL, Observation, Tracker
+from .episodes import (SILENT_DEDUP_S, THREAT_LEVEL, Observation, Tracker,
+                       silent_signature)
 
 LEVELS = ("info", "alert")
 
@@ -55,7 +56,25 @@ def _notify(level: str, alarm: str, reason: str) -> Decision:
 
 
 def decide(obs: Observation, tracker: Tracker) -> Decision:
-    """What the app should do at the moment this message arrived."""
+    """What the app should do at the moment this message arrived.
+
+    A thin wrapper: the rules decide, and then one last question is asked of
+    every silent line -- have we just said this? The channels repeat themselves
+    within seconds ("Вишневе - увага." then "Вишневе!" seven seconds later) and
+    each repetition was arriving as its own notification.
+    """
+    decision = _decide(obs, tracker)
+    ep = tracker.episode
+    if (decision.notify and not decision.audible and ep is not None):
+        when = ep.last_silent.get(silent_signature(obs, decision.reason))
+        if when is not None and 0 <= obs.ts - when <= SILENT_DEDUP_S:
+            return Decision(False, None, None,
+                            "already-notified: same line a moment ago")
+    return decision
+
+
+def _decide(obs: Observation, tracker: Tracker) -> Decision:
+    """The ordered rules."""
     ep = tracker.before(obs)
 
     # A message stating no type inherits the episode's. "Жуляни" during a
@@ -140,7 +159,10 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     # 3. Things that must never be audible, whatever else they contain.
     if obs.modality == "aftermath":
         return _silent("aftermath: nothing is flying")
-    if obs.modality == "summary-news":
+    if obs.modality == "summary-news" and not obs.recheck:
+        # "📡По балістиці станом на зараз чисто." reads as a summary and is one
+        # -- but it is also the answer he waits for through a ballistic alert,
+        # and it went by in silence.
         return _silent("summary")
     if obs.modality == "non-threat":
         return _silent("not a threat")
@@ -156,7 +178,11 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     #     *named* far region still loses -- "Дніпро та область — дорозвідка"
     #     is not our news.
     if obs.recheck and obs.scope != "elsewhere":
-        if ep is None:
+        # An open episode is not an alert. "Дорозвідка по БпЛА по областях"
+        # arrived at 06:19, forty-six minutes after the all-clear, into an
+        # episode some passing traffic had reopened -- and announced that a
+        # threat which had already been called off was probably destroyed.
+        if ep is None or not ep.alert_announced:
             return _silent("recheck: no alert running")
         key = threat if threat not in ("none", "unknown") else "all"
         if key in ep.rechecked:
@@ -169,6 +195,24 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     if (obs.reappeared and obs.scope != "elsewhere"
             and ep is not None and ep.rechecked):
         return _notify("info", "none", "it is back")
+
+    # 3b. A ballistic launch names where it came from, never where it is going:
+    #     "Є інформація про пуск балістичної ракети з Курської області" rings and
+    #     says nothing more. The next message that does say -- "Балістична ракета
+    #     повз Полтаву на Дніпро/Кам'янське" -- was silenced as another region's
+    #     business, so the answer to "is it coming here" never arrived.
+    #
+    #     Silent, and only when it is not ours: a destination in Kyiv falls
+    #     through to the ballistic rule below, which rings, as it should.
+    if (threat == "ballistic" and ep is not None and not ep.ballistic_located
+            and "ballistic" in ep.launched
+            and obs.scope not in CITY_OR_NEARER
+            #     ...and not another report of the launch itself. Two channels
+            #     announce the same one about 39 seconds apart, and "Пуски
+            #     балістичних ракет з Брянської області" repeats the origin
+            #     rather than naming a destination.
+            and not obs.says_launch):
+        return _notify("info", "none", "where the ballistic is going")
 
     # 4. Another region's target is not our business. Checked after modality so
     #    an all-clear or a launch with no target still gets through above.
@@ -223,7 +267,12 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     # Only on a class the message states. "Найближчий в районі Вишгороду
     # маневрує" names nothing at all; calling that a climb to ballistic is wrong
     # whatever the episode happens to be carrying, and it is what woke him.
-    if (ep is not None and ep.alert_announced and obs.live and not inherited):
+    #
+    # And on a message that shows some evidence of flight. "Поки чекаємо,
+    # розпишу нічні плани: по балістиці 🔴" has none at all -- no count, no
+    # place, no movement, no phase word -- and rang at 00:32.
+    if (ep is not None and ep.alert_announced and obs.live and not inherited
+            and obs.strength != "none"):
         climbed = THREAT_LEVEL.get(threat, 0)
         if climbed > ep.threat_peak:
             return _notify("alert", alarm, "threat level rose")
@@ -268,7 +317,17 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     # So cruise stays on the position path with its five-minute refractory, and
     # ballistic stays here on the launch path with none. Moving cruise across
     # was proposed and refused; do not propose it again.
-    if threat == "ballistic" and obs.certainty == "confirmed":
+    # `strength` guards this the same way it guards the ladder: a message with
+    # no count, no place, no movement and no phase word is commentary about
+    # ballistics, not a report of one. "Поки чекаємо, розпишу нічні плани: по
+    # балістиці 🔴" rang at 00:32 on nothing but the word.
+    # And geography is ignored for Ukrainian districts, not for Russia. "По
+    # балістиці — над Брянською областю (рф) дуже багато наших БпЛА, ворог може
+    # не ризикувати" is good news about somewhere else; a launch from there
+    # still rings, because `says_launch` is what makes it ours.
+    if (threat == "ballistic" and obs.certainty == "confirmed"
+            and obs.strength != "none"
+            and (obs.says_launch or obs.scope != "elsewhere")):
         # Novelty is a launch, not a position — and once a ballistic alert has
         # sounded, a place name over his own area adds nothing. His ruling, and
         # the reason is the point: "якщо був пуск балістики, то на моє коло
@@ -388,6 +447,7 @@ def run(observations: list[Observation], tracker: Tracker | None = None
     for obs in observations:
         decision = decide(obs, tracker)
         tracker.record(obs, decision.level if decision.notify else None,
-                       decision.alarm if decision.notify else None)
+                       decision.alarm if decision.notify else None,
+                       decision.reason)
         out.append((obs, decision))
     return out

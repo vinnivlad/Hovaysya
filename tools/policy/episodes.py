@@ -95,6 +95,12 @@ REFRACTORY_S = 20 * 60
 # one night out of three.
 REFRACTORY_NEAR_S = 5 * 60
 
+# Two silent lines saying exactly the same thing, seconds apart, are one line.
+# From the night of 2026-08-29: "Вишневе - увага." at 04:55:28 and "Вишневе!" at
+# 04:55:35, identical in class, place and rule. Deliberately short -- a minute
+# later the same place is news again, because it means the thing is still there.
+SILENT_DEDUP_S = 60
+
 # Two channels announcing the same launch a minute apart is one launch. The
 # pattern mining measured a median 39 s lag between channels reporting the same
 # event, p90 167 s, so a window of four minutes covers it.
@@ -154,6 +160,10 @@ class Episode:
     launched: set[str] = field(default_factory=set)
     last_launch: int | None = None
     cleared: bool = False
+    # Whether a ballistic launch in this episode has been given a destination.
+    ballistic_located: bool = False
+    # signature of a silent line -> when it was last sent
+    last_silent: dict = field(default_factory=dict)
     # Classes already reported as "дорозвідка" in this episode. The channels
     # repeat it, and he asked for it deduped.
     rechecked: set[str] = field(default_factory=set)
@@ -249,6 +259,12 @@ class Observation:
 
 # The channels that declare rather than report.
 OFFICIAL_CHANNELS = frozenset({"alarm_kyiv"})
+
+
+def silent_signature(obs: "Observation", reason: str) -> tuple:
+    """What makes two silent lines the same line: rule, class, and where."""
+    return (reason, obs.effective_threat or obs.threat,
+            tuple(sorted(obs.ring_places)), obs.scope)
 
 
 def observe(ts: int, text: str, is_reply: bool = False,
@@ -449,7 +465,8 @@ class Tracker:
 
     # -- bookkeeping -------------------------------------------------------
 
-    def record(self, obs: Observation, level: str | None, alarm: str | None) -> None:
+    def record(self, obs: Observation, level: str | None, alarm: str | None,
+               reason: str | None = None) -> None:
         """Fold one observation, and any notification for it, into the state."""
         if obs.official:
             self.official_seen = obs.ts
@@ -469,6 +486,11 @@ class Tracker:
 
         if obs.live or obs.alert_state == "alert":
             ep.last_live = obs.ts
+
+        if reason == "where the ballistic is going":
+            ep.ballistic_located = True
+        if level == "info" and reason:
+            ep.last_silent[silent_signature(obs, reason)] = obs.ts
 
         # Once per class, until the threat comes back. His correction, and the
         # corpus backs it: 71 of 165 episodes carry more than one "дорозвідка",

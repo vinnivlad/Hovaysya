@@ -193,6 +193,12 @@ class Announcer:
         """
         if not obs.live:
             return
+        # A strike that has already landed is not where anything is now.
+        # "💥Влучання реактивного шахеду було у Труханів острів" at 23:14 put
+        # Trukhaniv into the memory, and the siren ten minutes later opened
+        # with it -- pointing him at a place the threat had already left.
+        if obs.impact and not obs.falling:
+            return
         self.pending_at = obs.ts
         if obs.threat not in ("none", "unknown"):
             self.pending_threat = obs.threat
@@ -370,8 +376,11 @@ class Announcer:
             # сторони загроза" — a threat approaching Kyiv is outside Kyiv
             # until it is not, so "Вишгород" is the whole content, and the ring
             # filter was dropping exactly it.
+            # Both of these exist to answer "where", so the ring filter -- which
+            # would drop every name outside it -- must not apply to them.
+            EXPLAINS = ("what the siren was about", "where the ballistic is going")
             speakable = obs.ring_places
-            if decision.reason == "what the siren was about" and not speakable:
+            if decision.reason in EXPLAINS and not speakable:
                 from ..nlp.gazetteer import find_places
 
                 speakable = tuple(dict.fromkeys(
