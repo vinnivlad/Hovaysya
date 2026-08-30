@@ -19,7 +19,12 @@ from .gazetteer import flatten, place_spans
 # Ordered by specificity — the first match wins, so a jet Shahed is not read as
 # a plain one, and Iskander is not read as generic "ракета".
 THREAT_RULES: tuple[tuple[str, str], ...] = (
-    ("ballistic", r"балісти|іскандер|кн-?23|брсд|кинжал|кинджал|циркон"),
+    # Онікс joins on his ruling, 2026-08-30: "вона гіперзвукова, летить дуже
+    # швидко". It matched nothing at all in 74 messages, so it fell through to
+    # the bare-"ракета" rule and came out cruise -- which is the class that
+    # deliberately does not ring on launch, because a cruise missile flies for
+    # hours. For something supersonic that is the wrong end of the trade.
+    ("ballistic", r"балісти|іскандер|кн-?23|брсд|кинжал|кинджал|циркон|онікс"),
     # The boundaries around "кр" are load-bearing: the channels abbreviate
     # крилата ракета that way, and without them it also matches Крушинка,
     # кружляють, and Крим.

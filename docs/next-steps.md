@@ -285,6 +285,34 @@ is already guesswork: `hints.py`, where a regex over Ukrainian morphology
 decides what is flying, and where every fault this project has hit so far has
 lived.
 
+### Which launches should ring — open, 2026-08-30
+
+Today two labels were corrected because launches ring: "☄ Вихід у напрямку
+Києва" and the ballistic warning before it. Six other launch labels were left
+silent, because ringing on all of them would contradict rules he made earlier:
+the second launch of a wave ("☄ Другий вихід"), a cruise launch, bare "☄ Вихід
+Курськ" inside a wave that had already rung, a past-tense mention, and aviation.
+
+His own reading of it, and it is not settled: "може б мали дзвонити всі, крім
+авіації. А може і ні. Треба глянути на реальній ситуації."
+
+Two specific candidates he raised, both worth keeping:
+
+- **A launch with no destination.** It says nothing about where it is going,
+  which is an argument for ringing rather than against: nobody knows yet whether
+  it is coming here.
+- **A probable launch.** "А якщо пуск таки був реальний?" The asymmetry is
+  obvious once stated -- a warning that turns out to be nothing costs a
+  wake-up, and a launch treated as a warning costs the minutes.
+
+And one thing the waiting rule gets wrong in this shape: "Був вихід з Брянська.
+Очікуємо." is silenced by AWAITING_TERMS, but the waiting there is not about
+whether a launch happened -- it happened -- it is about waiting for the arrival.
+`AWAITING_TERMS` cannot tell those apart today.
+
+Nothing to do until a real ballistic night is watched live. The whole area has
+been tuned against recordings only.
+
 ## Adding a channel
 
 Two steps, and skipping the second costs a blind spot. He caught it within

@@ -1197,3 +1197,14 @@ def test_a_statement_about_habit_is_not_an_event():
         "загрози балістики — зазвичай уламки падають саме там.") == "summary-news"
     # ...and a real launch is untouched.
     assert hints.modality_hint("‼️ Вихід балістики з Брянська") == "live-threat"
+
+
+def test_oniks_is_ballistic_not_cruise():
+    """His ruling: "вона гіперзвукова, летить дуже швидко". It matched nothing
+    in 74 messages, so it fell through to the bare-"ракета" rule and came out
+    cruise — the class that deliberately does not ring on launch, because a
+    cruise missile flies for hours. For something supersonic that is the wrong
+    end of the trade."""
+    for text in ("❗️Онікс на Одещину", "2 ракети Онікс", "4 Онікси на Миколаїв"):
+        assert hints.threat_hint(text) == "ballistic", text
+    assert hints.threat_hint("2 Циркони на Київ") == "ballistic"
