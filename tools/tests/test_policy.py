@@ -1652,3 +1652,25 @@ def test_a_climb_says_where_it_is_climbing_from():
         said.append((d, ann.announce(o, d)))
     assert said[2][0].audible and "Конотоп" in said[2][1].text
     assert said[3][0].audible and "Оболонський" in said[3][1].text
+
+
+def test_a_partial_all_clear_after_the_full_one_is_not_news():
+    """"💥Реактивний шахед було збито, у Києві відбій по шахедах" arrived 102
+    seconds after the official all-clear and rang — announcing the lifting of a
+    threat that had already been called off in full.
+
+    The test is "did we say anything in this episode", not "was a siren
+    declared": a MiG takeoff rings without a siren, and its "Відбій загрози
+    МіГ-31К" twenty minutes later is a real partial all-clear."""
+    tr = Tracker()
+    tr.official_source = True
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (600, "alarm_kyiv", "🟢 м. Київ" + chr(10) + "Відбій повітряної тривоги"),
+            (702, "kievinform_ua1",
+             "💥Реактивний шахед було збито, у Києві відбій по шахедах")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+                  d.reason)
+    assert not d.audible, d.reason

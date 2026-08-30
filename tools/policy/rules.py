@@ -108,7 +108,17 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     #    all-clear always closes. But only *my* siren — an all-clear for Fastiv
     #    district is not an all-clear for me, and announcing those woke the user
     #    three times.
-    if obs.alert_state == "clear" and obs.partial_clear:
+    #
+    #    ...and only while there is an alert to take a part off. "💥Реактивний
+    #    шахед було збито, у Києві відбій по шахедах" arrived 102 seconds after
+    #    the official all-clear and rang, announcing the lifting of a threat
+    #    that had already been called off in full. Same fault as the recheck
+    #    rule had this morning, in the rule next door.
+    #    The test is "did we say anything in this episode", not "was a siren
+    #    declared" — a MiG takeoff rings without one, and its "Відбій загрози
+    #    МіГ-31К" twenty minutes later is a real partial all-clear.
+    if (obs.alert_state == "clear" and obs.partial_clear
+            and ep is not None and ep.notified):
         # Audible, with the all-clear tone. I had made this a silent status
         # update; the user labelled "⚪️ Відбій загрози МіГ-31К" as a wake-up
         # ("відбій по мігам") and asked outright to be told when a class is
