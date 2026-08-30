@@ -128,6 +128,9 @@ class Sent:
     ts: int
     level: str
     alarm: str
+    # The city's siren. It wakes him, but it says nothing about his ring, so it
+    # must not silence the one word that does.
+    official: bool = False
 
 
 @dataclass
@@ -426,7 +429,8 @@ class Tracker:
             return True
 
         window = self.refractory_near_s if obs.near else self.refractory_s
-        last_audible = max((s.ts for s in ep.sent if s.level != "info"), default=None)
+        last_audible = max((s.ts for s in ep.sent
+                            if s.level != "info" and not s.official), default=None)
         if last_audible is not None and obs.ts - last_audible < window:
             # Only an outright statement of a new target breaks through.
             return bool(obs.says_new and (obs.near or obs.nationwide))
@@ -603,11 +607,18 @@ class Tracker:
         if (level is not None and level != "info" and obs.says_launch
                 and obs.certainty == "confirmed"):
             ep.launched.add(obs.effective_threat or obs.threat)
-        for place in obs.ring_places:
-            ep.ring_seen[place] = obs.ts
+        # Only from a message that counted. "Жуляни/ Вишневе до вас йде" was
+        # dismissed as non-threat and still stamped Zhuliany as seen, so the
+        # real warning five seconds later -- "Борщагівки, Жуляни - в укриття!"
+        # -- read as the same target already notified, and he got no sound.
+        if obs.live and obs.modality not in ("aftermath", "summary-news",
+                                             "non-threat"):
+            for place in obs.ring_places:
+                ep.ring_seen[place] = obs.ts
         ep.ring_peak = max(ep.ring_peak, obs.ring_count)
         if level is not None and alarm is not None:
-            ep.sent.append(Sent(ts=obs.ts, level=level, alarm=alarm))
+            ep.sent.append(Sent(ts=obs.ts, level=level, alarm=alarm,
+                               official=obs.official))
             # The peak resets with each alert: the question is always "more than
             # I was last told about", not "more than tonight's worst moment".
             ep.ring_peak = obs.ring_count

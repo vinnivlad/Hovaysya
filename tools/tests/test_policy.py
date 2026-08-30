@@ -1557,3 +1557,52 @@ def test_a_risk_level_is_not_an_event():
     o = observe(T0, "❗️Біла Церква — підвищена загроза масованого ракетного удару.",
                 False, "mon1tor_ua")
     assert o.certainty == "probable"
+
+
+def test_a_drone_over_his_own_place_rings_even_soon_after_the_siren():
+    """The failure he caught live on 2026-08-30. A drone crossed Kyiv, the
+    channels named Zhuliany at 11:17:28, and nothing rang.
+
+    Two gates, each of which silenced it on its own.
+
+    The city's siren at 11:13:37 had started the five-minute near refractory,
+    inside which only a message explicitly announcing a new target breaks
+    through -- and "Борщагівки, Жуляни - в укриття!" does not announce one. But
+    the siren said nothing about his ring; it must not silence the one word that
+    is the whole reason a drone rings at all.
+
+    And "Жуляни/ Вишневе до вас йде", five seconds earlier, was dismissed as
+    non-threat -- and still stamped Zhuliany into the "already seen" memory. The
+    message that said nothing silenced the one that did.
+    """
+    from tools.policy.announce import Announcer
+
+    tr, ann = Tracker(), Announcer()
+    tr.official_source = True
+    out = []
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (195, "mon1tor_ua", "⚠️Реактивний шахед з Шулявки на Відрадний, Борщагівки."),
+            (226, "kievinform_ua1", "Жуляни/ Вишневе до вас йде"),
+            (231, "kievinform_ua1", "Борщагівки, Жуляни - в укриття!"),
+            (242, "kievinform_ua1", "Київ:" + chr(10) + "🅿️ 1х далі Жуляни / Вишневе")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+                  d.reason)
+        out.append((d, ann.announce(o, d)))
+    assert out[1][0].notify and not out[1][0].audible   # Borshchahivka: shown
+    assert out[3][0].audible, out[3][0].reason          # Zhuliany: heard
+    assert "Жуляни" in out[3][1].text
+    assert not out[4][0].notify                         # ...and then deduped
+
+
+def test_a_message_that_said_nothing_leaves_no_trace_in_the_ring_memory():
+    tr = Tracker()
+    tr.official_source = True
+    o = observe(T0, "Жуляни/ Вишневе до вас йде", False, "kievinform_ua1")
+    d = decide(o, tr)
+    assert o.modality == "non-threat"
+    tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+              d.reason)
+    assert tr.episode is None or "Жуляни" not in tr.episode.ring_seen
