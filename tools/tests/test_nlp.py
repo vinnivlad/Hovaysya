@@ -1222,3 +1222,20 @@ def test_a_stated_vector_is_a_fact_not_a_guess():
                  "❗️ 2х КР вектор Бровари"):
         assert hints.certainty_hint(text) == "confirmed", text
     assert hints.certainty_hint("Виліт МіГ-31К, курс поки не відомий") == "probable"
+
+
+def test_a_photo_a_tally_and_an_arsenal_are_not_events():
+    """Three that rang as ballistic, found by looking at what "Бандероль"
+    produced. Each names several missiles and none of them is in the air."""
+    # A photo caption.
+    assert hints.modality_hint(
+        '❗️Так виглядають пускові установки російської ракети "Бандероль"' + chr(10)
+        + 'На фото кадри її розміщення на БПЛА "Оріон".') == "summary-news"
+    # A tally of the night, followed by an inventory of everything that flew.
+    assert hints.modality_hint(
+        "❗️186 цілей були збиті/пригнічені цієї ночі." + chr(10)
+        + "▪️36 Х-101/«Іскандер-К»/Х-59" + chr(10) + "▪️2 «Бандероль»") == "summary-news"
+    # An arsenal the enemy *may* use.
+    assert hints.certainty_hint(
+        "❗️Озброєння яке ворог може застосувати під час масованого удару:" + chr(10)
+        + "⚠️525 шахедів;" + chr(10) + "❗31 балістичну ракету Іскандер-М;") == "probable"

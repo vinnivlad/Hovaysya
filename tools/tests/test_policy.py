@@ -1691,3 +1691,13 @@ def test_a_readiness_report_is_not_a_takeoff():
     d2 = decide(observe(T0, "❗️⚠️Виліт винищувача МіГ-31К з аеродрому Саваслейка.",
                         False, "mon1tor_ua"), tr2)
     assert d2.audible and d2.alarm == "mig"
+
+
+def test_the_ladder_does_not_climb_on_a_resolution():
+    """"186 цілей були збиті/пригнічені цієї ночі" reads as `clear` and still
+    rang: the ladder never asked about certainty. `lost` is the same shape —
+    losing track of something is not an escalation."""
+    tr = _alerted()
+    d = decide(observe(T0 + 300, "❗️186 цілей були збиті/пригнічені цієї ночі."
+                       + chr(10) + "▪️2 «Бандероль»", False, "war_monitor"), tr)
+    assert not d.audible, d.reason

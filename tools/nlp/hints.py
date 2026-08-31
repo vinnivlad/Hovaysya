@@ -77,6 +77,10 @@ _ANTICIPATED = re.compile(
     r"загроз\w*\s+(?:\w+\s+){0,3}(пуск|застосув|використ|удар|атак)|"
     r"можлив\w*\s+(пуск|застосув|удар)|"
     r"може\s+атакувати|можуть\s+атакувати|"
+    # "❗️Озброєння яке ворог може застосувати під час масованого комбінованого
+    # удару:" and then an inventory. All four occurrences in the corpus are
+    # forecasts of an arsenal, never a report of one in flight.
+    r"може\s+застосув|можуть\s+застосув|"
     r"ризик\w*\s+(пуск|застосув)|"
     r"ймовірн\w*|"
     r"протягом\s+\d+\s+(годин|діб|дні)|"
@@ -188,6 +192,15 @@ SUMMARY_TERMS = (
     # and a piece of commentary, both of which the escalation rule read as a
     # ballistic warning the moment it existed.
     "вночі було", "за ніч було", "на рахунок ночі", "стосовно ночі",
+    # A photo caption. "❗️Так виглядають пускові установки російської ракети
+    # «Бандероль». На фото кадри її розміщення на БПЛА «Оріон»" rang as a
+    # ballistic report -- it names two missiles and a launcher, and nothing is
+    # in the air. One message each in the corpus, so both forms are listed.
+    "на фото", "так виглядають", "так виглядає",
+    # A tally of the night. "❗️186 цілей були збиті/пригнічені цієї ночі" is
+    # followed by an inventory of everything that flew, which is exactly the
+    # shape of a live wave and is the opposite of one.
+    "пригнічен", "цілей були збит",
     # "🌟Русня випустила вночі щонайменше 38 ракет" — a count of the night just
     # past, and it rang.
     "випустила вночі", "випустив вночі", "запустила вночі", "щонайменше",

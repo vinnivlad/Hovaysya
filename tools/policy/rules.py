@@ -291,8 +291,13 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     # And on a message that shows some evidence of flight. "Поки чекаємо,
     # розпишу нічні плани: по балістиці 🔴" has none at all -- no count, no
     # place, no movement, no phase word -- and rang at 00:32.
+    #
+    # A resolution is not a climb either. "186 цілей були збиті/пригнічені цієї
+    # ночі" reads as `clear` and still rang, because the ladder never asked --
+    # and `lost` is the same shape: losing track of something is not an escalation.
     if (ep is not None and ep.alert_announced and obs.live and not inherited
-            and obs.strength != "none"):
+            and obs.strength != "none"
+            and obs.certainty not in ("clear", "lost")):
         climbed = THREAT_LEVEL.get(threat, 0)
         if climbed > ep.threat_peak:
             return _notify("alert", alarm, "threat level rose")
