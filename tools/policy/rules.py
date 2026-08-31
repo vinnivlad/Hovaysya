@@ -416,6 +416,16 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
         if alarm in DRONE_TONES and not obs.at_home:
             return _notify("info", "none", "a drone near me, but not my street")
         if not tracker.is_new(obs):
+            # Shown, not swallowed. "⚠️Реактивний з ТЕЦ-5 на Жуляни." arrived
+            # ten minutes after a ring for the same drone and produced nothing
+            # at all -- "ніякого повідомлення не було". Not ringing is his own
+            # ruling ("я собі спав, поки воно там щось намотувало"), but the
+            # weaker case one line above -- a drone in the ring, not his street
+            # -- is already `info`, so the stronger one getting silence was the
+            # inconsistency. 103 such messages in the corpus, 79 naming home.
+            if obs.at_home:
+                return _notify("info", "none",
+                               "already-notified: same target, my place again")
             return _silent("already-notified: same target near me")
         if obs.strength == "weak":
             # An emoji sits on 26% of all messages; it may raise the status, it

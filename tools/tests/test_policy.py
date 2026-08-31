@@ -132,9 +132,13 @@ def test_a_new_drone_near_you_wakes_you():
 
 
 def test_the_same_drone_restated_does_not():
+    """It is shown, not swallowed: home named again goes on the status line
+    without a second sound. His words when it produced nothing at all --
+    "ніякого повідомлення не було"."""
     r = play((0, "⚠️1 реактивний шахед на Жуляни."),
              (120, "Через Оболонь в сторону Жулян"))
-    assert levels(r) == ["alert", None]
+    assert levels(r) == ["alert", "info"]
+    assert r[1][1].alarm == "none"
 
 
 def test_circling_nearby_is_not_an_approach():
@@ -1594,7 +1598,8 @@ def test_a_drone_over_his_own_place_rings_even_soon_after_the_siren():
     assert out[1][0].notify and not out[1][0].audible   # Borshchahivka: shown
     assert out[3][0].audible, out[3][0].reason          # Zhuliany: heard
     assert "Жуляни" in out[3][1].text
-    assert not out[4][0].notify                         # ...and then deduped
+    # ...and then deduped: shown on the status line, without a second sound.
+    assert out[4][0].notify and not out[4][0].audible
 
 
 def test_a_message_that_said_nothing_leaves_no_trace_in_the_ring_memory():
