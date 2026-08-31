@@ -337,6 +337,35 @@ explicit ймовірн/можлив should stay stronger than word position.
 Nothing to do until a real ballistic night is watched live. The whole area has
 been tuned against recordings only.
 
+### Deduplicate by event, not by clock — his framing, 2026-08-31
+
+"Якби у нас було єдине джерело даних, то дзвонили б на кожну згадку, а так 4
+канали шлють повідомлення коли їм заманеться." That reframes the whole
+refractory machinery: it is not about how a drone behaves, it is about source
+multiplicity. The single authoritative picture would be Віраж-планшет, which is
+not available to anyone outside the military; what *is* available downstream of
+it is `alarm_kyiv` -- and only the binary siren state, never the detail.
+
+Measured cross-channel lag for the same target (same class, overlapping places,
+different channel): median 74 s, p90 4 min, p99 5 min. Which means the existing
+`REFRACTORY_NEAR_S` of five minutes is exactly the ceiling of "whenever they feel
+like it" -- not fitted to that, but justified by it after the fact.
+
+`RING_MEMORY_S` of ten minutes is longer than any cross-channel lag, so it is
+doing a different job: deciding whether a drone that circled and came back
+deserves a second sound. That is a judgement, not a measurement.
+
+**The two are tangled in one number today, which is why arguing about minutes has
+no answer.** Deduplicating on event identity -- class, place, and a window sized
+from the measured channel lag -- would separate them: the first becomes exact and
+data-driven, the second becomes an explicit choice. And his sentence becomes
+literally true, because after grouping there is one message per event and every
+genuinely new event rings.
+
+Not worth building yet: the measurement rests on 31 pairs, because matching
+identity by hand is strict. Event grouping is close to free once the LLM
+labelling exists.
+
 ## Adding a channel
 
 Two steps, and skipping the second costs a blind spot. He caught it within
