@@ -305,10 +305,34 @@ Two specific candidates he raised, both worth keeping:
   obvious once stated -- a warning that turns out to be nothing costs a
   wake-up, and a launch treated as a warning costs the minutes.
 
-And one thing the waiting rule gets wrong in this shape: "Був вихід з Брянська.
-Очікуємо." is silenced by AWAITING_TERMS, but the waiting there is not about
-whether a launch happened -- it happened -- it is about waiting for the arrival.
-`AWAITING_TERMS` cannot tell those apart today.
+### Waiting for the arrival reads as waiting for the launch
+
+Measured properly on 2026-08-31, after a first note blamed the wrong mechanism.
+It is not `AWAITING_TERMS`, which only gates `alert_state` and `partial_clear`.
+The word sits in a list inside `certainty_hint`, among the markers that mean "a
+takeoff is a possibility, not a fact" -- and it vetoes the whole message:
+
+    Був вихід з Брянська.             -> certainty = confirmed
+    Був вихід з Брянська. Очікуємо.   -> certainty = probable
+
+That is expensive because `certainty == "confirmed"` is the door into the
+ballistic launch rule. Demoted, the message takes the anticipation path instead,
+which is silent by design. So: a launch happened, the channel added that it is
+waiting for the arrival, and we read that as the launch not having happened yet.
+
+Twenty messages, not the one the first note assumed. Split by word order:
+
+- waiting **before** the launch word -- 18, genuine anticipation: "Очікуємо на
+  пуски ракет з Криму по Одещині"
+- waiting **after** -- 20, the launch already happened: "Проведено пуски КР
+  «Калібр» з акваторії Чорного моря. Очікуємо у повітряному просторі", "Пуски
+  Х-101 з Ту-95МС. Підліт ракет до України очікується", "Був вихід з Брянська.
+  Очікуємо."
+
+So order is the discriminator, and it divides the corpus almost cleanly. Not
+perfectly: "Є інформація про **можливий** пуск балістичної ракети, очікуємо" is
+in the second group and genuinely is probable -- which is the right outcome, an
+explicit ймовірн/можлив should stay stronger than word position.
 
 Nothing to do until a real ballistic night is watched live. The whole area has
 been tuned against recordings only.
