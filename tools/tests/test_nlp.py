@@ -1208,3 +1208,17 @@ def test_oniks_is_ballistic_not_cruise():
     for text in ("❗️Онікс на Одещину", "2 ракети Онікс", "4 Онікси на Миколаїв"):
         assert hints.threat_hint(text) == "ballistic", text
     assert hints.threat_hint("2 Циркони на Київ") == "ballistic"
+
+
+def test_a_stated_vector_is_a_fact_not_a_guess():
+    """"Вектор загалом використовується з ракетами" — his words. It is how the
+    channels state where something already in the air is heading, not how they
+    hedge about a takeoff, and it was in the list of uncertainty markers: all 106
+    messages containing it came out `probable`, "🚀 Кинджал вектором на
+    Вишгородський район Київщини" among them.
+
+    `курс поки` is the actual hedge and stays."""
+    for text in ("Вектор - Київ", "🚀 Кинджал вектором на Вишгородський район",
+                 "❗️ 2х КР вектор Бровари"):
+        assert hints.certainty_hint(text) == "confirmed", text
+    assert hints.certainty_hint("Виліт МіГ-31К, курс поки не відомий") == "probable"

@@ -853,9 +853,14 @@ def certainty_hint(text: str) -> str:
     # A takeoff is a possibility, not a fact: the corpus has
     # "Борти МіГ-31К розвернулись на аеродром базування" as often as it has a
     # launch, and "курс поки не відомий" says so outright.
+    # `вектор` was here and does not belong. It is how the channels state where
+    # something already in the air is heading -- "вектор загалом використовується
+    # з ракетами", his words -- not how they hedge about a takeoff. All 106
+    # messages containing it came out `probable`, including "🚀 Кинджал вектором
+    # на Вишгородський район Київщини". `курс поки` is the actual hedge and stays.
     if any(t in low for t in ("виліт", "вильот", "аеродром", "курс поки",
                               "очікуємо", "готує", "ймовірн", "попередньо",
-                              "уточнюємо", "вектор")):
+                              "уточнюємо")):
         return "probable"
     return "confirmed"
 
