@@ -165,12 +165,21 @@ def format_message(utterance, obs, decision) -> str:
     # The bell marks a sound; the radar marks a "дорозвідка", which is the one
     # kind of message that is good news. The channels write it with a premium
     # emoji whose fallback character is this same 📡, so it reads as theirs.
+    # The circles the channels themselves use: 🔴 on 220 of their siren messages,
+    # 🟢 on the all-clears. Scrolling back through a channel afterwards, the two
+    # that frame everything else should be findable without reading.
+    frame = ""
+    if decision.reason == "official siren":
+        frame = "🔴 "
+    elif decision.reason == "official all-clear":
+        frame = "🟢 "
+
     if decision.audible:
-        head = "🔔 " + utterance.text
+        head = "🔔 " + frame + utterance.text
     elif getattr(obs, "recheck", False):
         head = "📡 " + utterance.text
     else:
-        head = utterance.text
+        head = frame + utterance.text
 
     tags = []
     for label, field in NAMED_FIELDS:

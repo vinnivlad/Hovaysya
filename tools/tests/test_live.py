@@ -519,3 +519,31 @@ def test_no_previous_log_is_not_an_error(tmp_path):
     from tools.live.run import already_said
 
     assert already_said(tmp_path, skip=tmp_path / "current.jsonl") == set()
+
+
+def test_the_siren_and_the_all_clear_carry_the_channels_own_circles():
+    """His request: the same red and green circles the channels use, after the
+    bell. 🔴 sits on 220 of their siren messages and 🟢 on the all-clears, so
+    scrolling back through the channel afterwards the two messages that frame
+    everything else are findable without reading."""
+    from tools.live.notify import format_message
+    from tools.policy.announce import Announcer
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr, ann = Tracker(), Announcer()
+    tr.official_source = True
+    said = []
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (300, "mon1tor_ua", "⚠️2 реактивні шахеди на Вишневе."),
+            (900, "alarm_kyiv", "🟢 м. Київ" + chr(10) + "Відбій повітряної тривоги")):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+                  d.reason)
+        said.append(format_message(ann.announce(o, d), o, d))
+    assert said[0].startswith("🔔 🔴 ")
+    assert said[2].startswith("🔔 🟢 ")
+    # ...and nothing else wears one.
+    assert not said[1].startswith(("🔴", "🟢")) and "🔴" not in said[1].splitlines()[0]
