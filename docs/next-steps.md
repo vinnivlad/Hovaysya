@@ -366,6 +366,33 @@ Not worth building yet: the measurement rests on 31 pairs, because matching
 identity by hand is strict. Event grouping is close to free once the LLM
 labelling exists.
 
+### At night, vibration rather than sound — his idea, 2026-08-31
+
+"Дзвінки залишимо вдень, а вночі залишиться тільки різні вібросигнали. Зпросоння
+вони краще читаються. Не треба навіть брати телефон, щоб розуміти що і де
+відбувається." Also for a phone in a pocket somewhere loud.
+
+The part to decide before building it is not the interface but **the size of the
+alphabet.** There are nine tones today -- alert, ballistic, mig, cruise,
+drone-jet, drone, recon, clear-partial, clear -- which an ear separates by timbre.
+Vibration carries far less: half-asleep a person reliably tells three or four
+patterns apart, not nine, and nine would blur into something worse than one.
+
+So the natural grouping for vibration is **by action, not by class**:
+
+- **shelter now** -- ballistic, KAB, Kinzhal: minutes, and one decision
+- **look and be ready** -- a jet drone over the ring, cruise over the city
+- **over** -- the all-clear
+
+Three patterns nothing confuses: a sharp burst of short pulses, one long, two
+calm ones. The class stays in the text on screen, for whoever does pick the
+phone up.
+
+One constraint worth knowing now: at night the phone is in Do Not Disturb, so the
+notification channel needs priority with explicit permission to bypass it.
+Android allows that, and the user must grant it -- meaning the app has a setup
+step without which the whole idea does not work at all.
+
 ## Adding a channel
 
 Two steps, and skipping the second costs a blind spot. He caught it within
