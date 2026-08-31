@@ -1706,3 +1706,34 @@ def test_the_ladder_does_not_climb_on_a_resolution():
     d = decide(observe(T0 + 300, "❗️186 цілей були збиті/пригнічені цієї ночі."
                        + chr(10) + "▪️2 «Бандероль»", False, "war_monitor"), tr)
     assert not d.audible, d.reason
+
+
+def test_home_named_again_rings_after_ten_minutes_and_not_before():
+    """His call: twenty minutes was too long to stay quiet about Zhuliany even
+    for the same drone. The two data points in his own labels sit either side of
+    ten -- a repeat at 9 minutes he marked silent, one at 29 he marked a wake-up.
+
+    Inside the window it is still shown, just without a sound."""
+    from tools.policy.episodes import RING_MEMORY_S
+
+    assert RING_MEMORY_S == 10 * 60
+
+    def repeat_after(gap):
+        tr = Tracker()
+        tr.official_source = True
+        out = []
+        for off, text in ((0, "⚠️Реактивний шахед на Жуляни, Борщагівку."),
+                          (gap, "⚠️Реактивний з ТЕЦ-5 на Жуляни.")):
+            o = observe(T0 + off, text, False, "kievinform_ua1")
+            d = decide(o, tr)
+            tr.record(o, d.level if d.notify else None,
+                      d.alarm if d.notify else None, d.reason)
+            out.append(d)
+        return out
+
+    early = repeat_after(9 * 60)
+    assert early[0].audible
+    assert early[1].notify and not early[1].audible      # shown, not heard
+
+    late = repeat_after(11 * 60)
+    assert late[1].audible, late[1].reason               # the window has passed

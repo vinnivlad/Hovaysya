@@ -29,7 +29,12 @@ IDLE_CLOSE_S = 45 * 60
 # A place near the user counts as new again once it has been quiet this long.
 # The night showed "Жуляни" waking him at 07:02 and again at 07:35 after a lull,
 # with the note "новий дрон" — but 10 minutes let far too much through.
-RING_MEMORY_S = 20 * 60
+# How long a place near him counts as "already said". His call, 2026-08-31:
+# "20хв це занадто" -- and the two data points in his own labels sit either side
+# of ten rather than twenty: a repeat at 9 minutes he marked silent, one at 29
+# he marked a wake-up. Inside the window a repeat over home is still shown, just
+# without a sound; the sound is what waits for the window to pass.
+RING_MEMORY_S = 10 * 60
 
 # Words the channels use when adding a target rather than restating one.
 #
