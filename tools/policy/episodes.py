@@ -34,6 +34,13 @@ IDLE_CLOSE_S = 45 * 60
 # of ten rather than twenty: a repeat at 9 minutes he marked silent, one at 29
 # he marked a wake-up. Inside the window a repeat over home is still shown, just
 # without a sound; the sound is what waits for the window to pass.
+#
+# Ten and not eleven or twelve on his call, having seen that the case which
+# prompted the change sits 39 seconds outside it and now rings: "ми тут ніколи
+# не вгадаємо інтервал. Ситуації всі різні, колись хотілося б дзвону а колись
+# ні." So do not tune this number against a single night -- it is a compromise
+# that is wrong in both directions by design, and the thing that makes it
+# tolerable is that a repeat inside the window is still *shown*.
 RING_MEMORY_S = 10 * 60
 
 # Words the channels use when adding a target rather than restating one.
