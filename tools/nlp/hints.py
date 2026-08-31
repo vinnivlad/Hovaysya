@@ -201,6 +201,15 @@ SUMMARY_TERMS = (
     # followed by an inventory of everything that flew, which is exactly the
     # shape of a live wave and is the opposite of one.
     "пригнічен", "цілей були збит",
+    # News and analysis. Each of these names weapons and none of them reports
+    # anything in the air: "❗️Кремль готує потужніші балістичні удари по Києву,
+    # – Bloomberg", "Міноборони РФ анонсувало зимові удари". Six and three
+    # messages respectively, all of one kind.
+    "bloomberg", "reuters", "politico", "суспільне", "уніан", "радіо свобод",
+    "кремль", "міноборони",
+    # A retrospective map of where things flew, and a past-tense note on what
+    # was used. One message each, and both rang as a ballistic climb.
+    "орієнтовний маршрут", "маршрут ворожих", "у поєднанні з", "в поєднанні з",
     # "🌟Русня випустила вночі щонайменше 38 ракет" — a count of the night just
     # past, and it rang.
     "випустила вночі", "випустив вночі", "запустила вночі", "щонайменше",

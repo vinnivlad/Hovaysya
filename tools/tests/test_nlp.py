@@ -1239,3 +1239,16 @@ def test_a_photo_a_tally_and_an_arsenal_are_not_events():
     assert hints.certainty_hint(
         "❗️Озброєння яке ворог може застосувати під час масованого удару:" + chr(10)
         + "⚠️525 шахедів;" + chr(10) + "❗31 балістичну ракету Іскандер-М;") == "probable"
+
+
+def test_news_and_retrospect_are_not_events():
+    """Found by asking which messages the labels call "nothing flying" while the
+    patterns see a class: twenty, of which four still rang. Three were news or
+    retrospect, each naming weapons and reporting nothing in the air."""
+    for text in ("❗️Кремль готує потужніші балістичні удари по Києву, – Bloomberg.",
+                 "Орієнтовний маршрут ворожих цілей під час вечірньо-нічної атаки "
+                 "на Київ, Бровари",
+                 'Були "Іскандер" у поєднанні з системами С-400'):
+        assert hints.modality_hint(text) == "summary-news", text
+    # The fourth was right to ring: he asked to be told when a class is lifted.
+    assert hints.partial_clear("⚪️ Відбій загрози МіГ-31К.")
