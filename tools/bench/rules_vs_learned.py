@@ -13,8 +13,8 @@ they have effectively seen the test set, while the model is cross-validated. The
 comparison is therefore unfair *to the model*, and the gap it loses by is the
 interesting quantity rather than the winner.
 
-Two other things the numbers cannot say. The 458 labels leave about 190 examples
-per fold, which is not a regime where a learned model shows itself; and a
+Two other things the numbers cannot say. The 458 labels leave 366 examples to
+train on and 92 to test against per fold, which is not a regime where a learned model shows itself; and a
 character n-gram counter has no idea what words mean, so "озброєння яке ворог
 може застосувати" is invisible to it as a forecast while a pretrained
 multilingual model would very likely read it.
@@ -138,12 +138,18 @@ CASES = (
     ("certainty", "certainty", hints.certainty_hint, False),
 )
 
-for field, key, fn, stated in CASES:
-    n, reg, nb = run(key, fn, only_stated=stated)
-    print(f"\n=== {field}  ({n} мічених, 5-fold) ===")
-    print(f"  регулярки:      точність {score(reg):.3f}   macro-F1 {macro_f1(reg):.3f}")
-    print(f"  навчена модель: точність {score(nb):.3f}   macro-F1 {macro_f1(nb):.3f}")
-    wrong = collections.Counter((w, g) for g, w in reg if g != w)
-    print(f"  найчастіші промахи регулярок: {dict(wrong.most_common(4))}")
-    wrong2 = collections.Counter((w, g) for g, w in nb if g != w)
-    print(f"  ...і моделі:                  {dict(wrong2.most_common(4))}")
+
+def main():
+    for field, key, fn, stated in CASES:
+        n, reg, nb = run(key, fn, only_stated=stated)
+        print(f"\n=== {field}  ({n} мічених, 5-fold) ===")
+        print(f"  регулярки:      точність {score(reg):.3f}   macro-F1 {macro_f1(reg):.3f}")
+        print(f"  навчена модель: точність {score(nb):.3f}   macro-F1 {macro_f1(nb):.3f}")
+        wrong = collections.Counter((w, g) for g, w in reg if g != w)
+        print(f"  найчастіші промахи регулярок: {dict(wrong.most_common(4))}")
+        wrong2 = collections.Counter((w, g) for g, w in nb if g != w)
+        print(f"  ...і моделі:                  {dict(wrong2.most_common(4))}")
+
+
+if __name__ == "__main__":
+    main()
