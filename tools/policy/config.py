@@ -118,9 +118,16 @@ class Config:
     silent_dedup_s: int = 60
     # The only dedup left on the rule above -- "дедуп мінімальний". It exists for
     # one shape: the same shout from two channels seconds apart, "Жуляни🚀" then
-    # "ЖУЛЯНИ!" four seconds later. His two labelled rings are 129 s apart, so a
-    # minute keeps both and collapses the pair.
-    home_dedup_s: int = 60
+    # "ЖУЛЯНИ!" four seconds later.
+    #
+    # Fifteen seconds, and the corpus put it there rather than taste. Every echo
+    # of that shape lands in 1-13 s -- eight pairs, at 1, 1, 1, 4, 7, 7, 9 and
+    # 13 -- and then nothing until 24 s. What sits above the gap is a fresh
+    # shout, not an echo: "ЖУЛЯНИ!!" and then "Жуляни уважно" from another
+    # channel 35 s later, which under his rule has to ring. So the threshold
+    # belongs anywhere in the empty band of 14-23 s, and the low end of it is
+    # the one that assumes least.
+    home_dedup_s: int = 15
     # Measured: p90 of the same cross-channel lag.
     launch_dedup_s: int = 4 * 60
     idle_close_s: int = 45 * 60
