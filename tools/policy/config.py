@@ -37,7 +37,15 @@ from dataclasses import dataclass, fields, replace
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG_PATH = REPO_ROOT / "data" / "hovaysya.json"
+
+# The settings live in git, on his reasoning: a change to them is then a commit
+# with a message saying why, deployed by the same pull as the code, and the
+# restart that deploy performs is what applies it -- so there is nothing to
+# re-read and no reload machinery to get wrong.
+CONFIG_PATH = REPO_ROOT / "hovaysya.json"
+# ...with an optional override for a machine that wants to differ without a
+# commit. `data/` is gitignored, so it cannot travel through a deploy.
+CONFIG_LOCAL = REPO_ROOT / "data" / "hovaysya.json"
 
 # Bounds, not opinions: outside these a setting stops being a preference and
 # becomes a broken watch. A refractory of zero rings on every message of a wave;
@@ -139,6 +147,8 @@ def from_dict(raw: dict, base: Config = DEFAULTS,
     known = {f.name: f.type for f in fields(Config)}
     changes: dict[str, object] = {}
     for key, value in (raw or {}).items():
+        if key.startswith("_"):
+            continue          # a comment in a format that has none
         if key not in known:
             warn(f"  ! конфіг: невідомий ключ {key!r} — пропускаю")
             continue
@@ -170,19 +180,28 @@ def from_dict(raw: dict, base: Config = DEFAULTS,
     return replace(base, **changes)
 
 
-def load(path: Path = CONFIG_PATH, warn=print) -> Config:
-    """The file, or the defaults. Never an exception."""
+def _one(path: Path, base: Config, warn) -> Config:
+    """One file overlaid on what is already there. Never an exception."""
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        return DEFAULTS
+        return base
     except (OSError, ValueError) as exc:
-        warn(f"  ! конфіг {path.name}: {exc} — беру дефолти")
-        return DEFAULTS
+        warn(f"  ! конфіг {path.name}: {exc} — лишаю як було")
+        return base
     if not isinstance(raw, dict):
-        warn(f"  ! конфіг {path.name}: очікував обʼєкт — беру дефолти")
-        return DEFAULTS
-    return from_dict(raw, warn=warn)
+        warn(f"  ! конфіг {path.name}: очікував обʼєкт — лишаю як було")
+        return base
+    return from_dict(raw, base=base, warn=warn)
+
+
+def load(path: Path = CONFIG_PATH, local: Path | None = CONFIG_LOCAL,
+         warn=print) -> Config:
+    """Defaults, then the committed file, then a local override if there is one."""
+    cfg = _one(path, DEFAULTS, warn)
+    if local is not None:
+        cfg = _one(local, cfg, warn)
+    return cfg
 
 
 def changed_from_default(cfg: Config) -> dict:

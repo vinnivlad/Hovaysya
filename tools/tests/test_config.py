@@ -127,3 +127,71 @@ def test_the_quiet_hours_keep_only_what_leaves_minutes():
 def test_the_startup_line_shows_only_what_was_changed():
     assert changed_from_default(DEFAULTS) == {}
     assert changed_from_default(Config(ring_memory_s=900)) == {"ring_memory_s": 900}
+
+
+# --- two layers, and the first one is in git --------------------------------
+
+
+def test_the_committed_file_is_the_first_layer_and_data_overrides_it(tmp_path):
+    """His reasoning for putting it in git: a change is then a commit with a
+    message saying why, deployed by the same pull as the code, and the restart
+    that deploy performs is what applies it -- so there is nothing to re-read.
+
+    The local layer exists so a machine can differ without a commit."""
+    committed = tmp_path / "hovaysya.json"
+    committed.write_text('{"ring_memory_s": 900, "ring_all_clear": false}',
+                         encoding="utf-8")
+    cfg = load(committed, local=tmp_path / "absent.json", warn=_quiet)
+    assert cfg.ring_memory_s == 900 and cfg.ring_all_clear is False
+
+    override = tmp_path / "local.json"
+    override.write_text('{"ring_all_clear": true}', encoding="utf-8")
+    cfg = load(committed, local=override, warn=_quiet)
+    assert cfg.ring_memory_s == 900          # from the committed layer
+    assert cfg.ring_all_clear is True        # ...and the local one wins
+
+
+def test_a_broken_layer_leaves_the_other_alone(tmp_path):
+    committed = tmp_path / "hovaysya.json"
+    committed.write_text('{"ring_memory_s": 900}', encoding="utf-8")
+    broken = tmp_path / "local.json"
+    broken.write_text("{oops", encoding="utf-8")
+    cfg = load(committed, local=broken, warn=_quiet)
+    assert cfg.ring_memory_s == 900
+
+
+def test_underscore_keys_are_comments():
+    """JSON has none, and the file has to explain itself to whoever opens it at
+    3 a.m."""
+    cfg = from_dict({"_": "нотатка", "ring_memory_s": 900}, warn=_quiet)
+    assert cfg.ring_memory_s == 900
+
+
+def test_the_shipped_file_changes_nothing():
+    """It is a readable record of the current behaviour, not a change to it."""
+    import json as _json
+
+    from tools.policy.config import CONFIG_PATH
+
+    raw = _json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    cfg = from_dict(raw, warn=_quiet)
+    diff = changed_from_default(cfg)
+    # `home` and `ring` restate what the gazetteer already holds, so both are
+    # no-ops -- see test_the_ring_here_matches_the_gazetteer.
+    assert set(diff) <= {"home", "ring"}
+
+
+def test_the_ring_here_matches_the_gazetteer():
+    """The ring is in the settings file, on his call -- it is a preference, and
+    a preference belongs where preferences live. But the *reasons* stay in the
+    gazetteer, beside each name: Gatne inside, neighbouring Chabany outside.
+
+    Two copies of a list drift. This test is what stops them: change one and it
+    fails until the other is changed too, deliberately."""
+    import json as _json
+
+    from tools.nlp.gazetteer import MY_AREA
+    from tools.policy.config import CONFIG_PATH
+
+    raw = _json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    assert tuple(raw["ring"]) == tuple(p.name for p in MY_AREA)

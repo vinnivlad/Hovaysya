@@ -1,0 +1,43 @@
+{
+  "_": "Його налаштування. Кожна зміна тут — коміт із причиною, і деплой її застосовує перезапуском. Повний перелік із поясненнями — tools/policy/config.py. Локальне перекриття, якщо потрібне, — data/hovaysya.json (поза git).",
+
+  "home": "Жуляни",
+  "_ring": "Чому саме ці назви — написано біля кожної в tools/nlp/gazetteer.py: Гатне всередині, сусідні Чабани зовні. Тест test_the_ring_here_matches_the_gazetteer падає, якщо два списки розійдуться.",
+  "ring": [
+    "Жуляни",
+    "Вишневе",
+    "Борщагівка",
+    "Солом'янка",
+    "Деміївка",
+    "Іподром",
+    "Гатне",
+    "Голосіїв",
+    "Республіка",
+    "Теремки"
+  ],
+
+  "ring_alert_start": true,
+  "ring_all_clear": true,
+  "ring_partial_clear": true,
+  "ring_cruise_oblast": true,
+  "ring_cruise_city": true,
+  "ring_ballistic_after_recheck": true,
+  "drone_needs_home": true,
+
+  "show_ballistic_detail": true,
+  "show_recheck": true,
+  "show_ballistic_destination": true,
+  "show_home_repeat": true,
+  "show_ring_drone": true,
+
+  "ring_memory_s": 600,
+  "refractory_near_s": 300,
+  "refractory_s": 1200,
+  "silent_dedup_s": 60,
+  "launch_dedup_s": 240,
+  "idle_close_s": 2700,
+
+  "quiet_hours": false,
+  "quiet_from_hour": 23,
+  "quiet_to_hour": 7
+}
