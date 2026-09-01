@@ -1624,8 +1624,16 @@ def test_a_drone_over_his_own_place_rings_even_soon_after_the_siren():
     assert out[1][0].notify and not out[1][0].audible   # Borshchahivka: shown
     assert out[3][0].audible, out[3][0].reason          # Zhuliany: heard
     assert "Жуляни" in out[3][1].text
-    # ...and then deduped: shown on the status line, without a second sound.
-    assert out[4][0].notify and not out[4][0].audible
+    # ...and then deduped. This used to be shown on the status line without a
+    # second sound; since 2026-09-01 it is not shown either, because eleven
+    # seconds after the bell it is the same drone reaching a second channel --
+    # "глуши повтор", after a live one arrived six seconds behind its own bell as
+    # a message whose entire text was the word "Жуляни".
+    #
+    # The window is fifteen seconds. A repeat outside it still appears, which is
+    # what keeps the 2026-08-31 case working: the drone left towards Boiarka and
+    # came back ten minutes later, and that rings.
+    assert not out[4][0].notify, out[4][0].reason
 
 
 def test_a_message_that_said_nothing_leaves_no_trace_in_the_ring_memory():
@@ -1854,3 +1862,29 @@ def test_the_wave_says_where_it_is_without_ringing_again():
     assert said[2][0].notify and not said[2][0].audible
     assert "Вишневе" in said[2][1].text
     assert said[3][1] is not None and said[3][1].text.startswith("Збито")
+
+
+def test_a_repeat_over_home_is_shown_once_the_echo_window_has_passed():
+    """The other side of "глуши повтор", and the reason the window is short.
+
+    Six such repeats sit in the live log at 6, 43, 60, 60, 120 and 280 seconds
+    behind their bell. Only the first is an echo; by forty seconds a second
+    channel naming his street again is telling him it is still over him.
+    """
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    def play(gap: int):
+        tr = Tracker()
+        tr.official_source = True
+        for off, text in ((0, "⚠️Реактивний шахед з Шулявки на Жуляни."),
+                          (gap, "Жуляни")):
+            o = observe(T0 + off, text, False, "mon1tor_ua")
+            d = decide(o, tr)
+            tr.record(o, d.level if d.notify else None,
+                      d.alarm if d.notify else None, d.reason)
+        return d
+
+    assert play(6).notify is False              # echo from a second channel
+    assert play(45).notify is True              # still over you
+    assert play(45).audible is False            # ...but no second sound

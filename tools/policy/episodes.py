@@ -488,6 +488,8 @@ class Tracker:
         self.official_source = False
         # When his own place last rang while ballistic was up.
         self.home_rang_at: int | None = None
+        # ...and when it last rang for anything at all.
+        self.home_said_at: int | None = None
         self.closed: list[Episode] = []
 
     # -- lifecycle ---------------------------------------------------------
@@ -605,6 +607,12 @@ class Tracker:
         # true across an episode boundary as much as inside one.
         if level == "alert" and obs.at_home and alarm == "ballistic":
             self.home_rang_at = obs.ts
+        # Any audible mention of his place, whatever class. Kept apart from
+        # `home_rang_at` on purpose: that one guards a *ballistic* bell, and a
+        # ballistic ten seconds after a drone bell is an escalation rather than an
+        # echo, so the two must not share a marker.
+        if level == "alert" and obs.at_home:
+            self.home_said_at = obs.ts
         if obs.official:
             self.official_seen = obs.ts
         # A partial all-clear lifts one threat class, not the alert. Closing the

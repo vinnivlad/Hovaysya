@@ -516,6 +516,28 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             # -- is already `info`, so the stronger one getting silence was the
             # inconsistency. 103 such messages in the corpus, 79 naming home.
             if obs.at_home and cfg.show_home_repeat:
+                # ...unless it rang for this place seconds ago, in which case this
+                # is one shout arriving from a second channel. Seen live on
+                # 2026-09-01: a bell at 19:13:33 for "з Солом'янки на Жуляни,
+                # Деміївка, Голосіїв", then a bare "Жуляни" six seconds later from
+                # another channel -- which reached the phone as a message whose
+                # entire text was one word.
+                #
+                # `home_dedup_s`, the same number he gave for the audible echo and
+                # for the same measured reason: every echo of this shape lands
+                # within 1-13 s. Of six such repeats in the live log only that one
+                # is inside it; the others are 43 s and up, and by then a repeat
+                # says something -- it is still over you.
+                #
+                # This does *not* touch the case he complained about on 2026-08-31,
+                # which I first mistook it for. There the drone left towards
+                # Boiarka and came back ten minutes later -- "⚠️Реактивний з ТЕЦ-5
+                # на Жуляни." -- and got nothing at all. That one now *rings*,
+                # through `heading == toward` a few rules above, and is a
+                # different branch entirely.
+                said = tracker.home_said_at
+                if said is not None and 0 <= obs.ts - said <= cfg.home_dedup_s:
+                    return _silent("my place again, seconds after it rang")
                 return _notify("info", "none",
                                "already-notified: same target, my place again")
             return _silent("already-notified: same target near me")
