@@ -1252,3 +1252,22 @@ def test_news_and_retrospect_are_not_events():
         assert hints.modality_hint(text) == "summary-news", text
     # The fourth was right to ring: he asked to be told when a class is lifted.
     assert hints.partial_clear("⚪️ Відбій загрози МіГ-31К.")
+
+
+def test_a_dated_report_is_not_now():
+    """"💬 Атака балістичними та крилатими ракетами по Києву та Київській
+    області 01.09.26." arrived at 09:00 with no alert running and came out as
+    "Влучання: балістика. Солом'янський район."
+
+    The impact rule is checked before aftermath on purpose, so an explosion
+    report is never demoted to retrospective -- and five aftermath words lost to
+    one "влучань". A date stamp settles it: 118 messages in the corpus carry one
+    and 116 were already summaries."""
+    assert hints.modality_hint(
+        "💬 Атака балістичними та крилатими ракетами по Києву та Київській "
+        "області 01.09.26." + chr(10)
+        + "Внаслідок влучань пошкоджено житлову інфраструктуру, виникли пожежі."
+    ) == "summary-news"
+    # ...and a real impact report, which carries no date, still is one.
+    assert hints.modality_hint("💥Влучання у складське приміщення в районі ТЕЦ-5.") \
+        == "live-threat"

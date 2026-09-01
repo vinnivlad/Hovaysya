@@ -817,6 +817,14 @@ _FORECAST = re.compile(
     # verb: of 24 messages using пускають/пускали, several are real reports
     # ("пускають нові і нові. По 1 - 2 шт"), so the verb is no discriminator.
     r"найчастіше|зазвичай|[ув]\s+середньому|статистик|"
+    # A date stamp makes it a report about a day rather than about now. "💬 Атака
+    # балістичними та крилатими ракетами по Києву та Київській області 01.09.26."
+    # arrived at 09:00 with no alert running and came out as "Влучання:
+    # балістика. Солом'янський район." -- because the impact rule is checked
+    # before aftermath on purpose, so an explosion is never demoted, and five
+    # aftermath words lost to one "влучань". 118 such messages in the corpus and
+    # 116 were already summaries.
+    r"\b\d{2}\.\d{2}\.\d{2}\b|"
     r"оцінка загроз|"
     r"ніч буде без|"
     # First person about the situation is a column, not a report. Narrow on
