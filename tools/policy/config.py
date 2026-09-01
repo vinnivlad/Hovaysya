@@ -47,6 +47,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # differ can already be pointed at another file with `--config`.
 CONFIG_PATH = REPO_ROOT / "hovaysya.json"
 
+# A list of names has to be bounded too, and for a harder reason than taste.
+# Once a config can arrive over the network -- which is what an app editing its
+# own settings means, and he asked for it as the ring following him across the
+# city -- this loader stops being merely forgiving and becomes the trust
+# boundary. A ring of 50 000 names was accepted, and it moved one decision from
+# 0.03 ms to 0.3 ms: at a hundred recipients that is 30 ms a message, which is a
+# denial of service written in JSON.
+#
+# 128 is above any honest use: the gazetteer's whole near set is 122 canonical
+# names, so a larger ring cannot mean anything. The longest real name is 14
+# characters.
+MAX_RING = 128
+MAX_NAME = 64
+
 # Bounds, not opinions: outside these a setting stops being a preference and
 # becomes a broken watch. A refractory of zero rings on every message of a wave;
 # one of a day silences the night.
@@ -174,12 +188,19 @@ def from_dict(raw: dict, base: Config = DEFAULTS,
             if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
                 warn(f"  ! конфіг: {key} має бути списком назв — пропускаю")
                 continue
-            changes[key] = tuple(value)
+            if len(value) > MAX_RING:
+                warn(f"  ! конфіг: {key} — {len(value)} назв, беру перші {MAX_RING}")
+                value = value[:MAX_RING]
+            if any(len(x) > MAX_NAME for x in value):
+                warn(f"  ! конфіг: {key} — назви довші за {MAX_NAME} символів обрізано")
+            changes[key] = tuple(x[:MAX_NAME] for x in value)
         elif isinstance(current, str):
             if not isinstance(value, str):
                 warn(f"  ! конфіг: {key} має бути рядком — пропускаю")
                 continue
-            changes[key] = value
+            if len(value) > MAX_NAME:
+                warn(f"  ! конфіг: {key} — довше за {MAX_NAME} символів, обрізаю")
+            changes[key] = value[:MAX_NAME]
         elif isinstance(current, bool):
             if not isinstance(value, bool):
                 warn(f"  ! конфіг: {key} має бути true/false — пропускаю")

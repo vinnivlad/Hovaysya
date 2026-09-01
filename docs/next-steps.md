@@ -530,6 +530,57 @@ split is that the server knows where each recipient lives; the answer to that is
 that the configs sit on the box with no inbound port, which is the reason the
 previous section puts the open port somewhere else.
 
+### Config editing makes the port compulsory, and writable — 2026-09-01
+
+"HTTPS нам знадобиться в будь-якому випадку, користувачі мають мати можливість
+змінювати свій конфіг." That settles a question the section below had left as
+optional and later: the port is not for the feed screen, it is for the settings,
+and it has to accept writes.
+
+The pull direction saves the rest of the design. **A polls B for config changes**,
+the way it already polls Telegram and the way the deploy already pulls `main`, so
+A keeps having no inbound door at all. B holds the configs; A validates whatever
+it finds there.
+
+And that turns an existing property into a security one. `config.py` was written
+never to raise, to skip unknown keys and to clamp every number, because a typo
+must not be the reason the watch is down at 3 a.m. The same code is now the trust
+boundary against a box that can be compromised. It was not strong enough: a ring
+of 50 000 names was accepted and moved one decision from 0.03 ms to 0.3 ms, which
+at a hundred recipients is 30 ms a message -- a denial of service written in JSON.
+Bounded now (`MAX_RING`, `MAX_NAME`), with the ceiling above every honest use
+rather than tight: the gazetteer's whole near set is 122 names, so a larger ring
+cannot mean anything.
+
+What B holds is then district-level location for each recipient, which is the
+private data this design was trying to keep behind the closed door. Accepted
+knowingly, with the two things that actually matter kept off B: no bot token, and
+no key back into A. A compromised B can lie about a config -- and a lie is bounded
+by the clamping above -- but cannot forge a bell, because the bell comes from A.
+
+### ...but a ring that follows him needs the geometry that failed
+
+"Можливо навіть автоматично, при переміщенні містом" is not a transport problem.
+The ring is a hand-ruled list, so *something* has to produce a ring for wherever
+he happens to be, and the measurement above already says distance cannot:
+Chokolivka is the nearest place to Zhuliany of all at 2.2 km and he ruled it out,
+while Gatne at 7.1 km is in.
+
+The cheap way through, and it needs no geometry at all: **a handful of named
+rings, each hand-ruled once, and the phone picks by GPS which one it is in.** Not
+a rule over toponyms -- just "which of these presets am I nearest to". This works
+because a ring only has to be good where somebody actually lives, so the number of
+presets needed is the number of users, which today is one. It also degrades
+honestly: outside every preset the answer is the city tier, which is what a
+visitor should get.
+
+One consequence to design for rather than discover: **a config that changes
+mid-alert changes what the episode state means.** `ring_seen` and `at_home` were
+accumulated under the old ring, so arriving in a new district during a wave may
+ring again for a place already announced -- which is arguably right, since nobody
+has warned him about *here* yet, but it should be a decision rather than an
+accident.
+
 ### The raw feed is fetched, not pushed
 
 He remembered what the design above forgot: the app has a second screen with

@@ -229,3 +229,25 @@ def test_every_path_that_observes_passes_the_config():
             if "observe(" in line and "def observe" not in line:
                 assert "config=" in line or line.rstrip().endswith(","), \
                     f"{name}: {line.strip()}"
+
+
+def test_a_hostile_config_cannot_slow_the_watch_down():
+    """The loader is the trust boundary the moment a config can arrive over the
+    network -- which is what "користувачі мають мати можливість змінювати свій
+    конфіг" means, and he wants it automatic as the ring follows him across the
+    city.
+
+    Before the bound, 50 000 names of 200 characters were accepted and moved one
+    decision from 0.03 ms to 0.3 ms. At a hundred recipients that is 30 ms a
+    message: a denial of service written in JSON.
+    """
+    from tools.policy.config import MAX_NAME, MAX_RING
+
+    cfg = from_dict({"ring": ["х" * 500] * 50_000, "home": "у" * 100_000},
+                    warn=_quiet)
+    assert len(cfg.ring) == MAX_RING
+    assert max(len(name) for name in cfg.ring) == MAX_NAME
+    assert len(cfg.home) == MAX_NAME
+    # ...and his own ring is nowhere near the ceiling, which is the point of
+    # choosing one above every honest use rather than a tight one.
+    assert len(load(warn=_quiet).ring) * 4 < MAX_RING
