@@ -208,6 +208,24 @@ CITY = [
 OBLAST = [
     # Also ruled out of the near ring — "Віта Поштова: зовсім далеко".
     _p("Чабани", "oblast", "чабани"),
+    # Found by comparing the OSM extract against this file: towns within 90 km
+    # that the channels name and the gazetteer did not know at all. Counted in
+    # the corpus first, which is the lesson Chokolivka taught -- a name nobody
+    # writes is worth nothing however near it is.
+    #
+    # Kalynivka is the one that mattered: 53 mentions, and it sits on the
+    # southern approach. "Летить на низькій висоті на Калинівка/Глеваха" is a
+    # drone on its way to Zhuliany, and it read as nowhere at all.
+    _p("Калинівка", "oblast", "калинівк"),
+    _p("Ворзель", "oblast", "ворзел"),
+    _p("Козелець", "oblast", "козелец", "козельц"),
+    _p("Гребінки", "oblast", "гребінк"),
+    _p("Борова", "oblast", "борова"),
+    _p("Городок", "oblast", "городок"),
+    _p("Немішаєве", "oblast", "немішає"),
+    # Остер is named 21 times and is deliberately left out: every usable stem of
+    # it is a prefix of "остерігайтеся", which these channels write constantly.
+    # A name that cannot be recognised safely is worse than one that is missing.
     # Sat in the ring on inference rather than a ruling: woken for once
     # ("реактив на Крюківщину/Борщагівки"), marked far once. Ruled out by him on
     # 2026-08-29 — "Крюківщина не в колі". The wake-up that suggested otherwise

@@ -1317,3 +1317,48 @@ def test_folding_leaves_a_message_without_one_alone():
 
     plain = "⚠️Реактивний шахед на Жуляни."
     assert normalize_text(plain) == plain
+
+
+def test_the_coordinates_cover_the_ring_and_the_names_that_matter():
+    """Generated from OSM, and the table is only useful if it holds what gets
+    named. The ring must be complete -- a radius derived from a table missing one
+    of his own places would silently shrink it."""
+    from tools.nlp.coords import POINTS
+    from tools.nlp.gazetteer import MY_AREA
+
+    assert {p.name for p in MY_AREA} <= set(POINTS)
+    # The districts OSM's place extract does not hold at all, hand-geocoded:
+    # 200 and 60 mentions, and the only OSM places of those names in the oblast
+    # are villages 90 km out.
+    assert "Нивки" in POINTS and "Березняки" in POINTS
+    for name in ("Бориспіль", "Васильків", "Макарів"):
+        assert name in POINTS, name
+
+
+def test_a_radius_now_reproduces_the_hand_ruled_ring():
+    """The parked conclusion was that it could not -- and that rested on
+    coordinates which were never committed and turn out to have been wrong.
+
+    With OSM's, 5.5 km from Zhuliany covers every name he ruled in and excludes
+    both he ruled out: Крюківщина at 5.5 and Чабани at 5.8, against Гатне at 5.0.
+    The old measurement had claimed Gatne and Chabany were 300 m apart at 7 km,
+    which is what made the pair look undecidable.
+    """
+    from tools.geo.build import HOME_POINT, km
+    from tools.nlp.coords import POINTS
+    from tools.nlp.gazetteer import MY_AREA
+
+    inside = {n for n, pt in POINTS.items() if km(HOME_POINT, pt) <= 5.5}
+    assert {p.name for p in MY_AREA} <= inside
+    assert "Крюківщина" not in inside and "Чабани" not in inside
+
+    # What it adds is three districts adjacent to places already in the ring,
+    # and every one of them is the shape he described as "я не сильно знаю ті
+    # мікрорайони": Совки beside Zhuliany, Караваєві Дачі beside Solomianka,
+    # Відрадний beside Borshchahivka.
+    assert inside - {p.name for p in MY_AREA} == {
+        "Совки", "Караваєві Дачі", "Відрадний",
+        # A landmark and a district containing a ring member; neither is a new
+        # place in any real sense.
+        "Виставковий центр", "Солом'янський район",
+    }
