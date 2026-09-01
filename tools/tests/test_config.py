@@ -192,3 +192,40 @@ def test_the_ring_here_matches_the_gazetteer():
 
     raw = _json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     assert tuple(raw["ring"]) == tuple(p.name for p in MY_AREA)
+
+
+def test_the_ring_in_the_file_actually_reaches_the_decision():
+    """It did not, for a while, and nothing caught it.
+
+    `observe()` takes a config and every caller left it out, so the ring fell
+    back to the gazetteer's own tier. Behaviour was right by coincidence -- the
+    two lists are identical, and the drift test above guarantees they stay so --
+    which is exactly what hid the defect: a setting that changes nothing when
+    changed. Asked what was needed before the app, this was the answer.
+    """
+    import dataclasses
+
+    from tools.policy.episodes import observe
+
+    text = "⚠️Реактивний шахед на Борщагівку."
+    mine = observe(T0, text, False, "mon1tor_ua", config=load(warn=_quiet))
+    narrowed = observe(T0, text, False, "mon1tor_ua",
+                       config=dataclasses.replace(load(warn=_quiet),
+                                                  ring=("Жуляни",)))
+    assert mine.scope == "my-area" and mine.ring_places == ("Борщагівка",)
+    assert narrowed.scope == "city" and narrowed.ring_places == ()
+
+
+def test_every_path_that_observes_passes_the_config():
+    """The defect was one missing keyword in four callers, so the guard is on
+    the callers rather than on any one behaviour."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    for name in ("live/run.py", "eval/run.py", "labeler/prefill.py",
+                 "live/rerun.py"):
+        body = (root / "tools" / name).read_text(encoding="utf-8")
+        for line in body.splitlines():
+            if "observe(" in line and "def observe" not in line:
+                assert "config=" in line or line.rstrip().endswith(","), \
+                    f"{name}: {line.strip()}"

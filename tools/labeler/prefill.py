@@ -99,9 +99,10 @@ def build(night: str, db: Path) -> list[dict]:
     # anything else would pre-fill with decisions the watcher never made.
     from ..eval.run import run_policy
 
-    observations = [observe(ts, text, is_reply, anchor.split("/")[0])
+    cfg = load_config()
+    observations = [observe(ts, text, is_reply, anchor.split("/")[0], config=cfg)
                     for ts, anchor, text, is_reply in messages]
-    tracker = Tracker(config=load_config())
+    tracker = Tracker(config=cfg)
     tracker.official_source = any(
         anchor.split("/")[0] in OFFICIAL_CHANNELS
         for _ts, anchor, _t, _r in messages)

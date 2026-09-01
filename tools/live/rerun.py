@@ -81,7 +81,8 @@ def main(argv: list[str] | None = None) -> int:
     shown = moved = 0
     for r in rows:
         ts = int(datetime.fromisoformat(r["at"]).timestamp())
-        obs = observe(ts, r["text"], False, r["anchor"].split("/")[0])
+        obs = observe(ts, r["text"], False, r["anchor"].split("/")[0],
+                      config=tracker.config)
         d = decide(obs, tracker)
         tracker.record(obs, d.level if d.notify else None,
                        d.alarm if d.notify else None, d.reason)
