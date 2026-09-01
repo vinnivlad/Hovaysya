@@ -371,6 +371,29 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
         # launch itself — the thing the warning was about — went out silent.
         first_launch = (obs.says_launch and ep is not None
                         and threat not in ep.launched)
+        # ...or the first thing a channel calls new since a recheck closed the
+        # last wave. On 2026-09-01 a recheck at 02:25 was followed by Tsirkon
+        # launches a minute later, and every one was silenced as "the same
+        # wave". Checked against the other channels rather than guessed: none of
+        # them called it new until "Ще 2х РАКЕТИ НА КИЇВ" at 02:29:42, and three
+        # more said so within two minutes of that.
+        if (ep is not None and ep.recheck_at and obs.says_new
+                and obs.ts > ep.recheck_at):
+            first_launch = True
+        # A type nobody has named yet is a new event, whatever the wording. His
+        # point: "може ще на сам факт іншого виду балістичної ракети реагувати
+        # як на нове". It is what "ЦИРКОНИ НА КИЇВ" was at 02:26:51, three
+        # minutes before any channel used a word meaning new.
+        #
+        # Only after a recheck, and deliberately so: mid-wave it would override
+        # his older and firmer ruling that a ballistic launch is not re-announced
+        # ("я і так не сплю"). After a recheck there is no wave left to repeat --
+        # the recheck said it was over -- so a type nobody has named yet is the
+        # thing he asked for: "дорозвідка каже, що все вже ок, а насправді не ок
+        # і про це треба повідомити".
+        if (ep is not None and ep.recheck_at and obs.ts > ep.recheck_at
+                and hints.missile_kinds(obs.text) - ep.kinds_seen):
+            first_launch = True
         if (ep is not None and ep.notified and not first_launch
                 and not tracker.is_fresh_launch(obs)
                 and not tracker.is_new_class("ballistic")):

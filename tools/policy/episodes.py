@@ -182,6 +182,15 @@ class Episode:
     # 1 oblast, 2 city, 3 the ring. A rise rings once, the way the threat ladder
     # does -- his rule, because waking only when they reach the city is late.
     cruise_geo: int = 0
+    # When a recheck last closed a wave. What follows is a new one -- but only a
+    # message the channel itself calls new, because the count-off runs across
+    # waves: "спуск балістики! Дев'ята" is the ninth missile of the night rather
+    # than of this volley. His warning: "хвилі можуть бути різні, але канали
+    # рахують ракети загалом".
+    recheck_at: int = 0
+    # Named missile types already seen in this episode. A type nobody has
+    # mentioned yet is a new event even when no channel calls it new.
+    kinds_seen: set = field(default_factory=set)
     # Whether a ballistic launch in this episode has been given a destination.
     ballistic_located: bool = False
     # signature of a silent line -> when it was last sent
@@ -531,6 +540,21 @@ class Tracker:
         stated = obs.effective_threat or obs.threat
         if obs.recheck and level is not None:
             ep.rechecked.add(stated if stated not in ("none", "unknown") else "all")
+            # A recheck closes the wave it is about. What comes after it is a new
+            # one -- seen on the ballistic night of 2026-09-01, where a recheck
+            # at 02:25 was followed by Tsirkon launches a minute later and every
+            # one of them was silenced as "the same wave". Three of his findings
+            # that night are this single fault: the launches went unheard, the
+            # next recheck at 02:34 counted as a repeat, and the destination that
+            # arrived after the 02:42 launch was never shown.
+            #
+            # Not by clearing `launched`: "спуск балістики! Дев'ята" carries a
+            # launch word and is the ninth missile of a wave, so clearing it
+            # made every descent report ring. The channel says which is which --
+            # a real new launch has `says_new`, a count-off does not -- so the
+            # reopening keys on that instead, from `recheck_at`.
+            ep.recheck_at = obs.ts
+            ep.ballistic_located = False
         elif ((level is not None and obs.live
                and stated not in ("none", "unknown"))
               or (obs.reappeared and obs.scope != "elsewhere")):
@@ -619,6 +643,13 @@ class Tracker:
         if (level is not None and level != "info" and obs.says_launch
                 and obs.certainty == "confirmed"):
             ep.launched.add(obs.effective_threat or obs.threat)
+        if obs.live:
+            ep.kinds_seen |= hints.missile_kinds(obs.text)
+        # Reopening a wave is a single shot. Left standing, every later "ще" and
+        # "нові" rang too -- ten of them in five minutes on 2026-09-01, which is
+        # the opposite of the complaint it was fixing.
+        if level == "alert" and ep.recheck_at and obs.ts > ep.recheck_at:
+            ep.recheck_at = 0
         # Only from a message that counted. "Жуляни/ Вишневе до вас йде" was
         # dismissed as non-threat and still stamped Zhuliany as seen, so the
         # real warning five seconds later -- "Борщагівки, Жуляни - в укриття!"

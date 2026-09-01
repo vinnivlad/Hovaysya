@@ -485,6 +485,29 @@ def generic_rocket(text: str) -> bool:
     return not _SPECIFIC_CRUISE.search(text or "")
 
 
+# The named types, as opposed to the class. His observation on the ballistic
+# night: a different kind of missile is a different event, even when no channel
+# says "ще" -- and that is what "ЦИРКОНИ НА КИЇВ" was at 02:26:51, three minutes
+# before the first message anyone called new.
+MISSILE_KINDS: tuple[tuple[str, str], ...] = (
+    ("іскандер", r"іскандер"),
+    ("кн-23", r"кн-?23"),
+    ("циркон", r"циркон"),
+    ("кинджал", r"кинджал|кинжал"),
+    ("онікс", r"онікс"),
+    ("калібр", r"калібр"),
+    ("х-101", r"х-?101"),
+    ("х-59", r"х-?59"),
+    ("бандероль", r"бандерол"),
+)
+_KINDS = tuple((name, re.compile(pat, re.IGNORECASE)) for name, pat in MISSILE_KINDS)
+
+
+def missile_kinds(text: str) -> frozenset[str]:
+    """Which named missile types this message mentions."""
+    return frozenset(name for name, rx in _KINDS if rx.search(text or ""))
+
+
 def recheck(text: str) -> bool:
     return _hits(text, RECHECK_TERMS)
 

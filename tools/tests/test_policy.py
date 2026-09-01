@@ -1737,3 +1737,36 @@ def test_home_named_again_rings_after_ten_minutes_and_not_before():
 
     late = repeat_after(11 * 60)
     assert late[1].audible, late[1].reason               # the window has passed
+
+
+def test_a_recheck_closes_the_wave_and_the_next_launch_is_new():
+    """From the ballistic night of 2026-09-01. A recheck at 02:25 was followed
+    by Tsirkon launches a minute later and every one was silenced as "the same
+    wave" -- three of his findings that night are this one fault: the launches
+    went unheard, the next recheck counted as a repeat, and the destination that
+    arrived later was never shown.
+
+    "Дорозвідка каже, що все вже ок, а насправді не ок і про це треба
+    повідомити."
+    """
+    tr = _alerted()
+    out = []
+    for off, text in (
+            (60, "‼️ Вихід балістики з Брянська"),
+            (300, "📡Локаційно по балістиці чисто."),
+            (389, "❗6-8 Цирконів на Київ, Бровари."),
+            (400, "‼️ Київ — спуск балістики! Дев'ята"),
+            (700, "📡По балістиці чисто.")):
+        o = observe(T0 + off, text, False, "war_monitor")
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+                  d.reason)
+        out.append(d)
+    assert out[0].audible                       # the launch
+    assert out[1].reason.startswith("recheck")  # the wave is declared over
+    assert out[2].audible, out[2].reason        # a new type, so a new wave
+    # ...and the count-off that follows is not a third wave. The channels count
+    # missiles across waves: "хвилі можуть бути різні, але канали рахують ракети
+    # загалом".
+    assert not out[3].audible, out[3].reason
+    assert out[4].reason.startswith("recheck")  # ...and this recheck is news
