@@ -478,7 +478,8 @@ def main(argv: list[str] | None = None) -> int:
     # nothing about whether the process came up and reached the live feed, and
     # that is the thing the message is supposed to prove.
     state = state_word(session.tracker)
-    note = startup_note(f"{state} · {len(watchers)} канал(и)")
+    note = startup_note(f"{state} · {len(watchers)} канал(и)",
+                        settings=diff)
     if note:
         print(chr(10).join("  " + line for line in note.splitlines()), flush=True)
         if session.notifier and session.notifier.enabled:

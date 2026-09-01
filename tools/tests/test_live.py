@@ -332,7 +332,61 @@ def test_the_state_is_written_only_when_something_was_said(tmp_path):
     state = tmp_path / "v.json"
     remember(state, "af814ab", T0)
     startup_note("тихо", _version(), state_path=state, now=T0 + 60)
-    assert last_seen(state) == ("af814ab", T0)
+    assert last_seen(state)[:2] == ("af814ab", T0)
+
+
+def test_a_settings_change_is_confirmed_by_the_restart_that_applies_it(tmp_path):
+    """A setting deploys as a commit plus the restart the deploy performs. The
+    commit subject says what was meant; only the process that came up can say
+    what took effect -- "при перезапуску не видно" -- so the note carries it.
+
+    It also has to defeat the half-hour cooldown, because a settings-only
+    change on the same commit is precisely what that cooldown silences."""
+    from tools.live.version import last_seen, remember, startup_note
+
+    state = tmp_path / "v.json"
+    remember(state, "af814ab", T0, {"ring_all_clear": "так"})
+
+    quiet = startup_note("тихо", _version(), state_path=state, now=T0 + 60,
+                         settings={"ring_all_clear": True})
+    assert quiet is None                      # nothing moved, nothing said
+
+    note = startup_note("тихо", _version(), state_path=state, now=T0 + 60,
+                        settings={"ring_all_clear": False,
+                                  "ring": ["Жуляни", "Гатне"]})
+    assert note is not None and "налаштування:" in note
+    assert "ring_all_clear: так → ні" in note
+    assert "ring: за замовчуванням → 2 назв" in note   # a list is a count
+    assert last_seen(state)[2] == {"ring_all_clear": "ні", "ring": "2 назв"}
+
+
+def test_settings_never_announced_before_are_stated_once(tmp_path):
+    """The deploy that brings this feature finds a state file written before the
+    field existed. "Nothing changed" would be wrong there -- nothing was ever
+    said -- and the ring would stay unconfirmed until he happened to edit it."""
+    from tools.live.version import remember, startup_note
+
+    state = tmp_path / "v.json"
+    remember(state, "0ldc0de", T0)             # no settings recorded at all
+    note = startup_note("тихо", _version(), state_path=state, now=T0 + 60,
+                        settings={"home": "Жуляни", "ring": ["Жуляни", "Гатне"]})
+    assert note is not None
+    assert "· home: Жуляни" in note and "· ring: 2 назв" in note
+
+    # ...and only once: the next restart on the same settings is silent again.
+    assert startup_note("тихо", _version(), state_path=state, now=T0 + 120,
+                        settings={"home": "Жуляни",
+                                  "ring": ["Жуляни", "Гатне"]}) is None
+
+
+def test_a_first_start_does_not_recite_the_whole_config(tmp_path):
+    """There is nothing to compare against, and the journal already prints the
+    full list at startup."""
+    from tools.live.version import startup_note
+
+    note = startup_note("тихо", _version(), state_path=tmp_path / "v.json",
+                        settings={"home": "Жуляни", "ring": ["Жуляни"]})
+    assert note is not None and "налаштування:" not in note
 
 
 def test_several_commits_are_listed_but_not_all_of_them(tmp_path):

@@ -87,21 +87,63 @@ def changes_since(previous: str, root: Path = REPO_ROOT) -> list[str]:
     return [line for line in out.splitlines() if line.strip()]
 
 
-def last_seen(path: Path = STATE_PATH) -> tuple[str, float]:
+def last_seen(path: Path = STATE_PATH) -> tuple[str, float, dict]:
     try:
         state = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return "", 0.0
-    return str(state.get("commit") or ""), float(state.get("at") or 0.0)
+        return "", 0.0, {}
+    settings = state.get("settings")
+    return (str(state.get("commit") or ""), float(state.get("at") or 0.0),
+            settings if isinstance(settings, dict) else {})
 
 
-def remember(path: Path, commit: str, at: float) -> None:
+def remember(path: Path, commit: str, at: float,
+             settings: dict | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"commit": commit, "at": at}), encoding="utf-8")
+    path.write_text(json.dumps({"commit": commit, "at": at,
+                                "settings": settings or {}}), encoding="utf-8")
+
+
+def _short(value) -> str:
+    """A setting as one readable token. A ten-name ring is a count, not a list:
+    the message has to stay a glance."""
+    if isinstance(value, bool):
+        return "так" if value else "ні"
+    if isinstance(value, (list, tuple)):
+        return f"{len(value)} назв"
+    return str(value)
+
+
+def settings_note(now: dict, before: dict, *, ever_told: bool = True) -> list[str]:
+    """What changed in the settings since the last announcement.
+
+    The commit subject says what was *meant*; this says what the process
+    actually came up with -- which is the question a settings deploy raises and
+    the reason the note exists at all. Nothing changed means nothing said.
+
+    `ever_told` false means no announcement has ever carried settings, so there
+    is no "changed" to speak of and the honest thing is the current state, once.
+    That is what the deploy of this very feature hits: the state file on the
+    instance predates the field.
+    """
+    fresh = {k: _short(v) for k, v in now.items()}
+    if not ever_told:
+        return [f"· {k}: {v}" for k, v in sorted(fresh.items())]
+    if not before:                    # a first start has nothing to compare to
+        return []
+    lines = []
+    for key in sorted(set(fresh) | set(before)):
+        was, is_ = before.get(key), fresh.get(key)
+        if was == is_:
+            continue
+        lines.append(f"· {key}: {was or 'за замовчуванням'} → "
+                     f"{is_ or 'за замовчуванням'}")
+    return lines
 
 
 def startup_note(status: str, version: Version | None = None, *,
                  changes: list[str] | None = None,
+                 settings: dict | None = None,
                  root: Path = REPO_ROOT, state_path: Path = STATE_PATH,
                  now: float | None = None,
                  cooldown: float = RESTART_COOLDOWN_S) -> str | None:
@@ -111,7 +153,12 @@ def startup_note(status: str, version: Version | None = None, *,
     """
     version = version if version is not None else describe(root)
     now = time.time() if now is None else now
-    previous, when = last_seen(state_path)
+    previous, when, seen_settings = last_seen(state_path)
+    settings = {} if settings is None else settings
+    # A true first start says nothing about settings -- the journal prints the
+    # full list a few lines earlier and the phone does not need it twice.
+    moved = settings_note(settings, seen_settings,
+                          ever_told=bool(not previous or seen_settings))
 
     if not previous:
         head = "▶️ Спостерігач запущено."
@@ -119,6 +166,11 @@ def startup_note(status: str, version: Version | None = None, *,
         head = "🔧 Оновлено і перезапущено."
         if changes is None:
             changes = changes_since(previous, root)
+    elif moved:
+        # A settings-only change deploys as a restart on the same commit. That
+        # is exactly the case the cooldown would swallow, and exactly the one he
+        # is waiting to see confirmed.
+        head = "🔁 Перезапуск."
     elif now - when >= cooldown:
         head = "🔁 Перезапуск."
     else:
@@ -135,6 +187,11 @@ def startup_note(status: str, version: Version | None = None, *,
     if len(rest) > MAX_SUBJECTS:
         lines.append(f"· ще {len(rest) - MAX_SUBJECTS}")
 
+    if moved:
+        lines.append("налаштування:")
+        lines.extend(moved)
+
     lines.append("стан: " + status)
-    remember(state_path, version.commit, now)
+    remember(state_path, version.commit, now,
+             {k: _short(v) for k, v in settings.items()})
     return chr(10).join(lines)

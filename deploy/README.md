@@ -117,7 +117,21 @@ What can be set, and the full list is in `tools/policy/config.py`:
 - **quiet hours** -- a window in which only ballistic and above keep their sound.
 
 The startup line prints only what differs from the defaults, so a night's log
-says what the watcher was configured to do.
+says what the watcher was configured to do -- and the deploy note repeats it to
+the phone whenever it moved since the last one:
+
+    🔁 Перезапуск.
+    версія: b5c4914 — One file, because there is one server
+    налаштування:
+    · ring: 10 назв → 11 назв
+    · ring_all_clear: за замовчуванням → ні
+    стан: тихо · 5 канал(и)
+
+A commit subject says what a settings change was *meant* to do; only the process
+that came up can say what took effect, so that is where it belongs. It also
+overrides the half-hour restart cooldown, because a settings-only change is a
+restart on the same commit -- exactly what the cooldown would otherwise swallow.
+Unchanged settings say nothing.
 
 ## How you find out it worked
 
