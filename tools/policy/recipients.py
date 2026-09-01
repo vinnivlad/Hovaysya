@@ -43,6 +43,10 @@ class Recipient:
     def __post_init__(self) -> None:
         if self.tracker is None:
             self.tracker = Tracker(config=self.config)
+        # The announcer needs the ring too, to tell one threat named twice from
+        # two threats: see `_worth_saying`.
+        if self.announcer.config is None:
+            self.announcer.config = self.config
 
     def decide(self, reading: Reading) -> tuple[Observation, Decision]:
         """What this one message means to this one person."""

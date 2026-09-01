@@ -32,6 +32,9 @@
   "ring_home_ballistic": true,
   "drone_needs_home": true,
 
+  "_same_target_sector_deg": "Дві назви в одному секторі такої ширини — одна загроза, названа двічі, і кажемо тільки ближчу. Ширше — різні цілі, кажемо обидві. 0 вимикає.",
+  "same_target_sector_deg": 90,
+
   "show_ballistic_detail": true,
   "show_recheck": true,
   "show_ballistic_destination": true,

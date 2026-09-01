@@ -74,6 +74,7 @@ BOUNDS: dict[str, tuple[int, int]] = {
     "launch_dedup_s": (30, 1800),
     "idle_close_s": (5 * 60, 6 * 3600),
     "radius_km": (0, 50),
+    "same_target_sector_deg": (0, 360),
     "quiet_from_hour": (0, 23),
     "quiet_to_hour": (0, 23),
 }
@@ -127,6 +128,14 @@ class Config:
     # sleeping through five rings in fifty minutes.
     drone_needs_home: bool = True
 
+    # Two names inside one sector this wide are one thing seen twice, and only
+    # the nearer gets said. Wider apart they are separate threats and both do.
+    # His rule and his number: "якщо обидві цілі знаходяться в секторі 90 град
+    # від мене, то беремо ближню, інакше залишаємо як є, мо скоріше то різні
+    # цілі." Zero turns it off and says every name, which is how this worked
+    # before coordinates existed.
+    same_target_sector_deg: int = 90
+
     # --- what appears without a sound ---------------------------------------
     show_ballistic_detail: bool = True
     show_recheck: bool = True
@@ -174,6 +183,12 @@ class Config:
         property `episodes.Reading` exists to protect."""
         return _ring_names(self.home, self.ring, self.ring_drop, self.radius_km,
                            warn)
+
+    def centre(self):
+        """Where he is, or None if the gazetteer has no point for it."""
+        from ..nlp.coords import POINTS
+
+        return POINTS.get(self.home) if self.home else None
 
     def sounds_at(self, hour: int, threat: str | None) -> bool:
         """Whether something of this class may be audible at this hour."""

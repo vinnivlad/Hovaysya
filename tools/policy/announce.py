@@ -93,7 +93,21 @@ SCOPE_WORD = {
 }
 
 
-def _fallback(obs, threat: str | None) -> list[str]:
+def _worth_saying(names: list[str], config) -> list[str]:
+    """Drop a name that is the same threat as its neighbour, seen from further.
+
+    "Оболонь, Вишгород" is one thing at 18 and 8 degrees; "Оболонь, Васильків"
+    is two at 18 and 200, and saying only the nearer of *those* would be a lie
+    by omission. See `tools/nlp/direction.py`.
+    """
+    if config is None or len(names) < 2:
+        return names
+    from ..nlp.direction import say
+
+    return say(names, config.centre(), config.same_target_sector_deg)
+
+
+def _fallback(obs, threat: str | None, config=None) -> list[str]:
     """What to say when nothing is new but he is being woken anyway.
 
     "Увага." was here, and he asked the obvious question: what does that even
@@ -113,7 +127,9 @@ def _fallback(obs, threat: str | None) -> list[str]:
     if obs.ring_places:
         # One clause, not one sentence each: "Вишневе. Теремки." reads as two
         # separate reports of two separate things.
-        places = sorted(obs.ring_places, key=lambda p: (p != HOME, p))
+        places = _worth_saying(list(obs.ring_places), config)
+        places = sorted(places, key=lambda p: (p != (config.home if config
+                                                    and config.home else HOME), p))
         parts.append(", ".join(places))
     if not parts and SCOPE_WORD.get(obs.scope):
         parts.append(SCOPE_WORD[obs.scope])
@@ -157,6 +173,9 @@ class Announcer:
     #
     #   ⚠️2 реактивні шахеди на Вишневе        (we ring, officially nothing yet)
     #   🚨 м. Київ / Повітряна тривога         -> "Тривога. Реактивний шахед. Вишневе."
+    # Whose ring this is, for choosing between two names by direction. None
+    # means say every name, which is what happened before coordinates existed.
+    config: object = None
     pending_threat: str | None = None
     pending_places: list[str] = field(default_factory=list)
     # Towns outside the ring, kept separately and used only when the ring has
@@ -323,6 +342,7 @@ class Announcer:
                 # is which side it is coming from *now*, so only the newest.
                 remembered = (self.pending_places[-3:] if self.pending_places
                               else self.pending_far[-1:])
+                remembered = _worth_saying(list(remembered), self.config)
                 if remembered:
                     named_places = list(remembered)
                     parts.append(", ".join(named_places))
@@ -409,6 +429,10 @@ class Announcer:
                          self.always_full or p not in said['places']
                          or (p == HOME and decision.audible))]
             if fresh:
+                # This is the path most sentences take, and the one the sector
+                # rule is really for: "Жуляни, Солом'янка" is one drone seen from
+                # two channels, thirty degrees apart.
+                fresh = _worth_saying(fresh, self.config)
                 said['places'].update(fresh)
                 # Home first when it is there: it is the word he acts on.
                 fresh.sort(key=lambda p: (p != HOME, p))
@@ -422,7 +446,7 @@ class Announcer:
             # question: what does that mean, when there are only two
             # signals? It meant nothing. The class and the place get
             # repeated rather than replaced by a word carrying none.
-            parts.extend(_fallback(obs, threat) or ["Тривога"])
+            parts.extend(_fallback(obs, threat, self.config) or ["Тривога"])
 
         if decision.audible:
             # Heard is also seen.
