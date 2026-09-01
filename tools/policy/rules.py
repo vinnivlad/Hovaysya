@@ -406,6 +406,14 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
         if (ep is not None and ep.notified and not first_launch
                 and not tracker.is_fresh_launch(obs)
                 and not tracker.is_new_class("ballistic")):
+            # Shown while it is about here, not swallowed. His ask after the
+            # night of 2026-09-01: "кожен «Київ спуск балістики» під час
+            # балістичної тривоги можна б писати хоча б тихим... під час
+            # балістики краще часто оновлювати актуальною інформацією." The
+            # sixty-second identical-line dedup keeps the flood down; a wave
+            # over somebody else's region stays silent as before.
+            if obs.scope in CITY_OR_NEARER or obs.near:
+                return _notify("info", "none", "ballistic wave: where it is now")
             return _silent("already-notified: same ballistic wave")
         # Audible, with the ballistic tone. The tone is what says "now" —
         # a separate loudness level said it twice.

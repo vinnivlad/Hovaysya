@@ -244,7 +244,12 @@ SOCIAL_TERMS = (
 
 # `збит` covers збито / збили / збиття / збиті — the last of which
 # `monitoring_kyiv` uses and the others do not: "Усі збиті 💪💪".
-RESOLUTION_CLOSING = ("чисто", "збит", "збили", "мінус", "відбій")
+# `знищ` belongs here with `збит` and `мінус`, his ruling after "Знищено в
+# районі Жулян 💥" came out as "Загроза: реактивний шахед. Жуляни." -- a
+# destruction announced as a threat, over his own place. Of the 106 messages
+# containing it, 70 are news or aftermath about warehouses and are vetoed by
+# modality long before certainty is asked.
+RESOLUTION_CLOSING = ("чисто", "збит", "збили", "мінус", "відбій", "знищ")
 RESOLUTION_UNKNOWN = ("локаційно втрачено", "без фіксації", "дорозвідка",
                       "втрачено", "втрата фіксац", "зник")
 

@@ -100,7 +100,9 @@ def test_ordinals_within_one_volley_do_not_re_alarm():
     r = play((0, "❗️❗Є інформація про пуск балістичної ракети з Брянської області."),
              (60, "‼️ Київ — спуск балістики! Друга"),
              (120, "‼️ Київ — спуск балістики! Третя"))
-    assert levels(r) == ["alert", None, None]
+    # Shown while the wave is over here, never heard again: his ask after the
+    # ballistic night, "можна б писати хоча б тихим".
+    assert levels(r) == ["alert", "info", None]
 
 
 def test_two_channels_announcing_one_launch_wake_you_once():
@@ -119,7 +121,7 @@ def test_a_bare_place_during_a_ballistic_wave_is_that_wave():
     """The user annotated exactly this case "Ця балістика вже розбудила"."""
     r = play((0, "❗️❗Є інформація про пуск балістичної ракети з Брянської області."),
              (120, "Жуляни"))
-    assert levels(r) == ["alert", None]
+    assert levels(r) == ["alert", "info"]
 
 
 # --- drones near the ring ------------------------------------------------
@@ -239,7 +241,7 @@ def test_balistyka_na_kyiv_with_no_launch_word_still_wakes_you_first_time():
 def test_the_same_wording_later_in_the_wave_is_a_refinement():
     r = play((0, "🔴🔴🔴🚀Балістика на Київ/передмістя."),
              (120, "‼️Балістика на Київ/передмістя."))
-    assert levels(r) == ["alert", None]
+    assert levels(r) == ["alert", "info"]
 
 
 def test_a_new_class_breaks_through_an_ongoing_wave():
@@ -1800,3 +1802,31 @@ def test_any_ballistic_launch_after_a_recheck_rings():
     assert not wave("‼️Київ / Бровари — спуск балістики! Дев'ята").audible
     # ...and neither is a possibility.
     assert not wave("🔴Можливий повторний пуск 2-4х балістичних ракет по Києву.").audible
+
+
+def test_the_wave_says_where_it_is_without_ringing_again():
+    """His ask after the ballistic night: "кожен «Київ спуск балістики» під час
+    балістичної тривоги можна б писати хоча б тихим... під час балістики краще
+    часто оновлювати актуальною інформацією."
+
+    A destruction near home is not a threat either -- "Знищено в районі Жулян 💥"
+    came out as "Загроза: реактивний шахед. Жуляни.", the best news of the night
+    announced as the worst."""
+    from tools.policy.announce import Announcer
+
+    tr, ann = _alerted(), Announcer()
+    said = []
+    for off, text in ((60, "‼️ Вихід балістики з Брянська"),
+                      (120, "‼️ Київ — спуск балістики!"),
+                      (200, "Жуляни🚀"),
+                      (400, "Знищено в районі Жулян 💥")):
+        o = observe(T0 + off, text, False, "war_monitor")
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,
+                  d.reason)
+        said.append((d, ann.announce(o, d)))
+    assert said[0][0].audible
+    assert said[1][0].notify and not said[1][0].audible
+    assert said[2][0].notify and not said[2][0].audible
+    assert "Жуляни" in said[2][1].text
+    assert said[3][1] is not None and said[3][1].text.startswith("Збито")

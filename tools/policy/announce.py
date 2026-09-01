@@ -354,6 +354,12 @@ class Announcer:
                         # "Загроза" about something that has already come down
                         # is simply untrue.
                         parts.append(f"{landed}: {word}")
+                    elif obs.certainty == "clear":
+                        # Neither is it true about something that was shot down.
+                        # "Знищено в районі Жулян 💥" came out as "Загроза:
+                        # реактивний шахед. Жуляни." -- the best news of the
+                        # night announced as the worst.
+                        parts.append(f"Збито: {word}")
                     else:
                         parts.append(word.capitalize() if parts else f"Загроза: {word}")
 
