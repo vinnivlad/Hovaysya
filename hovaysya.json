@@ -22,6 +22,8 @@
   "ring_cruise_oblast": true,
   "ring_cruise_city": true,
   "ring_ballistic_after_recheck": true,
+  "_ring_home_ballistic": "Головне правило: балістика + Жуляни дзвонить щоразу. Розворот 01.09 проти шести власних міток — «Тихо з різницею в 10хв, я явно був не правий». Дрони не сюди: там drone_needs_home і ring_memory_s.",
+  "ring_home_ballistic": true,
   "drone_needs_home": true,
 
   "show_ballistic_detail": true,
@@ -34,6 +36,8 @@
   "refractory_near_s": 300,
   "refractory_s": 1200,
   "silent_dedup_s": 60,
+  "_home_dedup_s": "Єдиний дедуп, що лишився на правилі вище — «дедуп мінімальний». Для однієї форми: той самий крик із двох каналів за секунди.",
+  "home_dedup_s": 60,
   "launch_dedup_s": 240,
   "idle_close_s": 2700,
 

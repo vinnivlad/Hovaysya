@@ -21,6 +21,10 @@ def levels(results):
     return [(d.level if d.notify else None) for _o, d in results]
 
 
+def alarms(results):
+    return [(d.alarm if d.notify else None) for _o, d in results]
+
+
 # --- sirens ---------------------------------------------------------------
 
 
@@ -118,9 +122,26 @@ def test_a_ballistic_target_in_another_region_is_not_mine():
 
 
 def test_a_bare_place_during_a_ballistic_wave_is_that_wave():
-    """The user annotated exactly this case "Ця балістика вже розбудила"."""
+    """The class is inherited -- a bare "Жуляни" mid-wave is that wave, not a
+    new drone -- and since 2026-09-01 his own place rings on it.
+
+    This test used to assert the opposite, on his annotation "Ця балістика вже
+    розбудила". He reversed it after seeing all eight labels of the shape: "Тихо
+    з різницею в 10хв — я явно був не правий". The inheritance is what the test
+    is really about, and it is unchanged: the tone is ballistic, not the drone
+    tone the text alone would earn."""
     r = play((0, "❗️❗Є інформація про пуск балістичної ракети з Брянської області."),
              (120, "Жуляни"))
+    assert levels(r) == ["alert", "alert"]
+    assert alarms(r) == ["ballistic", "ballistic"]
+
+
+def test_a_bare_ring_place_during_a_ballistic_wave_still_stays_quiet():
+    """The reversal is about *his* place. Vyshneve is in the ring and not his
+    street, so the older ruling stands there -- otherwise a wave naming twenty
+    districts would ring twenty times."""
+    r = play((0, "❗️❗Є інформація про пуск балістичної ракети з Брянської області."),
+             (120, "Вишневе"))
     assert levels(r) == ["alert", "info"]
 
 
@@ -407,7 +428,7 @@ def test_a_ring_name_after_a_ballistic_alert_stays_quiet():
     for off, text in ((0, "‼️ Вихід балістики з Брянська"),
                       (60, "❗6-8 Цирконів на Київ, Бровари."),
                       (100, "‼️Київ / Бровари — спуск балістики! 9та"),
-                      (120, "Жуляни🚀"),
+                      (120, "Вишневе🚀"),
                       (200, "‼️Київ / Бровари — спуск балістики! 10та"),
                       (205, "БОРЩАГА")):
         o = observe(T0 + off, text)
@@ -1062,13 +1083,16 @@ def test_cruise_rings_on_position_and_ballistic_on_launch():
     got = []
     for off, channel, text in ((0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога"),
                                (200, "war_monitor", "‼️ Вихід балістики з Брянська"),
-                               (400, "kievinform_ua1", "Жуляни🚀")):
+                               (400, "kievinform_ua1", "Вишневе🚀")):
         o = observe(T0 + off, text, False, channel)
         d = decide(o, tr)
         tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
         got.append((d.audible, d.reason))
     assert got[1][0], got                      # the launch rings
-    assert not got[2][0], got                  # ...the position after it does not
+    # ...and a position after it does not. Vyshneve rather than Zhuliany: since
+    # 2026-09-01 his own street rings whatever else has been said, which would
+    # hide the thing this test is about.
+    assert not got[2][0], got
 
     # Cruise: the launch is hours away, so the position is what rings.
     tr = Tracker()
@@ -1818,7 +1842,7 @@ def test_the_wave_says_where_it_is_without_ringing_again():
     said = []
     for off, text in ((60, "‼️ Вихід балістики з Брянська"),
                       (120, "‼️ Київ — спуск балістики!"),
-                      (200, "Жуляни🚀"),
+                      (200, "Вишневе🚀"),
                       (400, "Знищено в районі Жулян 💥")):
         o = observe(T0 + off, text, False, "war_monitor")
         d = decide(o, tr)
@@ -1828,5 +1852,5 @@ def test_the_wave_says_where_it_is_without_ringing_again():
     assert said[0][0].audible
     assert said[1][0].notify and not said[1][0].audible
     assert said[2][0].notify and not said[2][0].audible
-    assert "Жуляни" in said[2][1].text
+    assert "Вишневе" in said[2][1].text
     assert said[3][1] is not None and said[3][1].text.startswith("Збито")

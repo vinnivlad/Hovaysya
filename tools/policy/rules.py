@@ -427,6 +427,31 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
         if (ep is not None and ep.recheck_at and obs.ts > ep.recheck_at
                 and hints.missile_kinds(obs.text) - ep.kinds_seen):
             first_launch = True
+        # ...unless the place named is his own, which is now the firmest rule
+        # here: "Жуляни завжди дзвонимо — головне правило".
+        #
+        # It reversed six of his own labels, and the measurement is why he
+        # reversed them rather than my arguing it. Across 2026-08-04, 08-27 and
+        # 09-01 he had ruled eight messages of this shape, six silent and two
+        # audible, with gaps from the previous ring of 2 to 34 minutes on *both*
+        # sides -- so no threshold on time could satisfy the set, and neither
+        # could "first mention of the wave" or "his place alone versus in a
+        # list". Shown the six, his answer was "Тихо з різницею в 10хв — я явно
+        # був не правий".
+        #
+        # Ballistic only, on his clarification: "коли летить балістика і
+        # Жуляни". A drone looping the ring stays under the ring memory, which
+        # is his older ruling and measured too -- five rings in fifty minutes
+        # that he slept through.
+        #
+        # Minimal dedup, his word, and for exactly one shape: the same shout
+        # from two channels seconds apart.
+        if (obs.at_home and cfg.ring_home_ballistic and alarm == "ballistic"):
+            rang = tracker.home_rang_at
+            if rang is not None and 0 <= obs.ts - rang <= cfg.home_dedup_s:
+                return _notify("info", "none",
+                               "my place again, seconds after it rang")
+            return _notify("alert", "ballistic", "my place, and ballistic is up")
         if (ep is not None and ep.notified and not first_launch
                 and not tracker.is_fresh_launch(obs)
                 and not tracker.is_new_class("ballistic")):

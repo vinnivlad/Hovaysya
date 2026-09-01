@@ -55,6 +55,7 @@ BOUNDS: dict[str, tuple[int, int]] = {
     "refractory_near_s": (30, 1800),
     "refractory_s": (60, 3600),
     "silent_dedup_s": (5, 600),
+    "home_dedup_s": (0, 600),
     "launch_dedup_s": (30, 1800),
     "idle_close_s": (5 * 60, 6 * 3600),
     "quiet_from_hour": (0, 23),
@@ -89,6 +90,10 @@ class Config:
     ring_cruise_city: bool = True
     # A launch after a recheck said the wave was over.
     ring_ballistic_after_recheck: bool = True
+    # Ballistic over his own place rings every time it is named, however often.
+    # "Жуляни завжди дзвонимо — головне правило", and it reversed six of his own
+    # earlier labels: "Тихо з різницею в 10хв — я явно був не правий".
+    ring_home_ballistic: bool = True
     # A drone rings only when his own place is named. False widens it to the
     # whole ring, which is where it started and which he narrowed himself after
     # sleeping through five rings in fifty minutes.
@@ -111,6 +116,11 @@ class Config:
     refractory_s: int = 20 * 60
     # Two identical silent lines seconds apart are one line.
     silent_dedup_s: int = 60
+    # The only dedup left on the rule above -- "дедуп мінімальний". It exists for
+    # one shape: the same shout from two channels seconds apart, "Жуляни🚀" then
+    # "ЖУЛЯНИ!" four seconds later. His two labelled rings are 129 s apart, so a
+    # minute keeps both and collapses the pair.
+    home_dedup_s: int = 60
     # Measured: p90 of the same cross-channel lag.
     launch_dedup_s: int = 4 * 60
     idle_close_s: int = 45 * 60

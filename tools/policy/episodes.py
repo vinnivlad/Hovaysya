@@ -436,6 +436,8 @@ class Tracker:
         # A chat all-clear at 19:09:53 rang, and the real one followed four
         # seconds later — two loud all-clears, which is what he heard.
         self.official_source = False
+        # When his own place last rang while ballistic was up.
+        self.home_rang_at: int | None = None
         self.closed: list[Episode] = []
 
     # -- lifecycle ---------------------------------------------------------
@@ -548,6 +550,11 @@ class Tracker:
     def record(self, obs: Observation, level: str | None, alarm: str | None,
                reason: str | None = None) -> None:
         """Fold one observation, and any notification for it, into the state."""
+        # Kept on the tracker rather than the episode: it exists only to collapse
+        # the same shout arriving from two channels seconds apart, and that is
+        # true across an episode boundary as much as inside one.
+        if level == "alert" and obs.at_home and alarm == "ballistic":
+            self.home_rang_at = obs.ts
         if obs.official:
             self.official_seen = obs.ts
         # A partial all-clear lifts one threat class, not the alert. Closing the
