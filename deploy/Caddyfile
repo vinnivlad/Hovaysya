@@ -1,0 +1,38 @@
+# TLS, and nothing else. Caddy gets a certificate from Let's Encrypt, renews it
+# without being asked, and hands plain HTTP to the API on localhost -- which is
+# why no Python in this repository touches a private key.
+#
+# Replace the hostname with the one from DuckDNS. Let's Encrypt will not issue a
+# certificate for a bare IP address, so a name is not optional.
+hovaysya.duckdns.org {
+	encode zstd gzip
+
+	# No rate limit here on purpose. `rate_limit` is a third-party module and the
+	# packaged `caddy` cannot parse it -- the directive would fail the config at
+	# startup, which is a bad way to learn about it. Adding it means building Caddy
+	# with xcaddy, and that is a second toolchain on the box for a service whose
+	# only unauthenticated path returns `{"ok": true}`.
+	#
+	# What guards the token instead: 32 bytes from `secrets.token_urlsafe`, which
+	# is not guessable at any rate, and fail2ban if it ever seems necessary.
+
+	# `/health` stays open for `systemctl` and for a check from outside; every
+	# other path needs the bearer token, which the API itself verifies.
+	reverse_proxy 127.0.0.1:8080 {
+		header_up X-Real-IP {remote_host}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/hovaysya.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

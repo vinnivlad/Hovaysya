@@ -1,0 +1,44 @@
+[Unit]
+Description=Hovaysya API — the feed, the decisions and one person's settings
+Documentation=https://github.com/vinnivlad/Hovaysya/blob/main/deploy/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hovaysya-api
+Group=hovaysya-api
+WorkingDirectory=/home/ubuntu/hovaysya
+# Bound to localhost. Caddy terminates TLS in front and talks to it here, so
+# nothing in this unit handles a certificate or a private key.
+ExecStart=/usr/bin/python3 -X utf8 -m tools.serve.api --host 127.0.0.1 --port 8080
+Restart=always
+RestartSec=5
+
+# This process is reachable from the internet and the watcher is not, so it gets
+# the tighter jacket of the two. Everything below is refusal rather than trust.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+# Read the corpus and the decision log; write only where settings live. The bot
+# token is in the same directory and is not listed, so this service cannot read
+# it even though the watcher beside it can.
+ReadOnlyPaths=/home/ubuntu/hovaysya
+ReadWritePaths=/home/ubuntu/hovaysya/data/recipients
+MemoryMax=192M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

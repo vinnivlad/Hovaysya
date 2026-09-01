@@ -133,6 +133,87 @@ overrides the half-hour restart cooldown, because a settings-only change is a
 restart on the same commit -- exactly what the cooldown would otherwise swallow.
 Unchanged settings say nothing.
 
+## The API, and why it lives on a second machine
+
+`tools/serve/api.py` is what the app talks to: the merged raw feed, the decisions,
+and one person's settings. It exists because config editing needs it -- "користувачі
+мають мати можливість змінювати свій конфіг" -- which makes the port both compulsory
+and writable.
+
+    GET  /messages?since=<cursor>     the raw feed, cursor-paged
+    GET  /decisions?since=<cursor>    what Ховайся decided, for this recipient
+    GET  /config                      their settings
+    PUT  /config                      change them
+    GET  /health                      no token needed
+
+**Today the instance has no inbound service at all**, and that is half the reason
+it is safe to keep a bot token there. Serving this means the first inbound door on
+a public IP, so it goes on a second instance:
+
+| | A, the watcher | B, the API |
+| --- | --- | --- |
+| inbound | SSH only | 80 and 443 |
+| holds | the bot token, the decisions, the bell | a copy of the corpus, the settings |
+| worth stealing | everything | public messages |
+| in the path to the bell | yes | no |
+
+His first instinct was to move the *bot* off the exposed box instead. Right
+instinct, wrong direction: the bell would then travel watcher -> write -> B polls
+-> Telegram, and a dead B or a lagging poll looks exactly like a quiet night. A
+bot token is not account access, it can only post to his own channel, and
+@BotFather revokes it in seconds. So the exposed thing moves, not the secret.
+
+**A pushes to B, never the reverse.** If B pulled over SSH it would hold a key
+into A, and compromising the public box would hand over the private one.
+
+### Setting it up
+
+On B, once:
+
+    git clone https://github.com/vinnivlad/Hovaysya.git ~/hovaysya
+    cd ~/hovaysya && sudo ./deploy/install-api.sh hovaysya.duckdns.org
+
+A hostname is not optional: **Let's Encrypt will not issue for a bare IP.** A free
+DuckDNS name is enough, and Caddy handles the certificate and its renewal, so
+nothing in this repository touches a private key.
+
+Two things the script cannot do:
+
+- **open 80 and 443 in Oracle's security list**, which is a click in the dashboard.
+  `iptables` alone will look like it worked and then time out.
+- **mint a token**: `python3 -m tools.serve.token --name <who>`. Printed once and
+  never recoverable; only its SHA-256 is stored, because the same machine could
+  one day hold other secrets. Minting again for the same name revokes the old one.
+
+Then `curl https://<host>/health` should answer `{"ok": true}`.
+
+### What protects it
+
+The service refuses rather than trusts, at four levels:
+
+- **A token on every path but `/health`**, compared with `hmac.compare_digest`.
+- **The config loader is the trust boundary.** It was written so a typo could not
+  take the watch down at 3 a.m.; the same code now stands between a hostile body
+  and the decision, which is why `MAX_RING` and `MAX_NAME` exist. A ring of 50 000
+  names was once accepted and moved one decision from 0.03 ms to 0.3 ms -- 30 ms a
+  message at a hundred recipients, a denial of service written in JSON. What lands
+  on disk is what the loader accepted, never the body as sent.
+- **A read-only database handle**, said in the connection URI rather than left to
+  the code.
+- **A systemd jacket** tighter than the watcher's, because this is the process
+  reachable from outside: its own unprivileged user, `ProtectSystem=strict`, an
+  empty capability set, and `ReadWritePaths` covering only where settings live.
+  The bot token sits in the same directory and is not listed, so this service
+  cannot read it even though the watcher beside it can.
+
+There is no rate limit, and that was a correction rather than a choice: the
+Caddyfile had one until I checked, and `rate_limit` is a third-party module the
+packaged Caddy cannot parse -- the directive fails the config at startup, which is
+a bad way to find out. Adding it means building Caddy with xcaddy, a second
+toolchain on the box for a service whose only unauthenticated path returns
+`{"ok": true}`. The token is 32 bytes from `secrets.token_urlsafe` and is not
+guessable at any rate; fail2ban is the answer if the log ever suggests otherwise.
+
 ## How you find out it worked
 
 The watcher sends a **silent** message to the same chat as it reaches the live

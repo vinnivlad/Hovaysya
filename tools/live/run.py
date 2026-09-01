@@ -51,7 +51,7 @@ from ..labeler.build import kyiv_dt
 from ..policy.announce import Announcer
 from ..policy.config import CONFIG_PATH, changed_from_default, load as load_config
 from ..policy.episodes import OFFICIAL_CHANNELS, Tracker, observe, read
-from ..policy.recipients import decide_all, only
+from ..policy.recipients import decide_all, from_dir
 from ..policy.rules import decide
 from .notify import Notifier
 from .version import startup_note
@@ -441,7 +441,11 @@ def main(argv: list[str] | None = None) -> int:
     # normal case; a broken one prints a line and changes nothing, because a
     # typo must never be the reason the watch is not running at 3 a.m.
     cfg = load_config(Path(args.config))
-    people = only(cfg)
+    # Everyone with settings of their own, or just him when there are none --
+    # which is what runs today. The directory is written by the API, so a person
+    # who changes their ring in the app is picked up at the next restart, and the
+    # deploy already restarts.
+    people = from_dir(fallback=cfg)
     session = Session(notifier=None if args.no_telegram else Notifier(),
                       recipients=people,
                       tracker=people[0].tracker,
@@ -460,6 +464,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  лог: {log_path}")
     diff = changed_from_default(cfg)
     print(f"  налаштування: {diff if diff else 'усе за замовчуванням'}")
+    if len(people) > 1:
+        print(f"  отримувачі: {', '.join(p.name for p in people)}")
     if session.notifier and session.notifier.enabled:
         who = session.notifier.chat_id or session.notifier.find_chat()
         print(f"  телефон: telegram → {who or 'напиши боту, щоб він знав куди слати'}")
