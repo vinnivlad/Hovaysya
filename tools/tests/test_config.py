@@ -129,35 +129,32 @@ def test_the_startup_line_shows_only_what_was_changed():
     assert changed_from_default(Config(ring_memory_s=900)) == {"ring_memory_s": 900}
 
 
-# --- two layers, and the first one is in git --------------------------------
+# --- one file, in git -------------------------------------------------------
 
 
-def test_the_committed_file_is_the_first_layer_and_data_overrides_it(tmp_path):
+def test_the_file_in_git_is_the_settings():
     """His reasoning for putting it in git: a change is then a commit with a
     message saying why, deployed by the same pull as the code, and the restart
     that deploy performs is what applies it -- so there is nothing to re-read.
 
-    The local layer exists so a machine can differ without a commit."""
-    committed = tmp_path / "hovaysya.json"
-    committed.write_text('{"ring_memory_s": 900, "ring_all_clear": false}',
-                         encoding="utf-8")
-    cfg = load(committed, local=tmp_path / "absent.json", warn=_quiet)
+    There was a second layer in `data/` for a machine wanting to differ without
+    a commit. He deleted the idea in four words -- "у нас же один сервер" -- and
+    he is right: there is one, and `--config` already points the watcher at any
+    file for an experiment. One file is the whole story."""
+    from tools.policy.config import CONFIG_PATH
+
+    assert CONFIG_PATH.name == "hovaysya.json"
+    assert CONFIG_PATH.parent.name != "data"      # not the gitignored folder
+    assert (CONFIG_PATH.parent / ".git").exists()
+
+
+def test_a_file_can_be_pointed_at_for_an_experiment(tmp_path):
+    """What `--config` gives, and what makes the second layer unnecessary."""
+    other = tmp_path / "somewhere-else.json"
+    other.write_text('{"ring_memory_s": 900, "ring_all_clear": false}',
+                     encoding="utf-8")
+    cfg = load(other, warn=_quiet)
     assert cfg.ring_memory_s == 900 and cfg.ring_all_clear is False
-
-    override = tmp_path / "local.json"
-    override.write_text('{"ring_all_clear": true}', encoding="utf-8")
-    cfg = load(committed, local=override, warn=_quiet)
-    assert cfg.ring_memory_s == 900          # from the committed layer
-    assert cfg.ring_all_clear is True        # ...and the local one wins
-
-
-def test_a_broken_layer_leaves_the_other_alone(tmp_path):
-    committed = tmp_path / "hovaysya.json"
-    committed.write_text('{"ring_memory_s": 900}', encoding="utf-8")
-    broken = tmp_path / "local.json"
-    broken.write_text("{oops", encoding="utf-8")
-    cfg = load(committed, local=broken, warn=_quiet)
-    assert cfg.ring_memory_s == 900
 
 
 def test_underscore_keys_are_comments():

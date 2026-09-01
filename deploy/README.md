@@ -83,9 +83,11 @@ setting is then a commit with a message saying why, it deploys by the same pull
 as the code, and the restart that deploy performs is what applies it -- so there
 is nothing to re-read and no reload machinery to get wrong.
 
-`data/hovaysya.json` is an optional second layer for a machine that wants to
-differ without a commit; `data/` is gitignored, so it cannot travel through a
-deploy. A missing file at either layer means the layer below. A broken file, an unknown
+One file, because there is one server. A second layer in `data/` was written and
+then removed on his reading of it -- "у нас же один сервер" -- and an experiment
+does not need one either, since `--config` points the watcher at any path.
+
+A missing file means the defaults, which are the behaviour as shipped. A broken file, an unknown
 key or a number out of range prints a line and changes nothing else -- a typo
 must never be the reason the watch is not running at 3 a.m.
 

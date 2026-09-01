@@ -20,7 +20,7 @@ that a config file did it.
 Nothing here may take the watch down. A missing file means the defaults, which
 are the current behaviour; a broken file means the defaults and a printed line.
 
-    data/hovaysya.json        # not in git: it is different on every machine
+    hovaysya.json             # in git, one server, one file
 
     {"ring_all_clear": false, "ring_memory_s": 900}
 
@@ -42,10 +42,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # with a message saying why, deployed by the same pull as the code, and the
 # restart that deploy performs is what applies it -- so there is nothing to
 # re-read and no reload machinery to get wrong.
+# One file, because there is one server. A second layer in `data/` was written
+# and removed: "у нас же один сервер" -- and a machine that really wanted to
+# differ can already be pointed at another file with `--config`.
 CONFIG_PATH = REPO_ROOT / "hovaysya.json"
-# ...with an optional override for a machine that wants to differ without a
-# commit. `data/` is gitignored, so it cannot travel through a deploy.
-CONFIG_LOCAL = REPO_ROOT / "data" / "hovaysya.json"
 
 # Bounds, not opinions: outside these a setting stops being a preference and
 # becomes a broken watch. A refractory of zero rings on every message of a wave;
@@ -180,8 +180,9 @@ def from_dict(raw: dict, base: Config = DEFAULTS,
     return replace(base, **changes)
 
 
-def _one(path: Path, base: Config, warn) -> Config:
-    """One file overlaid on what is already there. Never an exception."""
+def load(path: Path = CONFIG_PATH, base: Config = DEFAULTS,
+         warn=print) -> Config:
+    """The file overlaid on the defaults. Never an exception."""
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -195,13 +196,7 @@ def _one(path: Path, base: Config, warn) -> Config:
     return from_dict(raw, base=base, warn=warn)
 
 
-def load(path: Path = CONFIG_PATH, local: Path | None = CONFIG_LOCAL,
-         warn=print) -> Config:
-    """Defaults, then the committed file, then a local override if there is one."""
-    cfg = _one(path, DEFAULTS, warn)
-    if local is not None:
-        cfg = _one(local, cfg, warn)
-    return cfg
+
 
 
 def changed_from_default(cfg: Config) -> dict:
