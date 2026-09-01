@@ -263,6 +263,8 @@ class Observation:
     says_launch: bool = False
     # ...and without the descent, which is an arrival rather than a departure.
     says_launch_proper: bool = False
+    # Whose place this is, when a config names one instead of the gazetteer.
+    home: str = ""
     ring_count: int = 0
     falling: bool = False
     # Already landed, as opposed to `falling`, which is on its way down.
@@ -293,7 +295,7 @@ class Observation:
         """Names his own place, not merely somewhere in the ring."""
         from ..nlp.gazetteer import HOME
 
-        return HOME in self.ring_places
+        return (self.home or HOME) in self.ring_places
 
     @property
     def live(self) -> bool:
@@ -310,8 +312,15 @@ def silent_signature(obs: "Observation", reason: str) -> tuple:
             tuple(sorted(obs.ring_places)), obs.scope)
 
 
+def _near_names(cfg) -> frozenset[str]:
+    """The names that count as his ring, from the config or the gazetteer."""
+    if cfg is not None and cfg.ring:
+        return frozenset(cfg.ring) | ({cfg.home} if cfg.home else set())
+    return frozenset()
+
+
 def observe(ts: int, text: str, is_reply: bool = False,
-            channel: str | None = None) -> Observation:
+            channel: str | None = None, config=None) -> Observation:
     """Read one message into the fields the policy uses.
 
     `is_reply` matters for sirens specifically: a reply saying "По ньому
@@ -319,12 +328,28 @@ def observe(ts: int, text: str, is_reply: bool = False,
     in the labelled night were marked silent, while every standalone siren was a
     wake-up.
     """
-    guess = hints.suggest(text)
-    scope_places = tuple(
-        p.name for p in find_places(text) if p.tier in NEAR_TIERS
-    )
     from ..nlp.gazetteer import resolve_scope
 
+    guess = hints.suggest(text)
+    near = _near_names(config)
+    override_scope = None
+    if near:
+        scope_places = tuple(p.name for p in find_places(text) if p.name in near)
+        # A configured ring replaces the gazetteer's tier for its own names: the
+        # names are recognised the same way, only whose ring they are in changes.
+        if scope_places:
+            override_scope = "my-area"
+        else:
+            # ...and it replaces it in both directions. Without this, someone
+            # whose ring is Obolon still had Zhuliany read as their own street,
+            # because the gazetteer's `my-area` tier is his.
+            static = resolve_scope(text)
+            if static in NEAR_TIERS:
+                override_scope = "city"
+    else:
+        scope_places = tuple(
+            p.name for p in find_places(text) if p.tier in NEAR_TIERS
+        )
     return Observation(
         ts=ts,
         text=text,
@@ -332,7 +357,7 @@ def observe(ts: int, text: str, is_reply: bool = False,
         alarm=str(guess["alarm"]),
         modality=str(guess["modality"]),
         certainty=str(guess["certainty"]),
-        scope=resolve_scope(text),
+        scope=override_scope or resolve_scope(text),
         heading=str(guess["heading"]),
         strength=str(guess["strength"]),
         alert_state=hints.alert_state(text),
@@ -345,6 +370,7 @@ def observe(ts: int, text: str, is_reply: bool = False,
         falling=hints.falling(text),
         impact=hints._hits(text, hints.IMPACT_TERMS),
         recheck=hints.recheck(text),
+        home=(config.home if config is not None and config.home else ""),
         reappeared=hints.reappeared(text),
         is_reply=is_reply,
         official=channel in OFFICIAL_CHANNELS,
@@ -375,16 +401,25 @@ def _says_new(text: str) -> bool:
 class Tracker:
     """Keeps the current episode across a stream of observations."""
 
-    def __init__(self, idle_close_s: int = IDLE_CLOSE_S,
-                 ring_memory_s: int = RING_MEMORY_S,
-                 refractory_s: int = REFRACTORY_S,
-                 refractory_near_s: int = REFRACTORY_NEAR_S,
-                 launch_dedup_s: int = LAUNCH_DEDUP_S) -> None:
-        self.idle_close_s = idle_close_s
-        self.ring_memory_s = ring_memory_s
-        self.refractory_s = refractory_s
-        self.refractory_near_s = refractory_near_s
-        self.launch_dedup_s = launch_dedup_s
+    def __init__(self, idle_close_s: int | None = None,
+                 ring_memory_s: int | None = None,
+                 refractory_s: int | None = None,
+                 refractory_near_s: int | None = None,
+                 launch_dedup_s: int | None = None,
+                 config=None) -> None:
+        # The config carries every number; the keyword arguments stay because
+        # seventy-odd tests set them one at a time, and an explicit one wins.
+        from .config import DEFAULTS
+
+        cfg = config if config is not None else DEFAULTS
+        self.config = cfg
+        self.idle_close_s = idle_close_s if idle_close_s is not None else cfg.idle_close_s
+        self.ring_memory_s = ring_memory_s if ring_memory_s is not None else cfg.ring_memory_s
+        self.refractory_s = refractory_s if refractory_s is not None else cfg.refractory_s
+        self.refractory_near_s = (refractory_near_s if refractory_near_s is not None
+                                  else cfg.refractory_near_s)
+        self.launch_dedup_s = (launch_dedup_s if launch_dedup_s is not None
+                               else cfg.launch_dedup_s)
         self.episode: Episode | None = None
         # When the official channel was last heard from at all. While it is a
         # live source the chat channels stop declaring sirens — they were only

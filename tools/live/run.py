@@ -49,6 +49,7 @@ from ..export.config import CHANNELS, DB_PATH
 from ..export.tme import Client, FetchError
 from ..labeler.build import kyiv_dt
 from ..policy.announce import Announcer
+from ..policy.config import CONFIG_PATH, changed_from_default, load as load_config
 from ..policy.episodes import OFFICIAL_CHANNELS, Tracker, observe
 from ..policy.rules import decide
 from .notify import Notifier
@@ -352,6 +353,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Requests per second ceiling, shared across channels.")
     ap.add_argument("--channels", action="append", dest="channels",
                     help="Watch only this channel (repeatable).")
+    ap.add_argument("--config", default=str(CONFIG_PATH),
+                    help="Settings file. Missing means the defaults.")
     ap.add_argument("--no-telegram", action="store_true",
                     help="Decide and print, but send nothing. For trying a "
                          "change locally without posting into the real channel "
@@ -404,7 +407,12 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  ! {w.channel}: {exc}")
 
     started = time.time()
-    session = Session(notifier=None if args.no_telegram else Notifier())
+    # His settings, or the defaults if there are none. A missing file is the
+    # normal case; a broken one prints a line and changes nothing, because a
+    # typo must never be the reason the watch is not running at 3 a.m.
+    cfg = load_config(Path(args.config))
+    session = Session(notifier=None if args.no_telegram else Notifier(),
+                      tracker=Tracker(config=cfg))
     # The official channel speaks only when the siren changes, so "has it spoken
     # lately" is not the same question as "is it being watched".
     session.tracker.official_source = bool(OFFICIAL_CHANNELS & set(channels))
@@ -417,6 +425,8 @@ def main(argv: list[str] | None = None) -> int:
           f"{args.watch_interval:.0f}s стежу / "
           f"{args.alert_interval:.0f}s тривога")
     print(f"  лог: {log_path}")
+    diff = changed_from_default(cfg)
+    print(f"  налаштування: {diff if diff else 'усе за замовчуванням'}")
     if session.notifier and session.notifier.enabled:
         who = session.notifier.chat_id or session.notifier.find_chat()
         print(f"  телефон: telegram → {who or 'напиши боту, щоб він знав куди слати'}")

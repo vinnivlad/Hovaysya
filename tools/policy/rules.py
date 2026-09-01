@@ -47,6 +47,12 @@ class Decision:
         return self.notify and self.level in ("alert", "shelter")
 
 
+def _kyiv_hour(ts: int) -> int:
+    from datetime import datetime, timedelta, timezone
+
+    return datetime.fromtimestamp(ts, timezone(timedelta(hours=3))).hour
+
+
 def _silent(reason: str) -> Decision:
     return Decision(notify=False, level=None, alarm=None, reason=reason)
 
@@ -64,10 +70,19 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     each repetition was arriving as its own notification.
     """
     decision = _decide(obs, tracker)
+    cfg = tracker.config
+    # The quiet hours, applied once for every rule rather than inside each. Only
+    # the classes that leave minutes keep their sound; the rest becomes a status
+    # line. Off by default, and it exists because the app's vibration alphabet
+    # needs the same notion.
+    if decision.audible and not cfg.sounds_at(
+            _kyiv_hour(obs.ts), obs.effective_threat or obs.threat):
+        decision = Decision(True, "info", "none",
+                            decision.reason + " (тихі години)")
     ep = tracker.episode
     if (decision.notify and not decision.audible and ep is not None):
         when = ep.last_silent.get(silent_signature(obs, decision.reason))
-        if when is not None and 0 <= obs.ts - when <= SILENT_DEDUP_S:
+        if when is not None and 0 <= obs.ts - when <= tracker.config.silent_dedup_s:
             return Decision(False, None, None,
                             "already-notified: same line a moment ago")
     return decision
@@ -76,6 +91,7 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
 def _decide(obs: Observation, tracker: Tracker) -> Decision:
     """The ordered rules."""
     ep = tracker.before(obs)
+    cfg = tracker.config
 
     # A message stating no type inherits the episode's. "Жуляни" during a
     # ballistic wave is that wave, not a new drone — reading it in isolation
@@ -125,14 +141,17 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
         # lifted. It still does not close the episode.
         # Its own tone: the user asked for the distinction outright — "повний
         # відбій звучить по іншому" — so the two cannot share one.
-        return _notify("alert", "clear-partial", "partial all-clear")
+        return (_notify("alert", "clear-partial", "partial all-clear")
+                if cfg.ring_partial_clear
+                else _notify("info", "none", "partial all-clear"))
     # The official channel declares; everything else reports. Once it is in the
     # stream it owns the siren outright — his design: "повідомлення з інших
     # каналів для уточнення причини". Two of the last false wake-ups were chat
     # all-clears that were about somebody else's district, and he wrote on both
     # of them "вся надія на сервіси".
     if obs.alert_state == "clear" and obs.official:
-        return _notify("alert", "clear", "official all-clear")
+        return (_notify("alert", "clear", "official all-clear") if cfg.ring_all_clear
+                else _notify("info", "none", "official all-clear"))
     if obs.alert_state == "clear" and tracker.official_is_live(obs.ts):
         # Whether or not this episode saw an official declaration: while the
         # authoritative source is in the stream, a chat all-clear is a report
@@ -148,7 +167,8 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     if obs.alert_state == "alert" and obs.official:
         if ep is not None and ep.official_alert:
             return _silent("already-notified: official siren already declared")
-        return _notify("alert", "alert", "official siren")
+        return (_notify("alert", "alert", "official siren") if cfg.ring_alert_start
+                else _notify("info", "none", "official siren"))
 
     # While the official channel is a live source, the chat channels stop
     # declaring sirens — they were standing in for it. Two rings two seconds
@@ -207,6 +227,8 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
         key = threat if threat not in ("none", "unknown") else "all"
         if key in ep.rechecked:
             return _silent("already-notified: recheck")
+        if not cfg.show_recheck:
+            return _silent("recheck: shown off by config")
         return _notify("info", "none", "recheck: probably gone, alert continues")
 
     # 4a. "Знову виліз" -- a recheck retracted. Showing the good news and not
@@ -232,6 +254,8 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             #     балістичних ракет з Брянської області" repeats the origin
             #     rather than naming a destination.
             and not obs.says_launch):
+        if not cfg.show_ballistic_destination:
+            return _silent("ballistic destination: shown off by config")
         return _notify("info", "none", "where the ballistic is going")
 
     # 4. Another region's target is not our business. Checked after modality so
@@ -412,7 +436,8 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             # балістики краще часто оновлювати актуальною інформацією." The
             # sixty-second identical-line dedup keeps the flood down; a wave
             # over somebody else's region stays silent as before.
-            if obs.scope in CITY_OR_NEARER or obs.near:
+            if (cfg.show_ballistic_detail
+                    and (obs.scope in CITY_OR_NEARER or obs.near)):
                 return _notify("info", "none", "ballistic wave: where it is now")
             return _silent("already-notified: same ballistic wave")
         # Audible, with the ballistic tone. The tone is what says "now" —
@@ -453,7 +478,9 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
         # Keyed on the tone rather than the class name: a bare "🅿️ 1х Нивки →
         # Вишневе" states no class at all and would ring the drone tone, which
         # is what makes it a drone for this purpose.
-        if alarm in DRONE_TONES and not obs.at_home:
+        if alarm in DRONE_TONES and cfg.drone_needs_home and not obs.at_home:
+            if not cfg.show_ring_drone:
+                return _silent("ring drone: shown off by config")
             return _notify("info", "none", "a drone near me, but not my street")
         if not tracker.is_new(obs):
             # Shown, not swallowed. "⚠️Реактивний з ТЕЦ-5 на Жуляни." arrived
@@ -463,7 +490,7 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             # weaker case one line above -- a drone in the ring, not his street
             # -- is already `info`, so the stronger one getting silence was the
             # inconsistency. 103 such messages in the corpus, 79 naming home.
-            if obs.at_home:
+            if obs.at_home and cfg.show_home_repeat:
                 return _notify("info", "none",
                                "already-notified: same target, my place again")
             return _silent("already-notified: same target near me")
@@ -538,7 +565,14 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             and ep is not None and ep.alert_announced):
         step = GEO_STEP.get(obs.scope, 0)
         if step > ep.cruise_geo:
-            return _notify("alert", alarm, "cruise coming closer")
+            # Each rung can be switched off on its own. His order for dropping
+            # them, if it ever comes to that: city first, because "область мене
+            # вже розбудить і я навряд буду спати".
+            wanted = (cfg.ring_cruise_oblast if step == 1
+                      else cfg.ring_cruise_city if step == 2 else True)
+            if wanted:
+                return _notify("alert", alarm, "cruise coming closer")
+            return _notify("info", "none", "cruise coming closer, sound off")
 
     # 12. In the city but not near: worth knowing, not worth waking twice — and
     #    for a drone, not worth waking at all. His rule from the first

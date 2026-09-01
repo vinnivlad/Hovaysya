@@ -76,6 +76,39 @@ restarts only if the working tree actually changed. To force it:
 
     sudo systemctl start hovaysya-update
 
+## Settings
+
+`data/hovaysya.json`, not in git because it differs on every machine. Missing
+means the defaults, which are the behaviour as shipped. A broken file, an unknown
+key or a number out of range prints a line and changes nothing else -- a typo
+must never be the reason the watch is not running at 3 a.m.
+
+    {
+      "home": "Жуляни",
+      "ring": ["Жуляни", "Вишневе", "Борщагівка", "Солом'янка", "Теремки"],
+      "ring_all_clear": false,
+      "ring_memory_s": 900,
+      "quiet_hours": true
+    }
+
+What can be set, and the full list is in `tools/policy/config.py`:
+
+- **whose place** -- `home` and `ring` as lists of names. The gazetteer stays the
+  recognition layer, with every inflection and piece of slang; only the tier
+  becomes personal, which is what makes a different ring cheap.
+- **what makes a sound** -- the start of an alert, the all-clear, a partial
+  all-clear, each rung of the cruise ladder, a ballistic launch after a recheck,
+  and whether a drone needs the home name or the whole ring will do.
+- **what appears without one** -- the ballistic detail during a wave, rechecks,
+  ballistic destinations, a repeat over home, a drone in the ring.
+- **how long something counts as already said** -- and the measured ones are
+  marked as measured in the file's comments, so whoever changes one knows what
+  they are overriding.
+- **quiet hours** -- a window in which only ballistic and above keep their sound.
+
+The startup line prints only what differs from the defaults, so a night's log
+says what the watcher was configured to do.
+
 ## How you find out it worked
 
 The watcher sends a **silent** message to the same chat as it reaches the live
