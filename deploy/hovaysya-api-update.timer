@@ -1,0 +1,11 @@
+[Unit]
+Description=Hovaysya API — check for a new commit
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+RandomizedDelaySec=60s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

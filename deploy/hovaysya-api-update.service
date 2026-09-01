@@ -1,0 +1,9 @@
+[Unit]
+Description=Hovaysya API — pull the latest commit and restart if it changed
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/hovaysya
+ExecStart=/home/ubuntu/hovaysya/deploy/update.sh hovaysya-api

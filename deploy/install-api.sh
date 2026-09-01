@@ -58,10 +58,33 @@ echo "== Caddyfile для $HOST"
 sed "s/hovaysya\.duckdns\.org/$HOST/" "$REPO/deploy/Caddyfile" > /etc/caddy/Caddyfile
 install -d -o caddy -g caddy /var/log/caddy
 
-echo "== сервіс"
+echo "== сервіс і автооновлення"
 sed "s#/home/ubuntu/hovaysya#$REPO#g" "$REPO/deploy/api.service" > /etc/systemd/system/hovaysya-api.service
+for unit in hovaysya-api-update.service hovaysya-api-update.timer; do
+	sed "s#/home/ubuntu/hovaysya#$REPO#g; s#User=ubuntu#User=$OWNER#" 		"$REPO/deploy/$unit" > "/etc/systemd/system/$unit"
+done
+
+# The update timer runs as the checkout's owner, who may not restart a system
+# unit: systemd answers "Interactive authentication required". Nobody is at the
+# keyboard, so the grant is passwordless, and its narrowness is its safety -- one
+# command, one unit. A malformed sudoers file locks the machine out of sudo
+# entirely, so it is validated before being installed.
+sudoers="$(mktemp)"
+cat > "$sudoers" <<SUDO
+# Installed by deploy/install-api.sh. Lets the update timer restart the API.
+$OWNER ALL=(root) NOPASSWD: /usr/bin/systemctl restart hovaysya-api.service
+SUDO
+if visudo -cf "$sudoers" >/dev/null; then
+	install -m 0440 -o root -g root "$sudoers" /etc/sudoers.d/hovaysya-api
+else
+	echo "не встановлюю sudoers, який не парситься" >&2
+	rm -f "$sudoers"
+	exit 1
+fi
+rm -f "$sudoers"
 systemctl daemon-reload
-systemctl enable hovaysya-api
+systemctl enable hovaysya-api hovaysya-api-update.timer
+systemctl start hovaysya-api-update.timer
 # `restart`, not `enable --now`: a unit already stuck in a restart loop counts as
 # starting, so `--now` does nothing and the second run of this script looks like
 # it changed nothing at all.
@@ -125,6 +148,10 @@ echo "готово. Далі:"
 echo "  1. у дашборді Oracle дозволь 80 і 443 у security list цього інстанса"
 echo "  2. python3 -m tools.serve.token --name <хто>   — і збережи токен"
 echo "  3. curl https://$HOST/health"
+echo
+echo "далі оновлюється саме, раз на 10 хвилин, як і вартовий."
+echo "виняток — Caddyfile: він генерується цим скриптом, тож зміна в ньому"
+echo "вимагає запустити install-api.sh ще раз."
 echo
 echo "і окремо, один раз у дашборді: зарезервуй публічний IP цього інстанса,"
 echo "бо ephemeral змінюється при зупинці — оновлювач це підхопить, але з паузою"

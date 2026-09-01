@@ -185,7 +185,14 @@ Two things the script cannot do:
   never recoverable; only its SHA-256 is stored, because the same machine could
   one day hold other secrets. Minting again for the same name revokes the old one.
 
-Then `curl https://<host>/health` should answer `{"ok": true}`.
+Then `curl https://<host>/health` should answer `{"ok": true, "corpus": …}`.
+
+After that it updates itself, on the same ten-minute timer as the watcher and
+through the same `deploy/update.sh` -- which now takes the unit to restart as an
+argument rather than existing twice. **One exception**: the Caddyfile is generated
+into `/etc/caddy` by `install-api.sh`, so a change to it in git needs that script
+run again. Restarting Caddy from a timer that never rewrote its config would look
+like a deploy and change nothing.
 
 ### What protects it
 
