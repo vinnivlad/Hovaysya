@@ -31,4 +31,29 @@ HAND: dict[str, tuple[float, float, str]] = {
     "Виставковий центр": (50.38250, 30.47758, "n5267955453"),   # ВДНГ
     "Республіка": (50.37345, 30.44603, "w293888317"),   # Кільцева, Теремки-II
     "Антонов": (50.45917, 30.39592, "n2706632496"),     # завод, вул. Мрії
+    # Landmarks the channels use as origins -- "Реактивний з ТЕЦ-5 на Жуляни" is
+    # a bearing, not a place name. Each checked against what this gazetteer
+    # already said about it: ТЕЦ-5 Holosiiv, ТЕЦ-6 Troieshchyna, ТЕЦ-2 Darnytsia,
+    # Lavina by Vynohradar.
+    "ТЕЦ-5": (50.39423, 30.56838, "r6674937"),
+    "ТЕЦ-6": (50.53123, 30.66698, "w106296381"),
+    "ТЕЦ-2": (50.44796, 30.63725, "n11443564769"),
+    "Лавіна": (50.49553, 30.36058, "w446901282"),
+    "Вокзал": (50.44019, 30.48901, "n440084976"),       # Київ-Пасажирський
+    "Десна": (50.92478, 30.77298, "w167051677"),        # 59 км, Броварський бік
 }
+
+# Six names stay without a point, and each for a reason a radius has to respect.
+# This is the whole argument for the radius being an overlay rather than a
+# replacement: these keep the tier the gazetteer gave them by hand.
+#
+#   Київщина    1083 mentions -- the oblast itself, not a place in it
+#   Водосховище  153 -- a reservoir sixty kilometres long
+#   Правий берег  32 -- half a city
+#   Проспект       9 -- a mall; Nominatim answered with ТРЦ СкайМолл on another
+#                        avenue, and a wrong point is worse than none, because
+#                        the radius would act on it
+#   Кільцева       6 -- a road thirty kilometres long
+#   Києво-Святошинський район 1 -- an administrative district, since abolished
+WITHOUT_POINT = ("Київщина", "Водосховище", "Правий берег", "Проспект",
+                 "Кільцева", "Києво-Святошинський район")

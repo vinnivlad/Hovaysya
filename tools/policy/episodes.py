@@ -314,8 +314,8 @@ def silent_signature(obs: "Observation", reason: str) -> tuple:
 
 def _near_names(cfg) -> frozenset[str]:
     """The names that count as his ring, from the config or the gazetteer."""
-    if cfg is not None and cfg.ring:
-        return frozenset(cfg.ring) | ({cfg.home} if cfg.home else set())
+    if cfg is not None and (cfg.ring or cfg.radius_km):
+        return cfg.ring_names()
     return frozenset()
 
 

@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, fields, replace
+from functools import lru_cache
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -72,6 +73,7 @@ BOUNDS: dict[str, tuple[int, int]] = {
     "home_dedup_s": (0, 600),
     "launch_dedup_s": (30, 1800),
     "idle_close_s": (5 * 60, 6 * 3600),
+    "radius_km": (0, 50),
     "quiet_from_hour": (0, 23),
     "quiet_to_hour": (0, 23),
 }
@@ -90,7 +92,19 @@ class Config:
     # every inflection and piece of slang -- and only the tier becomes personal.
     # That split is what makes this cheap: nothing about reading Ukrainian moves.
     home: str = ""
+    # The ring as a radius, his direction: "рано чи пізно коло буде реально
+    # колом, з усіма мікрорайонами які входять в радіус". Zero means the list
+    # below is the whole ring, which is how this started.
+    #
+    # Six kilometres on his call, which takes in Chabany at 5.8 and Kriukivshchyna
+    # at 5.5 -- both of which he had previously ruled out by hand, and both of
+    # which he has now ruled back in by choosing the number.
+    radius_km: float = 0.0
+    # Names always in the ring whatever the radius says, and names never in it.
+    # "Може можна буде налаштувати індивідуальне коло, додавши або прибравши
+    # топоніми." With no radius, `ring` alone *is* the ring.
     ring: tuple = ()
+    ring_drop: tuple = ()
 
     # --- what makes a sound -------------------------------------------------
     ring_alert_start: bool = True
@@ -153,6 +167,14 @@ class Config:
     quiet_from_hour: int = 23
     quiet_to_hour: int = 7
 
+    def ring_names(self, warn=None) -> frozenset[str]:
+        """See `_ring_names`. Cached, because this is called per message per
+        recipient and the radius is 137 distance computations -- uncached it made
+        a hundred recipients twelve times the cost of one, which is precisely the
+        property `episodes.Reading` exists to protect."""
+        return _ring_names(self.home, self.ring, self.ring_drop, self.radius_km,
+                           warn)
+
     def sounds_at(self, hour: int, threat: str | None) -> bool:
         """Whether something of this class may be audible at this hour."""
         if not self.quiet_hours:
@@ -165,6 +187,33 @@ class Config:
 
 
 DEFAULTS = Config()
+
+
+@lru_cache(maxsize=64)
+def _ring_names(home: str, ring: tuple, ring_drop: tuple, radius_km: float,
+                warn=None) -> frozenset[str]:
+    """Every name that counts as near, radius and hand-list together.
+
+    The radius is an overlay, not a replacement: a name with no coordinate keeps
+    whatever tier the gazetteer gave it. `Кільцева` is a road thirty kilometres
+    long and `Правий берег` is half a city -- there is no honest point for either,
+    and inventing one would let a radius act on it.
+    """
+    names = set(ring)
+    if home:
+        names.add(home)
+    if radius_km > 0:
+        from ..geo.build import km
+        from ..nlp.coords import POINTS
+
+        centre = POINTS.get(home)
+        if centre is None:
+            if warn is not None:
+                warn(f"  ! конфіг: не знаю де {home!r} — радіус не застосовую")
+        else:
+            names |= {name for name, point in POINTS.items()
+                      if km(centre, point) <= radius_km}
+    return frozenset(names) - set(ring_drop)
 
 
 def _clamp(name: str, value: int) -> int:
@@ -207,10 +256,12 @@ def from_dict(raw: dict, base: Config = DEFAULTS,
                 continue
             changes[key] = value
         else:
-            if isinstance(value, bool) or not isinstance(value, int):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
                 warn(f"  ! конфіг: {key} має бути числом — пропускаю")
                 continue
             fixed = _clamp(key, value) if key in BOUNDS else value
+            if isinstance(current, int) and not isinstance(current, bool)                     and not isinstance(current, float):
+                fixed = int(fixed)
             if fixed != value:
                 lo, hi = BOUNDS[key]
                 warn(f"  ! конфіг: {key}={value} поза межами {lo}..{hi} — беру {fixed}")

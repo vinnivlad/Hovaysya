@@ -173,9 +173,12 @@ def test_the_shipped_file_changes_nothing():
     raw = _json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     cfg = from_dict(raw, warn=_quiet)
     diff = changed_from_default(cfg)
-    # `home` and `ring` restate what the gazetteer already holds, so both are
-    # no-ops -- see test_the_ring_here_matches_the_gazetteer.
-    assert set(diff) <= {"home", "ring"}
+    # `home` and `ring` restate what the gazetteer already holds. `radius_km`
+    # and `ring_drop` do change things -- the radius is his 2026-09-01 direction
+    # and widens the ring by eight names -- so this test stops claiming the file
+    # is inert and says exactly what in it is not.
+    assert set(diff) <= {"home", "ring", "radius_km", "ring_drop"}
+    assert cfg.radius_km == 6.0 and cfg.ring_drop == ()
 
 
 def test_the_ring_here_matches_the_gazetteer():
@@ -209,9 +212,12 @@ def test_the_ring_in_the_file_actually_reaches_the_decision():
 
     text = "⚠️Реактивний шахед на Борщагівку."
     mine = observe(T0, text, False, "mon1tor_ua", config=load(warn=_quiet))
+    # `radius_km=0` as well as a one-name ring: with the radius on, Borshchahivka
+    # is 5.3 km away and comes back in on geometry, which would hide what this
+    # test is about.
     narrowed = observe(T0, text, False, "mon1tor_ua",
                        config=dataclasses.replace(load(warn=_quiet),
-                                                  ring=("Жуляни",)))
+                                                  ring=("Жуляни",), radius_km=0.0))
     assert mine.scope == "my-area" and mine.ring_places == ("Борщагівка",)
     assert narrowed.scope == "city" and narrowed.ring_places == ()
 
