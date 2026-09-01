@@ -447,12 +447,21 @@ function loadLabels() {
   } catch (e) { /* private mode, cleared storage — carry on with the file */ }
 
   for (const l of cached) if (l && l.id) byId.set(l.id, l);
-  let overridden = 0;
+  let overridden = 0, kept = 0;
   for (const l of DATA.labels) {
-    if (l && l.id) {
-      if (byId.has(l.id)) overridden++;
-      byId.set(l.id, l);
+    if (!l || !l.id) continue;
+    // The file wins over the cache -- a fresh export is the source of truth and
+    // a stale cache must not undo it. One exception, and it exists because
+    // pre-filling a whole night made the old rule expensive: a pre-filled label
+    // loses to anything already saved by hand. Otherwise one refresh would
+    // throw away an evening of corrections, since `save()` drops the flag and
+    // the cached copy is the only place they live until the next export.
+    if (l.prefilled && byId.has(l.id) && !byId.get(l.id).prefilled) {
+      kept++;
+      continue;
     }
+    if (byId.has(l.id)) overridden++;
+    byId.set(l.id, l);
   }
   const merged = [...byId.values()];
   // A level that no longer exists would fail validation on export.
@@ -460,7 +469,8 @@ function loadLabels() {
 
   if (overridden || merged.length !== cached.length) {
     console.info(`labels: ${DATA.labels.length} from file, ${cached.length} cached, ` +
-                 `${overridden} taken from the file, ${merged.length} in use`);
+                 `${overridden} taken from the file, ${kept} corrections kept, ` +
+                 `${merged.length} in use`);
   }
   return merged;
 }
@@ -953,6 +963,7 @@ function save(advance) {
   }
   const out = Object.assign({}, draft);
   delete out._alarmManual;  // UI state, not data
+  delete out.prefilled;     // he has looked at it, so it is his now
   if (out.decision === "notify") delete out.silent_reason;
   else { delete out.level; delete out.alarm; }  // repeat_of is kept: see above
   if (!out.open_question) out.open_question = null;

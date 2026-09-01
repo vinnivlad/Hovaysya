@@ -201,7 +201,33 @@ def build_nights(messages: list[dict]) -> list[dict]:
     return nights
 
 
-def load_labels() -> list[dict]:
+def load_labels(prefill: list[Path] | None = None) -> list[dict]:
+    """Every snapshot in `labels/`, newest per night winning -- the same rule the
+    eval and the benchmark use, so the page shows what they score.
+
+    It used to read `moments.jsonl` alone, which meant a night labelled in its
+    own file was invisible here while counting everywhere else.
+
+    `prefill` adds machine-made labels for nights that have none. They never
+    override a hand-labelled night: pre-filled labels are scaffolding, and the
+    only irreplaceable thing in this repository is his judgement.
+    """
+    from .load import load_all, read_file
+
+    labels, _src = load_all(LABELS_PATH.parent)
+    if prefill:
+        have = {l.get("night") for l in labels}
+        for path in prefill:
+            rows = read_file(path)
+            fresh = [l for l in rows if l.get("night") not in have]
+            skipped = len(rows) - len(fresh)
+            if skipped:
+                print(f"  {path.name}: {skipped} пропущено — ніч уже розмічена")
+            labels += fresh
+    return labels
+
+
+def _old_load_labels() -> list[dict]:
     if not LABELS_PATH.exists():
         return []
     labels = []
@@ -217,6 +243,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--db", default=str(DB_PATH))
     ap.add_argument("--out", default=str(OUT_PATH))
     ap.add_argument("--since", metavar="YYYY-MM-DD", help="Only include this date onward.")
+    ap.add_argument("--prefill", action="append", metavar="PATH",
+                    help="Machine-made labels for an unlabelled night; see "
+                         "tools/labeler/prefill.py. Repeatable.")
     args = ap.parse_args(argv)
 
     conn = sqlite3.connect(f"file:{args.db}?mode=ro", uri=True)
@@ -234,7 +263,7 @@ def main(argv: list[str] | None = None) -> int:
         "reference": "Жуляни",
         "nights": build_nights(messages),
         "messages": messages,
-        "labels": load_labels(),
+        "labels": load_labels([Path(p) for p in (args.prefill or [])]),
     }
 
     template = TEMPLATE.read_text(encoding="utf-8")

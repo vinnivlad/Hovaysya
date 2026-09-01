@@ -36,6 +36,7 @@ from collections import Counter
 from pathlib import Path
 
 from ..labeler.load import load_all
+from ..policy.config import load as load_config
 from ..policy.episodes import Tracker, observe
 from ..policy.rules import run as run_policy
 
@@ -165,7 +166,10 @@ def main(argv: list[str] | None = None) -> int:
         keys = [key for _ts, key, _text, _r in messages]
         from ..policy.episodes import OFFICIAL_CHANNELS
 
-        tracker = Tracker()
+        # His settings, not the defaults. They are the same file today -- the
+        # shipped config is a no-op -- but the moment he changes one, an eval on
+        # the defaults would stop measuring the thing that runs at 3 a.m.
+        tracker = Tracker(config=load_config())
         tracker.official_source = any(
             key.split("/")[0] in OFFICIAL_CHANNELS for key in keys)
         decisions = run_policy(observations, tracker)
