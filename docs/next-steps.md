@@ -624,6 +624,28 @@ ring again for a place already announced -- which is arguably right, since nobod
 has warned him about *here* yet, but it should be a decision rather than an
 accident.
 
+### A recipient file holds deviations, and one question stays open
+
+Found by his own caution: he asked whether he needed the API token at all, GET
+answered `{"config": {}}`, and that empty object was the visible end of a defect.
+`from_dir` built a recipient from bare defaults, so **the first token minted on
+the watcher's own machine would have silently emptied his ring and zeroed the
+radius.** It had not happened only because the token was minted on B, which runs
+no watcher.
+
+Fixed: a person's file layers over the shipped `hovaysya.json` rather than over
+`DEFAULTS`. A name in the index with no file beside it means "changed nothing",
+not "configured nothing", and only the difference is stored -- so a later change to
+the shipped settings still reaches everyone who did not override that thing.
+
+**Open: a second person inherits his place.** With `hovaysya.json` as the baseline,
+somebody in Obolon starts with Zhuliany as home until their file says otherwise --
+useless to them rather than merely wrong. The intended answer is that the app
+writes the place on first run, before any decision is made for them. Until a
+second person exists there is nothing to test that against, so the watcher now
+prints each recipient's place on its startup line: a ring emptied by a bad file
+should be visible there rather than deduced from a night of silence.
+
 ### The raw feed is fetched, not pushed
 
 He remembered what the design above forgot: the app has a second screen with

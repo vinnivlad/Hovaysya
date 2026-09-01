@@ -118,10 +118,34 @@ def _config_path(name: str, directory: Path = DIR) -> Path:
     return directory / f"{Path(name).name}.json"
 
 
-def config_of(name: str, directory: Path = DIR, warn=None) -> Config:
+def config_of(name: str, directory: Path = DIR, base: Config | None = None,
+              warn=None) -> Config:
+    """One person's settings, over the shipped ones rather than over bare defaults.
+
+    The difference is not academic. `hovaysya.json` is the record of how this
+    behaves -- his ring, his radius, every switch -- and a recipient file holds
+    only what that person changed. Layered on `DEFAULTS` instead, the first token
+    minted on the watcher's own machine would have silently emptied his ring and
+    set the radius to zero, because a name in the index with no file beside it
+    means "nothing changed", not "nothing configured".
+
+    It leaves one thing open, recorded in `docs/next-steps.md`: a *new* person
+    inheriting his home is wrong for them, and the answer is that the app writes
+    their place on first run. Until there is a second person there is nothing to
+    test that against, so the startup line prints each recipient's place instead --
+    a wrong one should be visible rather than deduced.
+    """
     from .config import load as load_config
 
-    return load_config(_config_path(name, directory), warn=warn or (lambda _m: None))
+    return load_config(_config_path(name, directory),
+                       base=base if base is not None else _shipped(),
+                       warn=warn or (lambda _m: None))
+
+
+def _shipped() -> Config:
+    from .config import load as load_config
+
+    return load_config(warn=lambda _m: None)
 
 
 def save_config(name: str, raw: dict, directory: Path = DIR) -> Config:
@@ -148,6 +172,8 @@ def from_dir(directory: Path = DIR, fallback: Config | None = None) -> list[Reci
     Order is the index's, so a night's log reads the same way twice.
     """
     names = list(dict.fromkeys(index(directory).values()))
+    base = fallback if fallback is not None else _shipped()
     if not names:
-        return only(fallback if fallback is not None else DEFAULTS)
-    return [Recipient(name=n, config=config_of(n, directory)) for n in names]
+        return only(base)
+    return [Recipient(name=n, config=config_of(n, directory, base=base))
+            for n in names]

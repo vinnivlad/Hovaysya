@@ -464,8 +464,13 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  лог: {log_path}")
     diff = changed_from_default(cfg)
     print(f"  налаштування: {diff if diff else 'усе за замовчуванням'}")
-    if len(people) > 1:
-        print(f"  отримувачі: {', '.join(p.name for p in people)}")
+    # Each one's place, always -- not only when there are several. A recipient
+    # file that emptied somebody's ring should be visible on the startup line
+    # rather than deduced from a night of silence.
+    for who in people:
+        print(f"  отримувач {who.name}: {who.config.home or '(газетир)'} · "
+              f"радіус {who.config.radius_km or 0:g} км · "
+              f"{len(who.config.ring_names())} назв у колі")
     if session.notifier and session.notifier.enabled:
         who = session.notifier.chat_id or session.notifier.find_chat()
         print(f"  телефон: telegram → {who or 'напиши боту, щоб він знав куди слати'}")

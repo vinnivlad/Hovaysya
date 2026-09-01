@@ -14,6 +14,10 @@ import urllib.request
 import pytest
 
 from tools.policy.recipients import hashed
+
+
+def _quiet(*_a, **_k):
+    pass
 from tools.serve.api import decisions, messages, serve
 
 TOKEN = "sekret"
@@ -191,10 +195,27 @@ def test_a_missing_log_directory_is_an_empty_answer(tmp_path):
 # --- the settings -----------------------------------------------------------
 
 
-def test_settings_come_back_as_stored(api):
-    assert call(api, "/config") == (200, {"config": {}})
-    call(api, "/config", method="PUT", body={"home": "Оболонь"})
-    assert call(api, "/config")[1]["config"]["home"] == "Оболонь"
+def test_settings_come_back_effective_not_bare(api):
+    """GET answers with what actually applies to this person, which is the shipped
+    configuration plus whatever they changed -- not the contents of their file.
+
+    It used to answer `{}` for a recipient with no file of their own, and that was
+    the visible end of a real defect: the watcher built such a recipient from bare
+    defaults, so the first token minted on its own machine would have silently
+    emptied his ring and zeroed the radius. A name in the index with no file beside
+    it means "changed nothing", never "configured nothing".
+    """
+    from tools.policy.config import load as load_config
+
+    shipped = load_config(warn=_quiet)
+    got = call(api, "/config")[1]["config"]
+    assert got["home"] == shipped.home
+    assert got["radius_km"] == shipped.radius_km
+
+    call(api, "/config", method="PUT", body={"radius_km": 4})
+    after = call(api, "/config")[1]["config"]
+    assert after["radius_km"] == 4                 # theirs wins
+    assert after["home"] == shipped.home           # ...and the rest still applies
 
 
 def test_a_hostile_body_is_clamped_before_it_reaches_disk(api, who):
@@ -216,6 +237,14 @@ def test_a_hostile_body_is_clamped_before_it_reaches_disk(api, who):
 
     stored = json.loads((who / "vinni.json").read_text(encoding="utf-8"))
     assert stored["radius_km"] == 50 and "жарт" not in stored
+
+
+def test_only_the_difference_is_stored(api, who):
+    """Their file holds deviations, so a later change to the shipped settings
+    reaches everyone who did not override that particular thing."""
+    call(api, "/config", method="PUT", body={"radius_km": 4})
+    stored = json.loads((who / "vinni.json").read_text(encoding="utf-8"))
+    assert stored == {"radius_km": 4}
 
 
 def test_a_body_that_is_not_an_object_is_refused(api):
