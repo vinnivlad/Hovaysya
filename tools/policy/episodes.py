@@ -319,50 +319,51 @@ def _near_names(cfg) -> frozenset[str]:
     return frozenset()
 
 
-def observe(ts: int, text: str, is_reply: bool = False,
-            channel: str | None = None, config=None) -> Observation:
-    """Read one message into the fields the policy uses.
+@dataclass
+class Reading:
+    """One message read once, before anyone’s ring is applied.
 
-    `is_reply` matters for sirens specifically: a reply saying "По ньому
-    тривога" refines an announcement rather than making one. Both such messages
-    in the labelled night were marked silent, while every standalone siren was a
-    wake-up.
+    The split exists because the two halves cost wildly different amounts.
+    Measured on 2000 real messages: `hints.suggest` is 0.579 ms and finding the
+    toponyms 0.052 ms, and neither depends on who is being warned -- what is
+    flying and which places are named are the same for everybody. Turning those
+    names into *my* area is 0.0004 ms, and the rules on top are 0.002 ms.
+
+    So a hundred recipients cost 0.87 ms a message against 68 ms if each one
+    re-read it. That is the whole reason the decision can stay on the server
+    while every recipient has their own ring.
+
+    The gazetteer is a recognition layer, not a relevance layer: it says
+    "Борщагівка is named", with every inflection and piece of slang, and the ring
+    says what Борщагівка means to me.
     """
+
+    base: "Observation"
+    places: tuple           # (name, tier), found once
+    static_scope: str       # what the gazetteer’s own tiers make of it
+
+
+def read(ts: int, text: str, is_reply: bool = False,
+         channel: str | None = None) -> Reading:
+    """The half that is the same for everyone."""
     from ..nlp.gazetteer import resolve_scope
 
     guess = hints.suggest(text)
-    near = _near_names(config)
-    override_scope = None
-    if near:
-        scope_places = tuple(p.name for p in find_places(text) if p.name in near)
-        # A configured ring replaces the gazetteer's tier for its own names: the
-        # names are recognised the same way, only whose ring they are in changes.
-        if scope_places:
-            override_scope = "my-area"
-        else:
-            # ...and it replaces it in both directions. Without this, someone
-            # whose ring is Obolon still had Zhuliany read as their own street,
-            # because the gazetteer's `my-area` tier is his.
-            static = resolve_scope(text)
-            if static in NEAR_TIERS:
-                override_scope = "city"
-    else:
-        scope_places = tuple(
-            p.name for p in find_places(text) if p.tier in NEAR_TIERS
-        )
-    return Observation(
+    places = tuple((p.name, p.tier) for p in find_places(text))
+    static = resolve_scope(text)
+    base = Observation(
         ts=ts,
         text=text,
         threat=str(guess["threat"]),
         alarm=str(guess["alarm"]),
         modality=str(guess["modality"]),
         certainty=str(guess["certainty"]),
-        scope=override_scope or resolve_scope(text),
+        scope=static,
         heading=str(guess["heading"]),
         strength=str(guess["strength"]),
         alert_state=hints.alert_state(text),
         nationwide=hints.nationwide(text),
-        ring_places=scope_places,
+        ring_places=tuple(n for n, tier in places if tier in NEAR_TIERS),
         says_new=_says_new(text),
         says_launch=bool(_LAUNCH.search(text or "")),
         says_launch_proper=bool(_LAUNCH_PROPER.search(text or "")),
@@ -370,13 +371,62 @@ def observe(ts: int, text: str, is_reply: bool = False,
         falling=hints.falling(text),
         impact=hints._hits(text, hints.IMPACT_TERMS),
         recheck=hints.recheck(text),
-        home=(config.home if config is not None and config.home else ""),
+        home="",
         reappeared=hints.reappeared(text),
         is_reply=is_reply,
         official=channel in OFFICIAL_CHANNELS,
         partial_clear=hints.partial_clear(text),
         cleared_class=hints.cleared_class(text),
     )
+    return Reading(base=base, places=places, static_scope=static)
+
+
+def observe_for(reading: Reading, config=None) -> Observation:
+    """The same reading, as it looks to one person.
+
+    A fresh object every time, and not only for tidiness: `rules` stamps
+    `effective_threat` onto the observation it decided on, so two recipients
+    sharing one would overwrite each other.
+    """
+    import dataclasses
+
+    near = _near_names(config)
+    override_scope = None
+    if near:
+        scope_places = tuple(n for n, _t in reading.places if n in near)
+        # A configured ring replaces the gazetteer's tier for its own names: the
+        # names are recognised the same way, only whose ring they are in changes.
+        if scope_places:
+            override_scope = "my-area"
+        elif reading.static_scope in NEAR_TIERS:
+            # ...and it replaces it in both directions. Without this, someone
+            # whose ring is Obolon still had Zhuliany read as their own street,
+            # because the gazetteer's `my-area` tier is his.
+            override_scope = "city"
+    else:
+        scope_places = tuple(n for n, tier in reading.places if tier in NEAR_TIERS)
+    return dataclasses.replace(
+        reading.base,
+        scope=override_scope or reading.static_scope,
+        ring_places=scope_places,
+        home=(config.home if config is not None and config.home else ""),
+    )
+
+
+def observe(ts: int, text: str, is_reply: bool = False,
+            channel: str | None = None, config=None) -> Observation:
+    """Read one message into the fields the policy uses, for one person.
+
+    `is_reply` matters for sirens specifically: a reply saying "По ньому
+    тривога" refines an announcement rather than making one. Both such messages
+    in the labelled night were marked silent, while every standalone siren was a
+    wake-up.
+
+    Kept as one call because almost everything reads one message for one person:
+    the tests, the eval, the replay. Only the live watcher needs the two halves
+    apart, and it is the only place where N is not 1.
+    """
+    return observe_for(read(ts, text, is_reply, channel), config)
 
 
 def _says_new(text: str) -> bool:

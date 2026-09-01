@@ -494,6 +494,17 @@ So a recipient is `{FCM token, config}`, and that is where the two prerequisites
 meet: the per-recipient decision loop is what the transport needs, not a separate
 piece of work.
 
+**The loop exists as of 2026-09-01** -- `tools/policy/recipients.py`, and
+`episodes.read()` / `observe_for()` for the two halves of a reading. Built while
+the answer is still N=1, because that is the shape which would have been
+expensive to change once there were people in it. `Recipient` owns three things
+and shares none: settings, episode state, and the sentences said to them -- the
+middle one being the subtle one, since it is what makes a repeat a repeat.
+
+The list is deliberately **not a file yet**. There is one recipient and he is in
+`hovaysya.json`; inventing a format for people who do not exist is the mistake the
+second config layer already made.
+
 ### Where each layer lives, since this reads backwards easily
 
 He read the section above as the gazetteer staying on the server and the decision

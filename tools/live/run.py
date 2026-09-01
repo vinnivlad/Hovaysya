@@ -50,7 +50,8 @@ from ..export.tme import Client, FetchError
 from ..labeler.build import kyiv_dt
 from ..policy.announce import Announcer
 from ..policy.config import CONFIG_PATH, changed_from_default, load as load_config
-from ..policy.episodes import OFFICIAL_CHANNELS, Tracker, observe
+from ..policy.episodes import OFFICIAL_CHANNELS, Tracker, observe, read
+from ..policy.recipients import decide_all, only
 from ..policy.rules import decide
 from .notify import Notifier
 from .version import startup_note
@@ -136,6 +137,10 @@ class Watcher:
 
 @dataclass
 class Session:
+    # One recipient today, and a list because that is the shape that would have
+    # been expensive to retrofit. `tracker` and `announcer` stay as the first
+    # recipient's, so nothing that reads a Session had to change.
+    recipients: list = field(default_factory=list)
     tracker: Tracker = field(default_factory=Tracker)
     notifier: Notifier | None = None
     announcer: Announcer = field(default_factory=Announcer)
@@ -143,6 +148,21 @@ class Session:
     decisions: int = 0
     audible: int = 0
     log: list[dict] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        """A bare `Session()` still means one recipient: me.
+
+        Every caller that predates the list -- the tests, the smoke runs -- built
+        a Session from a tracker and an announcer, and that has to keep meaning
+        what it meant. So the list is derived from them rather than required
+        beside them.
+        """
+        if not self.recipients:
+            from ..policy.recipients import Recipient
+
+            self.recipients = [Recipient(name="я", config=self.tracker.config,
+                                         tracker=self.tracker,
+                                         announcer=self.announcer)]
 
 
 def fmt_lag(seconds: float) -> str:
@@ -159,12 +179,19 @@ def handle(session: Session, channel: str, message_id: int, ts: int, text: str,
     count towards the lag statistics, where a six-hour-old message would drown
     the number the whole exercise is here to measure.
     """
-    obs = observe(ts, text, is_reply, channel, config=session.tracker.config)
-    decision = decide(obs, session.tracker)
-    session.tracker.record(obs, decision.level if decision.notify else None,
-                           decision.alarm if decision.notify else None,
-                           decision.reason)
-    utterance = session.announcer.announce(obs, decision)
+    # Read once, decide once per person. The reading is 0.58 ms of Ukrainian and
+    # the personal half is 0.002 ms, so the loop is nearly free -- see
+    # `episodes.Reading`.
+    reading = read(ts, text, is_reply, channel)
+    for who, obs, decision in decide_all(reading, session.recipients):
+        utterance = who.announcer.announce(obs, decision)
+        _say(session, who, channel, message_id, ts, text, obs, decision,
+             utterance, now, warm)
+
+
+def _say(session: Session, who, channel: str, message_id: int, ts: int,
+         text: str, obs, decision, utterance, now: float, warm: bool) -> None:
+    """Everything one recipient's decision produces: numbers, log, phone, line."""
 
     lag = max(0.0, now - ts)
     if not warm:
@@ -183,6 +210,9 @@ def handle(session: Session, channel: str, message_id: int, ts: int, text: str,
         "alarm": decision.alarm,
         "reason": decision.reason,
         "said": utterance.text if utterance else None,
+        # Only when there is more than one, so a night's log of the single-
+        # recipient case reads exactly as it did before.
+        "who": who.name if len(session.recipients) > 1 else None,
         "warm": warm or None,
     })
 
@@ -411,8 +441,11 @@ def main(argv: list[str] | None = None) -> int:
     # normal case; a broken one prints a line and changes nothing, because a
     # typo must never be the reason the watch is not running at 3 a.m.
     cfg = load_config(Path(args.config))
+    people = only(cfg)
     session = Session(notifier=None if args.no_telegram else Notifier(),
-                      tracker=Tracker(config=cfg))
+                      recipients=people,
+                      tracker=people[0].tracker,
+                      announcer=people[0].announcer)
     # The official channel speaks only when the siren changes, so "has it spoken
     # lately" is not the same question as "is it being watched".
     session.tracker.official_source = bool(OFFICIAL_CHANNELS & set(channels))
