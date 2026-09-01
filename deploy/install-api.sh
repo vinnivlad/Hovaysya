@@ -57,7 +57,13 @@ install -d -o caddy -g caddy /var/log/caddy
 echo "== сервіс"
 sed "s#/home/ubuntu/hovaysya#$REPO#g" "$REPO/deploy/api.service" > /etc/systemd/system/hovaysya-api.service
 systemctl daemon-reload
-systemctl enable --now hovaysya-api
+systemctl enable hovaysya-api
+# `restart`, not `enable --now`: a unit already stuck in a restart loop counts as
+# starting, so `--now` does nothing and the second run of this script looks like
+# it changed nothing at all.
+systemctl restart hovaysya-api
+sleep 2
+systemctl is-active --quiet hovaysya-api 	&& echo "  сервіс піднявся" 	|| { echo "  ! сервіс не піднявся:"; journalctl -u hovaysya-api -n 8 --no-pager; }
 
 # Caddy needs 80 for the ACME challenge and 443 to serve. Oracle's own security
 # list has to allow them too, and that is a click in the dashboard rather than a
