@@ -68,3 +68,15 @@ HAND: dict[str, tuple[float, float, str]] = {
 # middle of a sixty-kilometre lake is wrong as a position and right as a bearing.
 WITHOUT_POINT = ("Київщина", "Правий берег", "Кільцева",
                  "Києво-Святошинський район")
+
+# ...and one that OSM *does* place, wrongly for our purpose. `Київ` has a centre,
+# 8.6 km from Zhuliany, and it made every distance measurement lie: 73 of 86
+# audible notifications came out at a median of exactly 8.6 km, because most of
+# them name the city and nothing nearer. A ballistic "на Київ" is not 8.6 km
+# away, it is fifty kilometres wide.
+#
+# So the rule is about what a name denotes, not about whether OSM knows it:
+# anything that is an area rather than a place has no point. Found while asking
+# what coordinates could improve in the output -- the first thing they improved
+# was the answer to that question.
+TOO_BIG_FOR_A_POINT = ("Київ",) + WITHOUT_POINT

@@ -97,11 +97,13 @@ def match(place, rows: list[dict]) -> tuple[tuple[float, float] | None, dict]:
 
 
 def build(rows: list[dict]):
-    from .hand import HAND
+    from .hand import HAND, TOO_BIG_FOR_A_POINT
 
     got, flagged, missing = {}, [], []
     for group in (MY_AREA, MY_DISTRICT, CITY, OBLAST, LANDMARKS):
         for place in group:
+            if place.name in TOO_BIG_FOR_A_POINT:
+                continue
             if place.name in HAND:
                 lat, lon, osm = HAND[place.name]
                 got[place.name] = ((lat, lon), {"how": f"руками ({osm})",
