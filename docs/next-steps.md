@@ -428,6 +428,155 @@ notification channel needs priority with explicit permission to bypass it.
 Android allows that, and the user must grant it -- meaning the app has a setup
 step without which the whole idea does not work at all.
 
+## 9. The Android client — what it needs from this side, decided 2026-09-01
+
+Not started, and this section is only the seam: what the watcher has to grow
+before an app has anything to connect to. Asked what stood in the way, the answer
+turned out to include a defect — `observe()` had taken a `config` for days and no
+caller passed it, so `ring` in the settings file changed nothing. Fixed in
+134186f. Worth naming because of *why* it hid: the list in the file is identical
+to the gazetteer's, and the test guarding that identity stood in for the wiring.
+A setting that changes nothing when changed has no symptom.
+
+### The transport is FCM
+
+Firebase Cloud Messaging, on his confirmation that everyone will have an ordinary
+Android. What it costs and what it does not:
+
+- an ordinary **free Google account** and a Firebase project. **No Play Developer
+  account** — that is only for publishing — and no payment method: FCM has no
+  send quota on the free plan.
+- it does require **Google Play Services on the device**, not the store listing.
+  A sideloaded APK is fine; a de-Googled ROM or a recent Huawei is not. That was
+  the only real wall here and he has closed it: "у всіх нормальний Андроїд буде".
+- updates outside the store are explicitly not a worry yet, on his call. The
+  keystore still is: lose it and an installed app cannot be updated at all, only
+  removed and reinstalled, so it belongs in `tools/backup.py` the day it exists.
+
+The alternative was ntfy/UnifiedPush — no Google anywhere, could live on the same
+box — and it loses on the one axis that is the product: it keeps its own
+connection, which Android's Doze kills more readily than the system's own push
+channel. Chosen with the dependency stated rather than by default.
+
+**FCM needs no inbound port.** The server calls Google outbound, exactly like the
+channel polling it already does. That matters more than it sounds — see below.
+
+### The push carries the decision, not the observation
+
+Two shapes were possible and only one of them is cheap.
+
+*Send the observation* — "ballistic, my area, launch" — and let the phone decide.
+That means the ordered rules and the episode state reimplemented in Kotlin: two
+copies of the one thing in this project whose whole design is that order is
+semantics and every rule carries its reason. They would diverge on the first fix.
+
+*Send the decision.* One implementation, and a rule fix reaches every phone in
+ten minutes through the pull deploy that already exists, with no app release. The
+phone stays dumb, which also means one that was offline does not replay a
+finished wave.
+
+The log row is already almost the payload:
+
+    { "seq": 10482, "at": "2026-09-01T02:30:08Z", "level": "alert",
+      "alarm": "ballistic", "said": "Загроза: балістика. Жуляни.",
+      "episode": "2026-09-01T02:22", "reason": "my place, and ballistic is up",
+      "anchor": "kievinform_ua1/24620" }
+
+Around 200 bytes against a 4 KB limit. Every field earns its place: `level`
+decides ring or status line, `alarm` picks the tone or the vibration pattern,
+`said` is the sentence `announce.py` already produces, `episode` lets the app
+update one notification instead of stacking eleven, `reason` is the screen that
+let eight faults be found in a week, and **`at` plus `seq` exist because FCM does
+not promise delivery time** — a phone must be able to discard a ballistic ring
+that arrives four minutes late, which is worse than none.
+
+So a recipient is `{FCM token, config}`, and that is where the two prerequisites
+meet: the per-recipient decision loop is what the transport needs, not a separate
+piece of work.
+
+### Where each layer lives, since this reads backwards easily
+
+He read the section above as the gazetteer staying on the server and the decision
+tree moving to the phone. It is the other way round, and one constraint settles it
+rather than any preference:
+
+**the decision needs every message, and every message cannot be pushed.** Rules
+that decide are stateful -- an episode, a wave, what was already said -- so they
+have to see the whole stream, all 1175 messages of a busy night. Pushing that
+stream is exactly what the section above rules out. So the decision lives where
+the messages arrive.
+
+    server   the gazetteer and hints        reading Ukrainian
+    server   the ordered rules + episodes   whether this is worth a sound
+    server   each recipient's config        home, ring, switches, quiet hours
+    phone    rendering                      which tone, which vibration pattern,
+                                            bypassing Do Not Disturb
+    phone    the two screens                the filtered one and the raw feed
+
+The phone is deliberately dumb about *whether*, and the only authority it keeps is
+*how* -- which is also where its own hardware knowledge belongs. The cost of the
+split is that the server knows where each recipient lives; the answer to that is
+that the configs sit on the box with no inbound port, which is the reason the
+previous section puts the open port somewhere else.
+
+### The raw feed is fetched, not pushed
+
+He remembered what the design above forgot: the app has a second screen with
+every chat message on it. That cannot be pushed. Each push wakes the app, and the
+busiest night in the corpus is 1175 messages — 149 KB of JSON, one message every
+six seconds at the peak. A thousand wake-ups would empty the battery.
+
+It also does not need to be. A feed nobody is looking at has nowhere to arrive:
+when the app is open he is reading it, and when it is closed he is asleep and only
+the bell matters. So:
+
+    GET /messages?since=<seq>     the merged raw feed
+    GET /decisions?since=<seq>    what Ховайся decided, for this recipient
+
+Cursor-based, which is the pattern the watcher already uses against `t.me/s/`
+with `?after=<id>`, and an app that was offline closes the gap in one request.
+Thin reading over the SQLite that exists.
+
+### ...and the open port goes on a second box, not this one
+
+**Today the instance has no inbound service at all** — it only polls outward,
+which is half the reason it is safe to keep a bot token there. Serving the feed
+means the first inbound door on a public IP.
+
+His instinct was to move the *bot* to a second instance so the token leaves the
+exposed box. Right instinct, wrong direction, and the reason is the critical path:
+the bell would then travel watcher → write → second box polls → Telegram, and a
+dead second box or a lagging poll looks exactly like a quiet night. That is paid
+in the one thing that is the product, to protect the cheapest secret in the system
+— a bot token is not account access, it can only post to his own channel, and
+@BotFather revokes it in seconds.
+
+So the exposed thing moves out instead:
+
+| | A, the instance that exists | B, new and small |
+| --- | --- | --- |
+| inbound | SSH only, as now | 443 |
+| holds | watcher, decisions, bot token, recipient configs, FCM sender | a copy of the raw feed |
+| worth stealing | everything | public messages |
+| in the path to the bell | yes, one process, as now | no |
+
+**A pushes to B, never the reverse.** If B pulled over SSH it would hold a key to
+A, and compromising the public box would then hand over the private one — far
+worse than the token this started from. Pushing outward means a compromised B
+yields a copy of public data and the ability to lie to a feed screen, while the
+bell still comes from A and cannot be forged. The recipient configs — which is to
+say where each person lives, the only genuinely private data here — stay behind
+the closed door.
+
+B is free within Always Free (the ARM allowance is 4 OCPU / 24 GB across up to
+four instances and 1/1 is in use), and the binding constraint is disk: 200 GB per
+account against a 47 GB boot volume, so two fit and a third is tight.
+
+**Not built until an app exists to read it.** It costs a second runtime — its own
+deploy, restart and runbook entry — and the push path needs no port at all, so the
+order is: the per-recipient decision loop, then FCM, then B when the feed screen
+is real.
+
 ## Adding a channel
 
 Two steps, and skipping the second costs a blind spot. He caught it within
