@@ -59,7 +59,13 @@ def row(obs, dec, anchor: str, night: str, seq: Counter) -> dict:
         "anchor": anchor,
         "at": at.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "decision": "notify" if dec.notify else "silent",
-        "threat": obs.threat,
+        # The class the decision was made on, not the one this message states.
+        # A bare "Жуляни🚀" during a ballistic wave states nothing and *is* that
+        # wave, which is how his own earlier labels read -- 98 of them carry an
+        # inherited class. Filling this from the raw text put `unknown` on the
+        # screen and he read it exactly right: "Бачу що воно не розуміє клас".
+        # The decision knew; this column did not.
+        "threat": getattr(obs, "effective_threat", obs.threat),
         "modality": obs.modality,
         "scope": obs.scope,
         "certainty": obs.certainty,
@@ -115,16 +121,16 @@ def main() -> None:
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
+    # Per label, not per night. The first version refused a night that had any
+    # hand labels at all, and three corrections then blocked the scaffolding for
+    # the other 693 messages of the same night -- which is the normal way a long
+    # night gets reviewed, in more than one sitting.
     have, _src = load_all()
-    already = sum(1 for l in have if l.get("night") == args.night)
-    if already:
-        # Refusing rather than warning: overwriting a hand-labelled night with
-        # the policy's own output is the one mistake that would quietly destroy
-        # the only thing in this repository that cannot be regenerated.
-        raise SystemExit(f"ніч {args.night} вже має {already} ручних міток — "
-                         f"передзаповнення її не торкається")
+    mine = {l.get("id") for l in have if l.get("night") == args.night}
 
-    rows = build(args.night, Path(args.db))
+    rows = [r for r in build(args.night, Path(args.db)) if r["id"] not in mine]
+    if mine:
+        print(f"  {len(mine)} власних міток цієї ночі не торкаюсь")
     out = Path(args.out or REPO_ROOT / "data" / f"prefill-{args.night}.jsonl")
     out.write_text("".join(json.dumps(r, ensure_ascii=False) + chr(10)
                            for r in rows), encoding="utf-8")

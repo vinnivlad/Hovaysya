@@ -208,21 +208,22 @@ def load_labels(prefill: list[Path] | None = None) -> list[dict]:
     It used to read `moments.jsonl` alone, which meant a night labelled in its
     own file was invisible here while counting everywhere else.
 
-    `prefill` adds machine-made labels for nights that have none. They never
-    override a hand-labelled night: pre-filled labels are scaffolding, and the
-    only irreplaceable thing in this repository is his judgement.
+    `prefill` adds machine-made labels, and never one that would displace his:
+    the match is by label id, so a night he has begun keeps every correction and
+    still gets scaffolding for the messages he has not reached. Pre-filled labels
+    are scaffolding; the only irreplaceable thing here is his judgement.
     """
     from .load import load_all, read_file
 
     labels, _src = load_all(LABELS_PATH.parent)
     if prefill:
-        have = {l.get("night") for l in labels}
+        have = {l.get("id") for l in labels}
         for path in prefill:
             rows = read_file(path)
-            fresh = [l for l in rows if l.get("night") not in have]
+            fresh = [l for l in rows if l.get("id") not in have]
             skipped = len(rows) - len(fresh)
             if skipped:
-                print(f"  {path.name}: {skipped} пропущено — ніч уже розмічена")
+                print(f"  {path.name}: {skipped} пропущено — вже розмічені")
             labels += fresh
     return labels
 
