@@ -80,17 +80,36 @@ def strip_footer(text: str) -> str:
     return "\n".join(lines)
 
 
+# Ukrainian is written with an apostrophe and the channels use four different
+# characters for it: U+0027 in most messages, U+02BC and U+2019 in a few hundred,
+# and sometimes none at all. His call, and the right one -- fold them at the
+# boundary rather than spell out variants in every rule downstream: "може
+# заміняй всі апострофи на якийсь один стандартний на самому початку, щоб потім
+# не морочитись з трьома різними в правилах".
+#
+# The gazetteer strips apostrophes on both sides already, so places were never
+# affected. What was is anything written as a plain pattern -- `REAPPEAR_TERMS`
+# carried "з'явив" and "зявив" by hand and still missed the other two forms.
+_APOSTROPHES = re.compile("[" + chr(0x2019) + chr(0x02BC) + chr(0x2018)
+                          + chr(0x00B4) + chr(0x0060) + "]")
+APOSTROPHE = chr(39)
+
+
+def fold_apostrophes(text: str) -> str:
+    return _APOSTROPHES.sub(APOSTROPHE, text or "")
+
+
 def normalize_text(raw: str | None) -> str:
     """Normalize a raw message body into comparable, analyzable text.
 
-    Collapses whitespace, removes invisible characters, and strips promo
-    footers. Line structure is preserved (blank-line-separated blocks
+    Collapses whitespace, removes invisible characters, folds every apostrophe
+    variant onto one, and strips promo footers. Line structure is preserved (blank-line-separated blocks
     become single newlines) because monitoring channels use one line per
     target group, and that grouping is a real signal.
     """
     if not raw:
         return ""
-    text = _INVISIBLE.sub("", raw)
+    text = fold_apostrophes(_INVISIBLE.sub("", raw))
     text = _NBSP.sub(" ", text)
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = strip_footer(text)

@@ -1288,3 +1288,30 @@ def test_a_dated_report_is_not_now():
     # ...and a real impact report, which carries no date, still is one.
     assert hints.modality_hint("💥Влучання у складське приміщення в районі ТЕЦ-5.") \
         == "live-threat"
+
+
+def test_one_apostrophe_reaches_the_rules():
+    """Ukrainian has one apostrophe and the channels write it four ways: U+0027
+    in most messages, U+02BC and U+2019 in a few hundred, sometimes none.
+
+    His call to fold at the boundary rather than spell variants out in every
+    rule: "може заміняй всі апострофи на якийсь один стандартний на самому
+    початку, щоб потім не морочитись з трьома різними в правилах". The gazetteer
+    was never affected -- it strips them on both sides -- but a plain pattern is,
+    and `REAPPEAR_TERMS` carried two of the four forms by hand.
+    """
+    from tools.export.normalize import APOSTROPHE, normalize_text
+    from tools.nlp.hints import reappeared
+
+    for mark in (chr(0x2019), chr(0x02BC), chr(0x2018), chr(0x00B4), chr(0x0060),
+                 APOSTROPHE):
+        text = normalize_text("Ціль знову з" + mark + "явилась над Києвом")
+        assert APOSTROPHE in text and mark not in text.replace(APOSTROPHE, "")
+        assert reappeared(text), mark
+
+
+def test_folding_leaves_a_message_without_one_alone():
+    from tools.export.normalize import normalize_text
+
+    plain = "⚠️Реактивний шахед на Жуляни."
+    assert normalize_text(plain) == plain
