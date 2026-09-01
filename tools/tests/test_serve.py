@@ -72,11 +72,31 @@ def call(base, path, token=TOKEN, method="GET", body=None):
 # --- what may be reached without a token ------------------------------------
 
 
-def test_health_needs_nothing_and_says_nothing(api):
-    """It exists for a load balancer and a `systemctl` check, so it must not
-    become a way to learn who uses this."""
+def test_health_needs_nothing_and_says_almost_nothing(api):
+    """It exists for a `systemctl` check, so it must not become a way to learn
+    who uses this. `corpus` is the one fact it carries, because a box can be
+    perfectly healthy and still have no feed to serve."""
     code, body = call(api, "/health", token=None)
-    assert code == 200 and body == {"ok": True}
+    assert code == 200 and body == {"ok": True, "corpus": True}
+
+
+def test_a_missing_corpus_does_not_stop_the_service(tmp_path, who):
+    """It did, and that cost an hour. `mode=ro` on a file that is not there
+    raises, and B is a fresh box with no database until something copies one --
+    while `/config`, the reason the port exists at all, needs no corpus."""
+    import threading
+
+    httpd = serve("127.0.0.1", 0, tmp_path / "absent.db", tmp_path / "live", who)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+    try:
+        assert call(base, "/health", token=None)[1] == {"ok": True,
+                                                       "corpus": False}
+        assert call(base, "/messages")[1]["messages"] == []
+        assert call(base, "/config", method="PUT",
+                    body={"home": "Оболонь"})[0] == 200
+    finally:
+        httpd.shutdown()
 
 
 @pytest.mark.parametrize("path", ["/messages", "/decisions", "/config"])

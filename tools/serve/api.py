@@ -65,7 +65,17 @@ def _parse_cursor(raw: str | None) -> tuple[int, str, int]:
         return (0, "", 0)
 
 
-def messages(conn: sqlite3.Connection, since: str | None, limit: int) -> dict:
+def messages(conn: sqlite3.Connection | None, since: str | None,
+             limit: int) -> dict:
+    """The feed, or an empty one when there is no corpus on this machine.
+
+    B is a fresh box with no database until something copies one there, and the
+    settings endpoint has nothing to do with the corpus. A service that refuses to
+    start because the feed is missing takes the useful half down with the absent
+    half -- which is exactly what it did on the first deploy.
+    """
+    if conn is None:
+        return {"messages": [], "next": since or "", "corpus": False}
     ts, channel, mid = _parse_cursor(since)
     rows = conn.execute(
         "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
@@ -158,7 +168,10 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(url.query)
 
         if url.path == "/health":
-            self._send(200, {"ok": True})
+            # `corpus` says whether the feed can be served at all, which is the
+            # one thing that can be true or false about this box while it is
+            # otherwise perfectly healthy.
+            self._send(200, {"ok": True, "corpus": self.server.db is not None})
             return
 
         who = self._who()
@@ -218,9 +231,17 @@ def serve(host: str, port: int, db: Path, log_dir: Path,
     httpd = ThreadingHTTPServer((host, port), Handler)
     # Read-only, said in the URI rather than left to the code: this process has
     # no business writing to the corpus and cannot be talked into it.
-    httpd.db = sqlite3.connect(f"file:{db}?mode=ro", uri=True,
-                               check_same_thread=False)
-    httpd.db.row_factory = sqlite3.Row
+    #
+    # Missing is not fatal. `mode=ro` on an absent file raises, and letting that
+    # reach systemd cost an hour: the service died with 1/FAILURE on a machine
+    # whose only job at that moment was to serve settings.
+    try:
+        httpd.db = sqlite3.connect(f"file:{db}?mode=ro", uri=True,
+                                   check_same_thread=False)
+        httpd.db.row_factory = sqlite3.Row
+    except sqlite3.Error as exc:
+        print(f"  ! бази {db} немає ({exc}) — /messages віддає порожньо")
+        httpd.db = None
     httpd.log_dir = log_dir
     httpd.recipients_dir = recipients_dir
     return httpd
