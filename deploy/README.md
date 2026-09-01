@@ -83,12 +83,14 @@ means the defaults, which are the behaviour as shipped. A broken file, an unknow
 key or a number out of range prints a line and changes nothing else -- a typo
 must never be the reason the watch is not running at 3 a.m.
 
+An empty object is the same as no file at all -- every setting below is shown
+with the value it already has, so this example changes nothing:
+
     {
       "home": "Жуляни",
-      "ring": ["Жуляни", "Вишневе", "Борщагівка", "Солом'янка", "Теремки"],
-      "ring_all_clear": false,
-      "ring_memory_s": 900,
-      "quiet_hours": true
+      "ring_all_clear": true,
+      "ring_memory_s": 600,
+      "quiet_hours": false
     }
 
 What can be set, and the full list is in `tools/policy/config.py`:
