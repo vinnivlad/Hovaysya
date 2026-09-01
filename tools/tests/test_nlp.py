@@ -35,7 +35,9 @@ def test_matches_slang_forms():
 
 def test_matches_through_trailing_punctuation():
     assert resolve_scope("1х Жуляни.") == "my-area"
-    assert resolve_scope("Дарниця, Чоколівка") == "city"
+    # Two city districts, and the comma is the thing under test -- Chokolivka
+    # joined the ring on 2026-09-01, so the example moved rather than the point.
+    assert resolve_scope("Дарниця, Мишоловка") == "city"
 
 
 def test_informal_masyv_areas_resolve():
@@ -575,15 +577,27 @@ def test_informational_text_is_nothing_not_unknown():
 # --- the near ring is a ruling, not a radius ------------------------------
 
 
-def test_the_near_ring_follows_the_approach_corridor_not_distance():
-    """The user's rule: "не завжди питання в відстані, а також якою дорогою
-    найчастіше воно летить". Gatne is in and its neighbour Chabany is out;
-    Solomianka is in and Chokolivka is not. Deriving this from geometry would
-    get both pairs wrong."""
+def test_the_near_ring_is_ruled_by_hand_for_now():
+    """It used to assert that the ring follows the approach corridor rather than
+    distance, on his rule "не завжди питання в відстані, а також якою дорогою
+    найчастіше воно летить", with Gatne in and neighbouring Chabany out,
+    Solomianka in and Chokolivka out.
+
+    Half of that has been withdrawn. Chokolivka came back on 2026-09-01 -- "я не
+    сильно знаю ті мікрорайони" -- so its exclusion was unfamiliarity, not a
+    corridor. And the corridor itself is now conditional in his own words:
+    "коридор підльоту умовний", with the destination stated: "рано чи пізно коло
+    буде реально колом, з усіма мікрорайонами які входять в радіус", adjustable
+    per person by adding and removing names.
+
+    So what this test can still honestly assert is only that the list is ruled by
+    hand today. Gatne and Chabany stay as the pair to watch: 300 m apart at 7 km,
+    which no radius separates, so whichever way that pair falls under a radius is
+    the first thing to check against his judgement rather than assume."""
     assert resolve_scope("Гатне") == "my-area"
     assert resolve_scope("Чабани") == "oblast"
     assert resolve_scope("Солом'янка") == "my-area"
-    assert resolve_scope("Чоколівка") == "city"
+    assert resolve_scope("Чоколівка") == "my-area"
 
 
 def test_the_ring_holds_exactly_what_was_ruled_in():
@@ -598,6 +612,9 @@ def test_the_ring_holds_exactly_what_was_ruled_in():
         # "Це недалеко, рахуй як Теремки" — the mall on the ring road, which the
         # corpus writes together with Teremky.
         "Республіка",
+        # Ruled out after the first night and back in on 2026-09-01: "Включи
+        # Чоколівку, я не сильно знаю ті мікрорайони."
+        "Чоколівка",
     }
 
 

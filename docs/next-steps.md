@@ -558,6 +558,49 @@ knowingly, with the two things that actually matter kept off B: no bot token, an
 no key back into A. A compromised B can lie about a config -- and a lie is bounded
 by the clamping above -- but cannot forge a bell, because the bell comes from A.
 
+### The ring becomes a real circle — his direction, 2026-09-01
+
+"Рано чи пізно коло буде реально колом, з усіма мікрорайонами які входять в
+радіус", and the corridor argument is withdrawn in the same breath: "коридор
+підльоту умовний. Може можна буде налаштувати індивідуальне коло, додавши або
+прибравши топоніми."
+
+This reverses the warning at the top of `gazetteer.py`, and it should be said
+plainly why the warning was too strong. It leaned on his first-night rulings as
+evidence that the ring is an approach corridor and not a distance. Chokolivka was
+the strongest of them -- the nearest place to Zhuliany of all at 2.2 km, ruled out
+while Gatne at 7.1 km stayed in -- and on 2026-09-01 it came back with the reason:
+"я не сильно знаю ті мікрорайони." Some of what looked like local knowledge was
+unfamiliarity, and a test that asserted the corridor now asserts only that the
+list is ruled by hand today.
+
+So the target shape is **a radius plus a personal add/remove**, which is also the
+only shape that can follow him across the city.
+
+What it needs, and the order:
+
+1. **Coordinates for the near-tier names.** 65 canonical names in the my-area,
+   my-district and city tiers, of which 62 are actually used by the channels --
+   only Солом'янський район, Мостицький and Лук'янівка never occur in 20 946
+   messages. District centroids are accurate enough at a 7 km scale. A one-off
+   table in the gazetteer, not a geocoding service at runtime.
+2. **`radius_km` in the config**, producing the base ring, with the existing
+   `ring` list demoted to an override -- add and remove, as he put it. Not built
+   before there is a radius to override: a list of adjustments with no base is the
+   mistake the second config layer already made.
+3. **Check the pair a radius cannot decide.** Gatne and Chabany are 300 m apart at
+   7 km, so whichever side of the line they fall on is arithmetic rather than
+   judgement, and that is the first thing to put in front of him.
+
+**How to judge a candidate radius**, and this is the part that was not obvious:
+not by the list of names it produces but by **which frequently-named places it
+moves.** Chokolivka is named 12 times in the whole corpus, and most of those name
+Zhuliany in the same message, so its whole ring membership is worth four messages
+and changed the measured nights by zero rings. Whereas Троєщина (494 mentions),
+Оболонь (417), Дарниця (332) and Нивки (200) are on the other side of the city and
+would each be felt immediately. The mention counts are what makes a radius
+cheap or expensive, not the geometry.
+
 ### ...but a ring that follows him needs the geometry that failed
 
 "Можливо навіть автоматично, при переміщенні містом" is not a transport problem.

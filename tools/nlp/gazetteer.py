@@ -113,6 +113,19 @@ MY_AREA = [
     # outranks it.
     _p("Республіка", "my-area", "республік", landmark=True),
     _p("Теремки", "my-area", "теремк"),
+    # Ruled *out* after the first night and back in on 2026-09-01: "Включи
+    # Чоколівку, я не сильно знаю ті мікрорайони."
+    #
+    # Which is worth recording plainly, because the comment at the top of this
+    # file leaned on those first rulings to argue that the ring is an approach
+    # corridor and must never be tidied into a radius. Some of them were
+    # unfamiliarity rather than knowledge. Chokolivka is the nearest place to
+    # Zhuliany of all -- 2.2 km, nearer than Іподром's 1.8 only just -- and it
+    # was the strongest single counterexample against a radius. It is now on the
+    # other side of that argument, and he has said where this is going: "рано чи
+    # пізно коло буде реально колом, з усіма мікрорайонами які входять в
+    # радіус."
+    _p("Чоколівка", "my-area", "чоколів"),
 ]
 
 MY_DISTRICT = [
@@ -127,9 +140,8 @@ CITY = [
     # are never used as ordinary nouns.
     _p("Берковець", "city", "берковец", "берковц"),
     _p("Вокзал", "city", "вокзал", landmark=True),
-    # Ruled out of the near ring by the user after the first night: in Kyiv,
-    # but not on the corridor that matters to them.
-    _p("Чоколівка", "city", "чоколів"),
+    # Мишоловка was ruled out of the near ring after the first night. Чоколівка
+    # was too, and came back on 2026-09-01 -- see MY_AREA.
     _p("Мишоловка", "city", "мишолов"),
     # The channels shorten it, and the short forms matched nothing: "На
     # КарДачі", "Кардачі", "Відрадний, Шулявка, Кар Дачі". `кар` alone would be
