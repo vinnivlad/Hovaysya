@@ -176,12 +176,21 @@ class Announcer:
     # Whose ring this is, for choosing between two names by direction. None
     # means say every name, which is what happened before coordinates existed.
     config: object = None
+    # Each remembered fact carries when it was seen, and is dropped on its own
+    # clock. A single `pending_at` refreshed by every live message measured "time
+    # since anything happened" instead -- and on a busy night something happens
+    # every few seconds, so nothing ever expired. Seen live on 2026-09-01: the
+    # siren at 20:43:57 was explained with "Святопетрівське", last mentioned at
+    # 20:32:48, eleven minutes earlier and 8.5 km west, while the drones that
+    # night were crossing the left bank. He caught it by asking the right
+    # question: "звідки пост про тривогу його взяв? Наскільки він був старший?"
     pending_threat: str | None = None
-    pending_places: list[str] = field(default_factory=list)
+    pending_threat_at: int = 0
+    pending_places: list[tuple] = field(default_factory=list)
     # Towns outside the ring, kept separately and used only when the ring has
     # said nothing. A name he acts on outranks one that merely tells him the
     # direction: "Вишневе" beats "Буча, Вишневе".
-    pending_far: list[str] = field(default_factory=list)
+    pending_far: list[tuple] = field(default_factory=list)
     # When the pending memory was last refreshed. Without a horizon it lived
     # from one full all-clear to the next, so a class named an hour earlier
     # could arrive as the explanation for a fresh siren. Five minutes is his
@@ -206,6 +215,7 @@ class Announcer:
         self.spoken = _blank()
         self.shown = _blank()
         self.pending_threat = None
+        self.pending_threat_at = 0
         self.pending_places = []
         self.pending_far = []
         self.pending_at = 0
@@ -227,6 +237,7 @@ class Announcer:
         self.pending_at = obs.ts
         if obs.threat not in ("none", "unknown"):
             self.pending_threat = obs.threat
+            self.pending_threat_at = obs.ts
         # Not only ring names. Seen live: seven minutes before a siren the
         # channels said "2 реактивні шахеди на Київ/Вишгород з півночі" and the
         # siren still came out as "Тривога. Реактивний шахед." with no place --
@@ -237,27 +248,39 @@ class Announcer:
         # "м. Київ" and contributes nothing, and "Київ" as a place name is noise
         # in a sentence that is already about Kyiv.
         for place in obs.ring_places:
-            if place not in self.pending_places:
-                self.pending_places.append(place)
+            self.pending_places = [(n, t) for n, t in self.pending_places
+                                   if n != place]
+            self.pending_places.append((place, obs.ts))
         if not obs.ring_places and not obs.official and obs.scope in ("city", "oblast"):
             from ..nlp.gazetteer import find_places
 
             for pl in find_places(obs.text):
                 if (not pl.origin and pl.tier in ("city", "oblast")
-                        and pl.name != "Київ" and pl.name not in self.pending_far):
-                    self.pending_far.append(pl.name)
+                        and pl.name != "Київ"):
+                    self.pending_far = [(n, t) for n, t in self.pending_far
+                                        if n != pl.name]
+                    self.pending_far.append((pl.name, obs.ts))
 
     def _forget_if_stale(self, ts: int) -> None:
-        """The remembered cause explains a siren only while it is fresh.
+        """Drop every remembered fact older than the horizon, one by one.
 
-        Checked when it is read rather than when it is written: a quiet stretch
-        writes nothing, and it was exactly the quiet stretch that let a class
-        named an hour earlier arrive as the explanation for a new siren.
+        Checked when read rather than when written: a quiet stretch writes
+        nothing, and it was exactly the quiet stretch that let a class named an
+        hour earlier arrive as the explanation for a new siren.
+
+        Per fact, not for the memory as a whole. The whole-memory version was
+        refreshed by any live message, so on a busy night the horizon never fired
+        and an eleven-minute-old village explained a fresh siren.
         """
-        if self.pending_at and ts - self.pending_at > PENDING_HORIZON_S:
+        def fresh(pairs):
+            return [(n, t) for n, t in pairs if ts - t <= PENDING_HORIZON_S]
+
+        self.pending_places = fresh(self.pending_places)
+        self.pending_far = fresh(self.pending_far)
+        if (self.pending_threat_at
+                and ts - self.pending_threat_at > PENDING_HORIZON_S):
             self.pending_threat = None
-            self.pending_places = []
-            self.pending_far = []
+            self.pending_threat_at = 0
 
     def announce(self, obs: Observation, decision: Decision) -> Utterance | None:
         self._forget_if_stale(obs.ts)
@@ -340,8 +363,9 @@ class Announcer:
                 # "Тривога. Реактивний шахед. Славутич, Тетіїв, Бровари." went
                 # out tonight, and Slavutych is 150 km away. What a town is for
                 # is which side it is coming from *now*, so only the newest.
-                remembered = (self.pending_places[-3:] if self.pending_places
-                              else self.pending_far[-1:])
+                remembered = [n for n, _t in
+                              (self.pending_places[-3:] if self.pending_places
+                               else self.pending_far[-1:])]
                 remembered = _worth_saying(list(remembered), self.config)
                 if remembered:
                     named_places = list(remembered)

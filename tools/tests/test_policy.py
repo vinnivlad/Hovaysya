@@ -1888,3 +1888,50 @@ def test_a_repeat_over_home_is_shown_once_the_echo_window_has_passed():
     assert play(6).notify is False              # echo from a second channel
     assert play(45).notify is True              # still over you
     assert play(45).audible is False            # ...but no second sound
+
+
+def test_a_remembered_place_ages_on_its_own_clock():
+    """His question found this: "звідки пост про тривогу його взяв? Якщо з
+    якогось попереднього поста, то наскільки він був старший."
+
+    Live on 2026-09-01: the siren at 20:43:57 came out as "Тривога. Реактивний
+    шахед. Святопетрівське." and that village was last mentioned at 20:32:48 --
+    eleven minutes earlier, 8.5 km west, while the night's drones were crossing
+    the left bank.
+
+    The horizon existed and was ten minutes. It did nothing, because a single
+    `pending_at` was refreshed by *any* live message, so it measured time since
+    anything happened rather than time since this name was seen -- and on a busy
+    night something happens every few seconds.
+    """
+    from tools.policy.announce import PENDING_HORIZON_S, Announcer
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    def play(gap: int, chatter: bool):
+        tr, ann = Tracker(), Announcer()
+        tr.official_source = True
+        said = None
+        steps = [(0, "mon1tor_ua", "⚠️Реактивний шахед на Святопетрівське.")]
+        if chatter:
+            # Exactly what kept the old memory alive: unrelated live traffic,
+            # naming nothing near him, every couple of minutes.
+            steps += [(t, "mon1tor_ua", "⚠️Реактивний шахед на Дарницю.")
+                      for t in range(120, gap, 120)]
+        steps.append((gap, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"))
+        for off, channel, text in steps:
+            o = observe(T0 + off, text, False, channel)
+            d = decide(o, tr)
+            tr.record(o, d.level if d.notify else None,
+                      d.alarm if d.notify else None, d.reason)
+            u = ann.announce(o, d)
+            if o.alert_state == "alert" and u:
+                said = u.text
+        return said or ""
+
+    inside = PENDING_HORIZON_S - 120
+    outside = PENDING_HORIZON_S + 120
+    assert "Святопетрівське" in play(inside, chatter=False)
+    assert "Святопетрівське" not in play(outside, chatter=False)
+    # ...and the chatter must not keep it alive, which is the whole defect.
+    assert "Святопетрівське" not in play(outside, chatter=True)
