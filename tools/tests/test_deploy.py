@@ -41,13 +41,18 @@ def test_the_update_cannot_be_stopped_by_a_privilege_it_does_not_have():
     """The failure seen live on the first deploy: the pull succeeded, the
     restart did not, and the machine sat with new code and an old process."""
     update = _text("update.sh")
-    assert "systemctl restart hovaysya" in update
+    # The unit is an argument now, so both boxes share one script -- A restarts
+    # `hovaysya`, B restarts `hovaysya-api`, and what has to be right is the same
+    # either way. The default has to stay the watcher, because A's unit file
+    # passes nothing.
+    assert 'units=("${@:-hovaysya}")' in update
+    assert 'systemctl restart "$unit"' in update
     # ...but never unguarded. The restart may appear indented, inside the branch
     # that has already established this is root; at column zero it is the bug.
     for line in update.splitlines():
         assert not line.startswith("systemctl restart"), \
             "unguarded restart: the timer's user may not do that"
-    assert "sudo -n systemctl restart hovaysya" in update
+    assert 'sudo -n systemctl restart "$unit"' in update
     assert 'id -u' in update, "must still work when run as root by hand"
 
 
