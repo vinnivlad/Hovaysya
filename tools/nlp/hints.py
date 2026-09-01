@@ -404,6 +404,32 @@ def _role_of(flat: str, start: int) -> str:
     return role
 
 
+def origin_places(text: str) -> frozenset[str]:
+    """The names this sentence uses as where something came *from*.
+
+    "З Республіки на Вишневе, Чабани." names three places and only two of them
+    are where the drone is going. Seen live on 2026-09-01, when the sentence came
+    out as "Вишневе, Республіка, Чабани" -- and Республіка is 2.2 km from home, so
+    it read as a threat over his own ring rather than as the direction it left.
+
+    The same `_role_of` and list logic that `heading()` uses, so the two cannot
+    disagree about which name is which: "з A / B" makes both origins, because the
+    preposition governs the list and not just its first name.
+    """
+    flat = flatten(text)
+    out = []
+    prev_end, prev_role = 0, ""
+    for start, end, place in place_spans(text):
+        role = _role_of(flat, start)
+        if (role == "position" and prev_role in ("dest", "origin")
+                and _LIST_GAP.fullmatch(flat[prev_end:start])):
+            role = prev_role
+        prev_end, prev_role = end, role
+        if role == "origin":
+            out.append(place.name)
+    return frozenset(out)
+
+
 def heading(text: str) -> str:
     """`toward` | `away` | `loitering` | `position` | `unknown`.
 

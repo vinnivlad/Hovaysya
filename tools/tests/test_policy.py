@@ -1935,3 +1935,54 @@ def test_a_remembered_place_ages_on_its_own_clock():
     assert "Святопетрівське" not in play(outside, chatter=False)
     # ...and the chatter must not keep it alive, which is the whole defect.
     assert "Святопетрівське" not in play(outside, chatter=True)
+
+
+def test_a_ring_name_used_as_an_origin_is_not_where_it_is():
+    """Live on 2026-09-01: "⚠️З Республіки на Вишневе, Чабани." came out as
+    "Вишневе, Республіка, Чабани" -- and Республіка is 2.2 km from home, so the
+    sentence put a threat on his doorstep while the drone was heading away from
+    it. `ring_places` asks which names are in the ring and never what the
+    sentence does with them; `heading()` has always known, through the
+    prepositions.
+
+    Three limits, and each came from a question of his rather than from me.
+
+    A *distant* origin is the content, not noise: "3 групи КР від Конотопа у
+    напрямку Ніжина" is how he learns which side it is coming from, and two older
+    tests said so before this rule did.
+
+    The origin is kept when it is the only ring name left -- "а якщо початок у
+    моєму колі?" -- because dropping it loses the one fact the sentence exists
+    for.
+
+    And his own street is never dropped at all, which is an older ruling of his:
+    "тільки що було new target near me, але в повідомленні не було Жуляни".
+    """
+    from tools.policy.announce import Announcer
+    from tools.policy.config import load as load_config
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    cfg = load_config(warn=lambda _m: None)
+
+    def say(text: str) -> str:
+        tr, ann = Tracker(config=cfg), Announcer(config=cfg)
+        tr.official_source = True
+        for off, line in ((0, "⚠️Реактивний шахед на Київ."), (120, text)):
+            o = observe(off, line, False, "mon1tor_ua", config=cfg)
+            d = decide(o, tr)
+            tr.record(o, d.level if d.notify else None,
+                      d.alarm if d.notify else None, d.reason)
+            said = ann.announce(o, d)
+        return said.text if said else ""
+
+    # The origin goes, because two ring destinations remain.
+    out = say("⚠️З Республіки на Вишневе, Чабани.")
+    assert "Республіка" not in out and "Вишневе" in out
+
+    # It stays when it is the only ring name in the sentence.
+    assert "Вишневе" in say("⚠️З Вишневого на Боярку.")
+
+    # ...and home stays whatever role it is given.
+    assert "Жуляни" in say("⚠️Шахед з Жуляни на Борщагівку.")
+    assert "Жуляни" in say("⚠️Реактивний шахед з Жуляни на Центр.")

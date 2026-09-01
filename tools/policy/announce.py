@@ -440,7 +440,45 @@ class Announcer:
             # сторони загроза", and they were saying only the class.
             EXPLAINS = ("what the siren was about", "where the ballistic is going",
                         "threat level rose", "cruise coming closer")
-            speakable = obs.ring_places
+            # A name in *his ring* used as an origin is where the threat left,
+            # not where it is. "З Республіки на Вишневе, Чабани." came out as
+            # "Вишневе, Республіка, Чабани" on 2026-09-01, and Республіка is
+            # 2.2 km from home -- so the sentence put a threat on his own doorstep
+            # while the drone was heading away from it.
+            #
+            # Only the ring, and that distinction is the whole rule. For a distant
+            # threat the origin *is* the content -- "3 групи КР від Конотопа у
+            # напрямку Ніжина" tells him which side it is coming from, which is
+            # what he asked for: "це мені дає інформацію з якої сторони загроза".
+            # Two tests said so before this change did, and they were right.
+            #
+            # `obs.ring_places` cannot make the distinction on its own: it asks
+            # which names are in the ring, never what the sentence does with them.
+            # `heading()` has always known, through the prepositions.
+            from ..nlp.hints import origin_places
+
+            config_home = (self.config.home
+                           if self.config is not None and self.config.home else "")
+
+            came_from = origin_places(obs.text)
+            # His own street is never dropped, whatever role the sentence gives
+            # it. That is an older rule of his and it outranks this one: "тільки
+            # що було new target near me, але в повідомленні не було Жуляни" --
+            # the one name that decides what he does was the only one left out.
+            # In "з Жуляни на Борщагівку" the drone is over him *now* and merely
+            # leaving, so naming the neighbour instead of him would be exactly
+            # the fault that rule was written for.
+            mine = config_home or HOME
+            speakable = tuple(p for p in obs.ring_places
+                              if p == mine or p not in came_from)
+            # ...but only while something in the ring is left to say. His
+            # objection, and it is the hole in "never name a ring origin": in
+            # "З Республіки на Вишневе, Чабани" all three are in the ring, so
+            # dropping the origin keeps the sentence true. In "З Жулян на Центр"
+            # the origin is the *only* ring name, and dropping it loses the one
+            # fact the sentence exists for -- that a second ago it was over him.
+            if not speakable:
+                speakable = obs.ring_places
             if decision.reason in EXPLAINS and not speakable:
                 from ..nlp.gazetteer import find_places
 
