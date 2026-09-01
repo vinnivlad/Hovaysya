@@ -21,6 +21,25 @@ import secrets
 from ..policy import recipients as people
 
 
+def _write(directory, index: dict) -> None:
+    """Store the index, and say something useful when the directory says no.
+
+    The install script creates it owned by the service and group-writable by the
+    repository owner. A bare PermissionError traceback here sends the reader
+    looking at Python instead of at `ls -ld`.
+    """
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "index.json").write_text(
+            json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
+    except PermissionError:
+        raise SystemExit(
+            f"нема прав писати в {directory}\n"
+            f"  подивись: ls -ld {directory}\n"
+            f"  має бути група власника репозиторію і режим 2770:\n"
+            f"  sudo chgrp $(id -gn) {directory} && sudo chmod 2770 {directory}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--name", help="whose token to mint")
@@ -45,9 +64,7 @@ def main() -> None:
 
     if args.revoke:
         index = {d: n for d, n in index.items() if n != args.revoke}
-        directory.mkdir(parents=True, exist_ok=True)
-        (directory / "index.json").write_text(
-            json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
+        _write(directory, index)
         # The settings stay: a revoked token is usually a lost phone, and
         # throwing away where somebody lives would be a poor answer to that.
         print(f"{args.revoke}: токен відкликано, налаштування лишились")
@@ -59,9 +76,7 @@ def main() -> None:
     token = secrets.token_urlsafe(32)
     index = {d: n for d, n in index.items() if n != args.name}
     index[people.hashed(token)] = args.name
-    directory.mkdir(parents=True, exist_ok=True)
-    (directory / "index.json").write_text(
-        json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
+    _write(directory, index)
 
     print(f"{args.name}: {token}")
     print("  показано один раз — зберігай зараз. Тут лишається тільки хеш.")

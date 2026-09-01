@@ -36,7 +36,11 @@ OWNER_GROUP="$(stat -c %G "$REPO")"
 usermod -aG "$OWNER_GROUP" hovaysya-api
 echo "  hovaysya-api додано в групу $OWNER_GROUP (власник репозиторію: $OWNER)"
 
-install -d -o hovaysya-api -g hovaysya-api -m 0750 "$REPO/data/recipients"
+# Two parties write here and only one of them is the service: `tools.serve.token`
+# is run by a person, and `0750 hovaysya-api:hovaysya-api` locked that person out.
+# So the group is the repository owner's, and setgid keeps it that way for
+# whatever either of them creates later.
+install -d -o hovaysya-api -g "$OWNER_GROUP" -m 2770 "$REPO/data/recipients"
 
 echo "== Caddy"
 if ! command -v caddy >/dev/null 2>&1; then
