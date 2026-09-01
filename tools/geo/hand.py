@@ -41,6 +41,18 @@ HAND: dict[str, tuple[float, float, str]] = {
     "Лавіна": (50.49553, 30.36058, "w446901282"),
     "Вокзал": (50.44019, 30.48901, "n440084976"),       # Київ-Пасажирський
     "Десна": (50.92478, 30.77298, "w167051677"),        # 59 км, Броварський бік
+    # ТРЦ Проспект, from a plus code he pasted -- "FJ3P+V6 Киев", which is the
+    # short form of 9G2GFJ3P+V6. Decoded here and then checked by reverse
+    # geocoding rather than trusted: the point lands on Multiplex at Hnata
+    # Khotkevycha 1-В, which is the cinema inside that mall. He confirmed the
+    # address. My own earlier attempt at this name through a search string
+    # returned a different mall on a different avenue.
+    "Проспект": (50.45469, 30.63556, "плюс-код FJ3P+V6"),
+    # The reservoir is sixty kilometres long and a point for it is a compromise,
+    # but his reason is about bearing rather than position: "воно тут важливе для
+    # розуміння напрямку польоту" -- anything crossing it is coming from the
+    # north. The centre of OSM relation 1605938, whose box runs 50.59 to 51.26.
+    "Водосховище": (50.92183, 30.50474, "r1605938"),
 }
 
 # Six names stay without a point, and each for a reason a radius has to respect.
@@ -48,12 +60,11 @@ HAND: dict[str, tuple[float, float, str]] = {
 # replacement: these keep the tier the gazetteer gave them by hand.
 #
 #   Київщина    1083 mentions -- the oblast itself, not a place in it
-#   Водосховище  153 -- a reservoir sixty kilometres long
 #   Правий берег  32 -- half a city
-#   Проспект       9 -- a mall; Nominatim answered with ТРЦ СкайМолл on another
-#                        avenue, and a wrong point is worse than none, because
-#                        the radius would act on it
 #   Кільцева       6 -- a road thirty kilometres long
 #   Києво-Святошинський район 1 -- an administrative district, since abolished
-WITHOUT_POINT = ("Київщина", "Водосховище", "Правий берег", "Проспект",
-                 "Кільцева", "Києво-Святошинський район")
+#
+# Водосховище was on this list and came off it on his instruction: a point in the
+# middle of a sixty-kilometre lake is wrong as a position and right as a bearing.
+WITHOUT_POINT = ("Київщина", "Правий берег", "Кільцева",
+                 "Києво-Святошинський район")
