@@ -203,8 +203,16 @@ The service refuses rather than trusts, at four levels:
 - **A systemd jacket** tighter than the watcher's, because this is the process
   reachable from outside: its own unprivileged user, `ProtectSystem=strict`, an
   empty capability set, and `ReadWritePaths` covering only where settings live.
-  The bot token sits in the same directory and is not listed, so this service
-  cannot read it even though the watcher beside it can.
+
+  It does **not** keep a secret in the same tree out of reach -- I wrote that it
+  did, and it is backwards: `ReadOnlyPaths` grants read access. What keeps the bot
+  token away from this service is that the token is on the other machine. B has no
+  bot, no chat id and nothing to post with, which is the whole reason the split is
+  worth its second runtime.
+
+  `ProtectHome` is `read-only` and not `yes` for a duller reason: `yes` makes
+  `/home` inaccessible, the working directory is under it, and the service died
+  with `200/CHDIR` before it could open a socket.
 
 There is no rate limit, and that was a correction rather than a choice: the
 Caddyfile had one until I checked, and `rate_limit` is a third-party module the

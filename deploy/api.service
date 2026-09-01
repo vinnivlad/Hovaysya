@@ -21,7 +21,11 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectSystem=strict
-ProtectHome=yes
+# read-only rather than yes: `yes` makes /home inaccessible, and the working
+# directory is under it, so the service died with 200/CHDIR before it could
+# open a socket. Read-only keeps the useful half -- it cannot write anywhere
+# in /home except the one path below.
+ProtectHome=read-only
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
@@ -32,9 +36,12 @@ MemoryDenyWriteExecute=yes
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 CapabilityBoundingSet=
-# Read the corpus and the decision log; write only where settings live. The bot
-# token is in the same directory and is not listed, so this service cannot read
-# it even though the watcher beside it can.
+# Read the corpus and the decision log; write only where settings live.
+#
+# This does *not* stop the service reading a secret in the same tree -- I claimed
+# it did, and `ReadOnlyPaths` grants read access, so the claim was backwards. What
+# actually keeps the bot token away from it is that the token is on the other
+# machine: B has no bot, no chat id, and nothing to post with.
 ReadOnlyPaths=/home/ubuntu/hovaysya
 ReadWritePaths=/home/ubuntu/hovaysya/data/recipients
 MemoryMax=192M
