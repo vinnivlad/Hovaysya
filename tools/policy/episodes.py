@@ -78,6 +78,16 @@ _LAUNCH = re.compile(
     re.IGNORECASE,
 )
 
+# A launch proper, with the descent excluded. "спуск балістики" is the ninth
+# missile arriving, not a tenth leaving, and his rule after the ballistic night
+# is about launches: "мені треба нотифікація на будь-який пуск балістики після
+# дорозвідки". Keyed separately rather than by removing `спуск` from `_LAUNCH`,
+# because the wider pattern is load-bearing elsewhere.
+_LAUNCH_PROPER = re.compile(
+    r"\bвихід\w*|\bвиліт\w*|\bвилет\w*|\bзліт\w*|\bпуск\w*|\bстарт\w*",
+    re.IGNORECASE,
+)
+
 # ...unless the message is counting off one volley. "спуск балістики! Друга"
 # contains a launch verb but is the second missile of a wave already announced,
 # and the user labelled every such message "уточнення попереднього". The veto
@@ -251,6 +261,8 @@ class Observation:
     # Whether the text says something launched, wherever it is aimed. Distinct
     # from `says_new`, which asks whether that launch is a *new* event.
     says_launch: bool = False
+    # ...and without the descent, which is an arrival rather than a departure.
+    says_launch_proper: bool = False
     ring_count: int = 0
     falling: bool = False
     # Already landed, as opposed to `falling`, which is on its way down.
@@ -328,6 +340,7 @@ def observe(ts: int, text: str, is_reply: bool = False,
         ring_places=scope_places,
         says_new=_says_new(text),
         says_launch=bool(_LAUNCH.search(text or "")),
+        says_launch_proper=bool(_LAUNCH_PROPER.search(text or "")),
         ring_count=stated_count(text),
         falling=hints.falling(text),
         impact=hints._hits(text, hints.IMPACT_TERMS),

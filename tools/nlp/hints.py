@@ -75,7 +75,9 @@ _ANTICIPATED = re.compile(
     # a risk level, not an event, and read as a confirmed cruise report over
     # Bila Tserkva. His words: "це не про загрозу в моменті".
     r"загроз\w*\s+(?:\w+\s+){0,3}(пуск|застосув|використ|удар|атак)|"
-    r"можлив\w*\s+(пуск|застосув|удар)|"
+    # Words may sit between here too: "Можливий повторний пуск 2-4х балістичних
+    # ракет" rang as a confirmed launch.
+    r"можлив\w*\s+(?:\w+\s+){0,3}(пуск|застосув|удар)|"
     r"може\s+атакувати|можуть\s+атакувати|"
     # "❗️Озброєння яке ворог може застосувати під час масованого комбінованого
     # удару:" and then an inventory. All four occurrences in the corpus are

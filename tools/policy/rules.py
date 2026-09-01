@@ -377,8 +377,17 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
         # wave". Checked against the other channels rather than guessed: none of
         # them called it new until "Ще 2х РАКЕТИ НА КИЇВ" at 02:29:42, and three
         # more said so within two minutes of that.
-        if (ep is not None and ep.recheck_at and obs.says_new
-                and obs.ts > ep.recheck_at):
+        if (ep is not None and ep.recheck_at and obs.ts > ep.recheck_at
+                and obs.says_launch_proper and obs.scope in CITY_OR_NEARER):
+            # His correction, once he saw the narrower version: "моє старе
+            # правило буде не зовсім вірне. Мені треба нотифікація на будь-який
+            # пуск балістики після дорозвідки: пуск без місця куди, або пуск по
+            # Києву." A recheck said the wave was over, so there is nothing left
+            # for this to be a repeat of -- and a launch that names no
+            # destination is the case where nobody yet knows whether it is ours.
+            #
+            # Once only: `recheck_at` is cleared as soon as this rings, or every
+            # later "ще" and "спуск" rang too, ten times in five minutes.
             first_launch = True
         # A type nobody has named yet is a new event, whatever the wording. His
         # point: "може ще на сам факт іншого виду балістичної ракети реагувати

@@ -1770,3 +1770,33 @@ def test_a_recheck_closes_the_wave_and_the_next_launch_is_new():
     # загалом".
     assert not out[3].audible, out[3].reason
     assert out[4].reason.startswith("recheck")  # ...and this recheck is news
+
+
+def test_any_ballistic_launch_after_a_recheck_rings():
+    """His correction after seeing the narrower version: "мені треба нотифікація
+    на будь-який пуск балістики після дорозвідки: пуск без місця куди, або пуск
+    по Києву."
+
+    A descent is not a launch. "спуск балістики! Дев'ята" is the ninth missile
+    arriving, and treating it as a launch rang for every count-off."""
+    def wave(second):
+        tr = _alerted()
+        out = []
+        for off, text in ((60, "‼️ Вихід балістики з Брянська"),
+                          (300, "📡Локаційно по балістиці чисто."),
+                          (400, second)):
+            o = observe(T0 + off, text, False, "war_monitor")
+            d = decide(o, tr)
+            tr.record(o, d.level if d.notify else None,
+                      d.alarm if d.notify else None, d.reason)
+            out.append(d)
+        return out[2]
+
+    # No destination stated: nobody yet knows whether it is ours.
+    assert wave("❗️❗️❗️Пуски балістичних ракет з Брянської області.").audible
+    # Or a launch toward Kyiv.
+    assert wave("❗️Пуск балістики по Києву.").audible
+    # ...but an arrival count-off is not a launch.
+    assert not wave("‼️Київ / Бровари — спуск балістики! Дев'ята").audible
+    # ...and neither is a possibility.
+    assert not wave("🔴Можливий повторний пуск 2-4х балістичних ракет по Києву.").audible
