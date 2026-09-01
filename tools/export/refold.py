@@ -14,6 +14,15 @@ Idempotent: running it twice changes nothing the second time.
 
     python -m tools.export.refold                # this machine
     python -m tools.export.refold --dry-run
+
+**The instance does not need this**, and 1b28cf8 claimed it did. Its database is
+read in exactly two places and both look at the last ninety minutes: the tracker
+warm-up on start, and the row of a message just written. Everything the watcher
+stores after a deploy is already folded, the handful of older rows inside the warm
+window age out within the hour, and what they could affect is one pattern. The
+reasoning that made the run necessary here -- the eval replays four months, so 152
+unfolded rows would stay in it forever -- does not transfer to a machine that
+never looks further back than ninety minutes.
 """
 
 from __future__ import annotations
