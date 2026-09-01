@@ -724,6 +724,39 @@ scored on one question — **how often is it first to name the near ring, agains
 the channels already in place** — see docs/pattern-findings.md. Three of the four
 were left out on the numbers.
 
+### Two channels to weigh, from a night he watched — 2026-09-01
+
+A Shahed came at Zhuliany and one channel had it first: **KyivPolitic**, which is
+not in the list. It was measured once and left out, but on the 11-name ring, and
+the ring is 19 names now. He also found **rocketskyiv**, which he says posts only
+about missiles on Kyiv.
+
+What tonight's sample of KyivPolitic already settles, so tomorrow starts further
+along:
+
+- **It writes one word.** `Гостомель`, `Оболонь`, `Бровары` — a place and the
+  channel's own signature. Measured over 59 messages: a place recognised in 42,
+  **a threat class in 2**. Which is exactly why it is fast; there is nothing to
+  write.
+- **So the rules need nothing.** `hints.py`, the layer where every fault in this
+  project has lived, is untouched by a channel that states no classes. His
+  question was whether a Russian-language source means rewriting everything, and
+  the answer is no.
+- **The gazetteer needs about ten lines.** Russian spelling already resolves for
+  9 of the 19 ring names, because the stems carry no endings: `Жуляны` →
+  Жуляни, `Соломенка` → Солом'янка, `Чоколовка`, `Голосеево`. Missing: Гатное,
+  Демиевка, Отрадный, Ипподром, Крюковщина, Чабаны, Республика, Караваевы Дачи.
+  That is ordinary gazetteer work — it is already a synonym dictionary holding
+  `Троя` and `КарДачі`.
+- **Speed without a class has a price, and it is not measured yet.** A bare
+  `Жуляны` arriving five seconds early opens an episode with class `unknown`. What
+  that does downstream is the thing to check before adding it, not after.
+
+And his sharper question, which is measurable rather than a matter of opinion:
+"не відомо ж хто справжній а хто ретранслює". A relay is never first — it copies
+with a lag. The same test that chose `monitoring_kyiv` answers it: for each
+candidate, does it ever *lead* the five already in place, or only ever follow.
+
 ## Deferred, with the trigger that un-defers them
 
 | Item | Deferred until |
