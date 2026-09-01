@@ -210,9 +210,13 @@ The service refuses rather than trusts, at four levels:
   bot, no chat id and nothing to post with, which is the whole reason the split is
   worth its second runtime.
 
-  `ProtectHome` is `read-only` and not `yes` for a duller reason: `yes` makes
-  `/home` inaccessible, the working directory is under it, and the service died
-  with `200/CHDIR` before it could open a socket.
+  Two duller things had to be right before any of that mattered, and both showed
+  up as the same `200/CHDIR` exit: `ProtectHome` must be `read-only` rather than
+  `yes`, since `yes` makes `/home` inaccessible and the working directory is under
+  it; and the service user has to be in the group that owns the repository,
+  because Ubuntu creates a home directory as `0750` and nobody else may even
+  traverse it. The second one reads like a systemd sandbox problem and is really a
+  POSIX one.
 
 There is no rate limit, and that was a correction rather than a choice: the
 Caddyfile had one until I checked, and `rate_limit` is a third-party module the

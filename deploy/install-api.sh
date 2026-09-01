@@ -20,8 +20,22 @@ fi
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "== користувач, який не має доступу до токена бота"
+echo "== окремий користувач для сервісу"
 id -u hovaysya-api >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin hovaysya-api
+
+# The repo sits in somebody's home, and Ubuntu creates a home as 0750 -- owner and
+# owning group only. Without this the service dies with 200/CHDIR: "Changing to
+# the requested working directory failed: Permission denied", which reads like a
+# systemd sandbox problem and is really a POSIX one.
+#
+# Joining the group rather than `chmod o+x` on the home directory: the group is
+# already the boundary the files were created with, and widening the home to
+# everyone would be a broader change than this needs.
+OWNER="$(stat -c %U "$REPO")"
+OWNER_GROUP="$(stat -c %G "$REPO")"
+usermod -aG "$OWNER_GROUP" hovaysya-api
+echo "  hovaysya-api додано в групу $OWNER_GROUP (власник репозиторію: $OWNER)"
+
 install -d -o hovaysya-api -g hovaysya-api -m 0750 "$REPO/data/recipients"
 
 echo "== Caddy"
