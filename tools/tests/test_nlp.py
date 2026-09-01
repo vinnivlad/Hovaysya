@@ -1305,8 +1305,10 @@ def test_one_apostrophe_reaches_the_rules():
 
     for mark in (chr(0x2019), chr(0x02BC), chr(0x2018), chr(0x00B4), chr(0x0060),
                  APOSTROPHE):
-        text = normalize_text("Ціль знову з" + mark + "явилась над Києвом")
-        assert APOSTROPHE in text and mark not in text.replace(APOSTROPHE, "")
+        text = normalize_text("Ціль знову з" + mark + "явився над Києвом")
+        assert text.count(APOSTROPHE) == 1
+        if mark != APOSTROPHE:
+            assert mark not in text
         assert reappeared(text), mark
 
 
