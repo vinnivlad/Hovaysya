@@ -366,6 +366,41 @@ Not worth building yet: the measurement rests on 31 pairs, because matching
 identity by hand is strict. Event grouping is close to free once the LLM
 labelling exists.
 
+### The rolling feed, considered and dropped — 2026-09-01
+
+He asked for every ballistic and cruise detail message, silent, during a wave:
+"Спокійніше відразу знати що не до тебе, чим не знати взагалі." Then for the
+shape it would take -- one message rewritten in place holding the last five or
+ten lines, a new *type* of notification, closing on an all-clear or a recheck.
+
+Measured on the night of 2026-08-31 before building any of it, and the
+measurement is what settled it:
+
+    02:23-02:33 (густіше нема)   94 повідомлень, 91 у стрічку -> лишає 96%
+    02:20-02:47 (уся хвиля)     155,            137           -> 88%
+    за півдоби                  369,            176           -> 47%
+
+**During the wave the filter leaves 96% of the raw traffic.** So the feed would
+be the five channels he is already subscribed to, reproduced inside Ховайся
+exactly when it matters most -- and 94 edits in ten minutes, against Telegram's
+rate limits, for the privilege. His own conclusion arrived at the same place from
+the other side: "спам повідомленнями на основному екрані це таки може бути
+незручно. Для спаму повідомленнями буде свій спеціальний екран."
+
+So the raw detail belongs to the app's own screen (stage 9), not to the
+notification channel. Two things survive the decision:
+
+- **The picture, not the feed.** One silent message per wave, edited in place,
+  holding only what the raw channels cannot give: what is up, since when, how
+  many launches, whether his own place has been named. One edit every ten or
+  fifteen seconds, no rate-limit exposure. Not built -- offered and not yet
+  taken.
+- **`info` does not mean what the schema says it means.** The schema has said
+  from the start that `info` is "the persistent status notification updates
+  only", and `notify.py` sends a fresh silent message per line instead. Nothing
+  is wrong today, at 72 silent lines a night; anything of the shape above needs
+  the transport fixed first.
+
 ### At night, vibration rather than sound — his idea, 2026-08-31
 
 "Дзвінки залишимо вдень, а вночі залишиться тільки різні вібросигнали. Зпросоння
