@@ -33,9 +33,35 @@ CHANNELS = (
     # ring mentions total. One of those firsts put a ballistic warning five
     # minutes ahead of every other source.
     #
-    # `kyivalarm`, `kyivnow` and `KyivPolitic` were measured the same way and
-    # left out — see docs/pattern-findings.md.
+    # `kyivalarm` and `kyivnow` were measured the same way and left out — see
+    # docs/pattern-findings.md.
     "monitoring_kyiv",
+    # Added 2026-09-02, after `tools/bench/channel.py` on the 46 nights where all
+    # five of the above exist. Before that window the comparison is meaningless:
+    # `kievinform_ua1` only starts on 19.07, so anything earlier "leads" us
+    # merely because we were not watching.
+    #
+    # The most useful source about his own ring after `monitoring_kyiv`: 561 ring
+    # mentions, and 276 of them arrived when our five had said nothing about the
+    # ring for ten minutes. Replayed through the policy it moves 29 wake-ups
+    # earlier -- 8 of them by more than a minute -- and adds 20 bells across 46
+    # nights, which is 0.4 a night. Almost every added bell names Жуляни, so by
+    # his own rule they are coverage rather than noise.
+    "nebo_raketa",
+    # Two messages a day, and the cleanest source measured: 248 of them state a
+    # class about here and 244 arrive while a Kyiv alert is actually on. Zero
+    # noise in a year, which none of the other five manages.
+    #
+    # It names his ring once a year, so it is not a monitor -- it is a second
+    # clock on ballistic, and it costs nothing at all: **+0 bells** across the 46
+    # nights, because its bells replace ours rather than adding to them, while
+    # moving seven of them earlier.
+    #
+    # `KyivPolitic` was measured beside these two and left out. It does lead, but
+    # with aftermath -- "В Соломенском районе повреждено здание школы", "Жуляны,
+    # момент прилета «Шахеда»" -- which the policy vetoes by design, and it would
+    # have cost a second language in the gazetteer for it.
+    "rocketskyiv",
 )
 
 DB_PATH = REPO_ROOT / "data" / "messages.db"
