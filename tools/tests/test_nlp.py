@@ -1366,3 +1366,51 @@ def test_a_radius_now_reproduces_the_hand_ruled_ring():
         # place in any real sense.
         "Виставковий центр", "Солом'янський район",
     }
+
+
+def test_a_class_named_only_to_deny_it_is_not_that_class():
+    """Live on 2026-09-02: "З Брянська тільки мопед летить. Загрози балістики
+    немає" was read as ballistic, the episode carried that class for twenty-five
+    minutes, and the siren at 14:54 announced "Тривога. Балістика." -- from a
+    message saying there was none. His question found it: "проаналізуй звідки
+    воно його взяло?"
+
+    The class must be the *subject* of the negation. Sentence-level detection was
+    tried first and is unsafe: it would have cut the class from two real reports,
+    one of them a jet Shahed over the city.
+    """
+    from tools.nlp.hints import threat_hint
+
+    # Denied, so the class comes from what is left -- the moped.
+    assert threat_hint("З Брянська тільки мопед летить. Загрози балістики немає") \
+        == "shahed"
+    assert threat_hint("Для нас наразі немає загрози балістики.") == "none"
+    assert threat_hint("Реактивних в наш бік немає.") == "none"
+
+
+def test_a_denial_about_something_else_leaves_the_class_alone():
+    """The dangerous half, and the reason the pattern is tight. In both of these
+    the negation is about movement or about the siren, not about the class -- and
+    the second is a jet Shahed already over Kyiv."""
+    from tools.nlp.hints import threat_hint
+
+    assert threat_hint(
+        "⚠️3 реактивні шахеди кружляють на Київщині, руху на Київ поки немає"
+    ) == "shahed-jet"
+    assert threat_hint(
+        "❗️Реактивний шахед вже над Києвом, а тривоги немає.") == "shahed-jet"
+    assert threat_hint("⚠️Реактивний шахед на Жуляни.") == "shahed-jet"
+    assert threat_hint("❗️Балістика на Київ.") == "ballistic"
+
+
+def test_only_the_class_reads_the_trimmed_text():
+    """Places, modality and certainty read the whole message. A denial is still a
+    live report of the sky, and "шахедів в повітрі немає, по балістиці бажано
+    бути уважним" says something about both halves."""
+    from tools.nlp.gazetteer import find_places
+    from tools.nlp.hints import modality_hint, without_denials
+
+    line = "Для Києва загрози від шахедів немає, по балістиці уважно."
+    assert "шахед" not in without_denials(line).lower()
+    assert [p.name for p in find_places(line)] == ["Київ"]
+    assert modality_hint(line) == "live-threat"

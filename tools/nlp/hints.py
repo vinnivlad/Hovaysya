@@ -258,8 +258,48 @@ def _low(text: str) -> str:
     return (text or "").lower()
 
 
+# A class named only in order to say it is absent. "З Брянська тільки мопед
+# летить. Загрози балістики немає" came out as `ballistic`, the episode carried
+# that class for twenty-five minutes, and the siren at 14:54 was announced as
+# "Тривога. Балістика." -- from a message saying there was none. His question
+# found it: "проаналізуй звідки воно його взяло?"
+#
+# The class has to be the *subject* of the negation, which is why this is a tight
+# pattern rather than a sentence-level one. Sentence level would have cut the
+# class from "⚠️3 реактивні шахеди кружляють на Київщині, руху на Київ поки
+# немає" and from "❗️Реактивний шахед вже над Києвом, а тривоги немає" -- both
+# real, and the second one over the city. Only service words may stand between
+# the class and the denial.
+_DENIED = re.compile(
+    r"(?:загроз\w*\s+)?(?:балістик\w*|крилат\w*|реактивн\w*|шахед\w*|"
+    r"міг-31\w*|кинж\w*|кинд\w*|ракет\w*)"
+    r"(?:\s+(?:в\s+повітрі|у\s+повітрі|над\s+містом|в\s+наш\s+бік|наразі|поки|"
+    r"станом\s+на\s+зараз|для\s+нас|для\s+столиці|для\s+києва|більше|тут))*"
+    r"\s*(?:нема\w*|не\s+має|відсутн\w*)",
+    re.IGNORECASE)
+# ...and the other word order: "наразі немає загрози балістики".
+_DENIED_FIRST = re.compile(
+    r"(?:нема\w*|не\s+має|відсутн\w*)\s+(?:загроз\w*\s+)?"
+    r"(?:балістик\w*|крилат\w*|реактивн\w*|шахед\w*|міг-31\w*|кинж\w*|кинд\w*)",
+    re.IGNORECASE)
+
+
+def without_denials(text: str) -> str:
+    """The text with denied classes cut out, for deciding what is flying.
+
+    Only for the class. Places, modality and certainty read the whole message --
+    a denial is still a live report of the sky, and "шахедів в повітрі немає, по
+    балістиці бажано бути уважним" says something about both halves.
+    """
+    text = text or ""
+    for rx in (_DENIED, _DENIED_FIRST):
+        text = rx.sub(" ", text)
+    return text
+
+
 def threat_hint(text: str) -> str:
     """Best guess at what is flying. `none` when nothing suggests a threat."""
+    text = without_denials(text)
     if _MIG.search(text or "") and not _LAUNCHED.search(text or ""):
         return "mig"
     for kind, rx in _THREAT:
