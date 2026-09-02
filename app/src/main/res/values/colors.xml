@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches `Ground` in ui/Theme.kt. Two places for one colour, because one
+         of them is read by the window manager before any Kotlin runs. -->
+    <color name="ground">#FFF7F6F3</color>
+    <!-- The launcher icon keeps one identity in both themes: an app is found
+         by its icon, and a two-faced one is harder to find, not easier. -->
+    <color name="icon_ground">#FF2E3A38</color>
+</resources>

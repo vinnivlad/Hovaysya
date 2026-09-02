@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A platform parent rather than a Material one, so this does not pull in the
+  `com.google.android.material` library for a theme that Compose immediately
+  replaces. All the colour that matters is in `ui/Theme.kt`; this exists to give
+  the window a background before the first frame, so launching does not flash
+  white on the way to a dark screen -- which at night is the whole difference.
+-->
+<resources>
+    <style name="Theme.Hovaysya" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/ground</item>
+        <item name="android:statusBarColor">@color/ground</item>
+        <item name="android:navigationBarColor">@color/ground</item>
+    </style>
+</resources>

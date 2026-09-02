@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext to one address, and only in a debug build.
+
+  Android 9 and up refuse plain HTTP by default, which is right -- but the
+  emulator reaches the machine it runs on at 10.0.2.2, so a local
+  `python -m tools.serve.api` is unreachable without this. Scoped to that one
+  address rather than opened generally, and it lives under `src/debug/` so a
+  release build cannot carry it even by accident: the file is not in that
+  variant's sources at all.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

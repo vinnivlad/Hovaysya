@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The screen this app exists for is looked at in the dark, half awake. -->
+    <color name="ground">#FF111214</color>
+</resources>

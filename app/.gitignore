@@ -1,0 +1,10 @@
+# Build output and machine-local paths. `local.properties` holds the Android SDK
+# location, which differs on every machine and is written by the IDE.
+build/
+.gradle/
+local.properties
+.idea/
+*.iml
+*.apk
+*.keystore
+*.jks

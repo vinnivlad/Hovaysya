@@ -12,6 +12,7 @@ up on a real server:
   process running, which is the worst of both
 """
 
+import pathlib
 import stat
 import subprocess
 import sys
@@ -138,3 +139,21 @@ def test_both_installers_thin_the_checkout():
         # root-owned and the update timer, which runs as the owner, could not
         # read it.
         assert "SUDO_USER" in body
+def test_the_phone_app_never_reaches_a_server():
+    """The other half of "щоб тільки бекенд качався і деплоївся на серверах", and
+    the half a test can actually hold.
+
+    `lean.sh` names what survives, so a new top-level directory is excluded by
+    saying nothing -- which is a guarantee that holds only as long as nobody adds
+    it to the list for a reason that seemed good at the time. A box reachable
+    from the internet has no business carrying the app's source, and one day its
+    signing config.
+    """
+    lean = _text("lean.sh")
+    kept = [line for line in lean.splitlines() if line.startswith("DIRS=")]
+    assert len(kept) == 1, kept
+    assert "app" not in kept[0].split("=", 1)[1], kept[0]
+
+    root = pathlib.Path(__file__).resolve().parents[2]
+    assert (root / "app" / "build.gradle.kts").exists(), (
+        "the app is expected at the top level; move this test with it")
