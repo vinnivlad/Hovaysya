@@ -254,14 +254,27 @@ fun Settings(store: Store, bell: Bell, forgotten: () -> Unit) {
 
         Spacer(Modifier.height(16.dp))
         TextButton(onClick = {
-            // Only on this phone. The server keeps the settings, because a lost
-            // phone is the usual reason and throwing away where somebody lives
-            // would be a poor answer to that.
-            store.forget()
-            forgotten()
+            scope.launch {
+                // Ask the server to drop the registration first, then forget it
+                // here. In that order, because the token is what authorises the
+                // removal and clearing it locally first would throw away the
+                // only thing that could.
+                //
+                // A failure is not a reason to stay registered on this phone:
+                // the person asked to be forgotten, and the row left behind is
+                // a stale recipient rather than anything of theirs.
+                runCatching { store.api().unregister() }
+                store.forget()
+                forgotten()
+            }
         }) {
             Text("Забути цей пристрій", color = MaterialTheme.colorScheme.error)
         }
+        Text(
+            "Знімає реєстрацію і на сервері.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.height(24.dp))
     }
 }

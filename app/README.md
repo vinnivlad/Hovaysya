@@ -49,9 +49,25 @@ is a network-security config permitting cleartext to that one address -- and it
 lives under `src/debug/`, which means a release build cannot carry it even by
 accident: the file is not in that variant's sources at all.
 
-Registration is open and creates a real recipient on whatever server it is
-pointed at. `python -m tools.serve.token --list` shows who exists and `--revoke`
-removes a test one.
+**Test against the real server, under a test user.** His workflow, and the right
+way round: real data, real state, real timing, so the emulator sees exactly what
+a phone will. Register from the emulator under a name like `тест` and the watcher
+takes it on within one poll -- warmed from the corpus, so its first screen is
+true even if a raid is already running.
+
+Nothing needs preparing for that. Registration is open, the test user gets no
+Telegram (only `telegram_channel` does), and **Забути цей пристрій** removes the
+registration from the server as well as the phone -- which is what keeps a
+reinstall from leaving a recipient behind every time.
+
+`python -m tools.serve.token --list` still shows who exists and `--revoke`
+removes one from the server side, for the cases where the phone is gone.
+
+A local API is the other option -- `python -m tools.serve.api`, reached from the
+emulator at `http://10.0.2.2:8080` -- but it answers less than it looks like it
+does: `/state` and `/decisions` come from files the watcher writes, so without a
+watcher running locally the first screen reads "НЕ ЗНАЮ" and both feeds are
+empty. `/places`, `/config` and registration work fully.
 
 ## What is here
 

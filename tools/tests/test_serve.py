@@ -587,3 +587,44 @@ def test_registration_is_throttled_by_attempts_not_by_successes():
     assert not may_register(now, per_min=3)
     # And it is a window, not a quota.
     assert may_register(now + 61, per_min=3)
+def test_a_device_can_take_itself_out(tmp_path):
+    """His workflow: "може зробимо тестового користувача і будемо тестити завжди
+    зпід нього на реальному сервері?"
+
+    Which is the right way round -- real data, real timing, and the emulator sees
+    exactly what a phone will. It needs this to stay sustainable: every reinstall
+    generates a fresh secret, so each cycle would otherwise leave a recipient
+    behind, and the only broom would be a terminal on the server.
+
+    The settings go with it, and that is the difference from `--revoke`. A revoke
+    is usually a lost phone, where throwing away where somebody lives would be a
+    poor answer. A device asking to be forgotten is saying it is done.
+    """
+    from tools.policy import tokens as people
+
+    people.register(people.hashed("mine"), "тест", tmp_path)
+    people.register(people.hashed("theirs"), "оля", tmp_path)
+    people.save_config("тест", {"home": "Виноградар"}, tmp_path)
+    assert people._config_path("тест", tmp_path).exists()
+
+    assert people.unregister("mine", tmp_path) == "тест"
+    assert people.name_for("mine", tmp_path) is None
+    assert not people._config_path("тест", tmp_path).exists()
+
+    # ...and nobody else's row was touched.
+    assert people.name_for("theirs", tmp_path) == "оля"
+    assert sorted(people.index(tmp_path).values()) == ["оля"]
+
+    # A token that is already gone, or was never there, removes nothing.
+    assert people.unregister("mine", tmp_path) is None
+    assert people.unregister("never", tmp_path) is None
+    assert sorted(people.index(tmp_path).values()) == ["оля"]
+
+
+def test_unregistering_without_settings_is_not_an_error(tmp_path):
+    """The normal case for somebody who registered and never chose a home."""
+    from tools.policy import tokens as people
+
+    people.register(people.hashed("bare"), "хтось", tmp_path)
+    assert people.unregister("bare", tmp_path) == "хтось"
+    assert people.index(tmp_path) == {}

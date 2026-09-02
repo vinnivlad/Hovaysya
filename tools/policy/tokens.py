@@ -127,6 +127,44 @@ def write_index(index: dict[str, str], directory: Path = DIR) -> None:
         raise
 
 
+def unregister(token: str, directory: Path = DIR) -> str | None:
+    """Take a device out, at that device's own request. Returns its name.
+
+    Only its own: the token it holds is the whole authority, and there is nothing
+    here that could reach anybody else's row.
+
+    This is how the test workflow stays sustainable -- his idea: "може зробимо
+    тестового користувача і будемо тестити завжди зпід нього на реальному
+    сервері?" Yes, and every reinstall of the app generates a fresh secret, so
+    without this each test cycle would leave a recipient behind and the only
+    broom would be a terminal on the server.
+
+    The settings go with it, and that is the difference from `token.py --revoke`.
+    A revoke is usually a lost phone, where throwing away where somebody lives
+    would be a poor answer to that. A device asking to be forgotten is saying it
+    is done.
+    """
+    with _WRITE:
+        current = index(directory)
+        wanted = hashed(token)
+        name = None
+        for digest, stored in list(current.items()):
+            if hmac.compare_digest(digest, wanted):
+                name = stored
+                del current[digest]
+        if name is None:
+            return None
+        write_index(current, directory)
+        try:
+            _config_path(name, directory).unlink()
+        except OSError:
+            # No settings file is the normal case for somebody who registered
+            # and never chose a home. Not being able to remove one is not a
+            # reason to report the removal as failed.
+            pass
+    return name
+
+
 def register(digest: object, name: object, directory: Path = DIR,
              ceiling: int = MAX_RECIPIENTS) -> str:
     """Take a device's own hash into the index and answer with its stored name.

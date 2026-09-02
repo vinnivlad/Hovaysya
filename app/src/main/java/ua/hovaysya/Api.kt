@@ -218,6 +218,19 @@ class Api(private val base: String, private val token: String?) {
         return send("POST", "/register", body) { o -> o.optString("name") }
     }
 
+    /**
+     * Take this device out again. The token is the whole authority, and it can
+     * only ever remove the row it belongs to.
+     *
+     * What keeps a test device from piling up: every reinstall makes a fresh
+     * secret, so without this each cycle of testing against the real server
+     * would leave a recipient behind and the only broom would be a terminal on
+     * the server.
+     */
+    suspend fun unregister(): String = send("DELETE", "/register", null) { o ->
+        o.optString("name")
+    }
+
     // --- the plumbing -------------------------------------------------------
 
     private suspend fun <T> get(path: String, read: (JSONObject) -> T): T =

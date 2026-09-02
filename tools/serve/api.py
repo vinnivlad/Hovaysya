@@ -16,6 +16,8 @@ is that nothing has to be installed:
     PUT  /config                      change them
     POST /register                    a device takes itself in -- no token,
                                       because this is where a token begins
+    DELETE /register                  ...and takes itself out again, which is
+                                      what keeps a test device from piling up
     GET  /health                      no token needed
 
 **This process must never be the reason the watch stops.** It shares nothing with
@@ -485,6 +487,21 @@ class Handler(BaseHTTPRequestHandler):
         # be able to see it being filled.
         print(f"  + зареєстрували {name}")
         self._send(201, {"name": name})
+
+    def do_DELETE(self) -> None:
+        """A device takes itself out. The token it sends is the whole authority."""
+        if urlparse(self.path).path != "/register":
+            self._send(404, {"error": "нема такого"}, close=True)
+            return
+        token = self._token()
+        name = (people.unregister(token, self.server.recipients_dir)
+                if token else None)
+        if name is None:
+            self._send(401, {"error": "потрібен токен"}, close=True)
+            return
+        # In the journal beside the registration, so the pair reads as a pair.
+        print(f"  - зняли з реєстрації {name}")
+        self._send(200, {"name": name})
 
     def do_PUT(self) -> None:
         if urlparse(self.path).path != "/config":
