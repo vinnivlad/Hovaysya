@@ -2262,3 +2262,90 @@ def test_the_state_file_is_replaced_whole(tmp_path):
     assert payload["said"][-1]["text"] == "Тривога."
     # No temporary files left behind.
     assert [p.name for p in tmp_path.iterdir()] == ["я.json"]
+# --- an all-clear is said once per alert ------------------------------------
+
+
+def _official(script):
+    """Run official-channel messages through one tracker and collect the bells."""
+    from tools.policy.config import load as load_config
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    cfg = load_config(warn=lambda _m: None)
+    tracker = Tracker(config=cfg)
+    tracker.official_source = True
+    out = []
+    for offset, text in script:
+        obs = observe(T0 + offset, text, False, "alarm_kyiv")
+        decision = decide(obs, tracker)
+        tracker.record(obs, decision.level if decision.notify else None,
+                       decision.alarm if decision.notify else None,
+                       decision.reason)
+        out.append((offset, decision.notify and decision.level != "info",
+                    decision.reason))
+    return out
+
+
+CLEAR = "🟢 м. Київ\nВідбій повітряної тривоги"
+SIREN = "🚨 м. Київ\nПовітряна тривога"
+
+
+def test_the_official_channel_repeating_itself_rings_once():
+    """It does repeat. On 2024-06-12 it posted the identical all-clear three
+    times in sixteen seconds -- ids 305, 306, 307 -- and every one of them rang,
+    because announcing an all-clear closes the episode and the repeat then
+    arrives to find nothing to check itself against.
+
+    This is also what makes a second official source possible at all. That
+    channel has seven subscribers, which is a risk in the one place the design
+    cannot tolerate one, and any relay added beside it would duplicate every
+    transition rather than only the occasional one.
+    """
+    rang = _official([(0, SIREN), (300, CLEAR), (307, CLEAR), (316, CLEAR)])
+    assert [r[1] for r in rang] == [True, True, False, False], rang
+    assert "already-notified" in rang[2][2]
+
+
+def test_a_fresh_alert_re_arms_the_all_clear():
+    """The case that rules out a time window, and the reason the marker is "has
+    an alert been declared since" instead.
+
+    2026-01-13: an all-clear at 03:09:33, a fresh siren at 03:10:08, and that
+    one closed at 03:10:55. Eighty-two seconds between two real all-clears, so
+    any window wide enough for the sixteen-second triple above would have
+    swallowed the second of these -- leaving somebody sheltering from an alert
+    that had ended.
+    """
+    rang = _official([(0, SIREN), (300, CLEAR),
+                      (335, SIREN), (382, CLEAR)])
+    assert [r[1] for r in rang] == [True, True, True, True], rang
+
+
+def test_two_official_sources_declaring_together_ring_once_each():
+    """What redundancy has to look like. Two relays of the same feed post within
+    a second or two of each other -- measured: `kyivalarm` matches `alarm_kyiv`
+    on all twenty of a day's Kyiv transitions, median +0s -- so without this
+    every siren and every all-clear would arrive twice."""
+    from tools.policy.config import load as load_config
+    from tools.policy.episodes import OFFICIAL_CHANNELS, Tracker, observe
+    from tools.policy.rules import decide
+
+    cfg = load_config(warn=lambda _m: None)
+    tracker = Tracker(config=cfg)
+    tracker.official_source = True
+    bells = []
+    # Both channels treated as official, which is the shape `OFFICIAL_CHANNELS`
+    # already has room for -- it is a frozenset, not a name.
+    assert isinstance(OFFICIAL_CHANNELS, frozenset)
+    for offset, channel, text in ((0, "alarm_kyiv", SIREN),
+                                  (1, "alarm_kyiv", SIREN),
+                                  (600, "alarm_kyiv", CLEAR),
+                                  (601, "alarm_kyiv", CLEAR)):
+        obs = observe(T0 + offset, text, False, channel)
+        decision = decide(obs, tracker)
+        tracker.record(obs, decision.level if decision.notify else None,
+                       decision.alarm if decision.notify else None,
+                       decision.reason)
+        if decision.notify and decision.level != "info":
+            bells.append((offset, decision.alarm))
+    assert bells == [(0, "alert"), (600, "clear")], bells

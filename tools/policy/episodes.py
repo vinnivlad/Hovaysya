@@ -519,6 +519,22 @@ class Tracker:
         # A chat all-clear at 19:09:53 rang, and the real one followed four
         # seconds later — two loud all-clears, which is what he heard.
         self.official_source = False
+        # When an all-clear was last announced, and None once an alert has been
+        # declared since. It lives on the tracker and not on the episode because
+        # announcing an all-clear *closes* the episode -- so the fact that it was
+        # said has nowhere else to survive, and a second all-clear arrives to
+        # find no episode and nothing to check against.
+        #
+        # Not a time window, and the corpus is why. On 2024-06-12 the official
+        # channel posted the identical all-clear three times in sixteen seconds,
+        # which a window would catch -- but on 2026-01-13 it posted one at
+        # 03:09:33, declared a fresh alert at 03:10:08, and closed that one at
+        # 03:10:55. Eighty-two seconds apart and both real, so any window wide
+        # enough for the triple would have swallowed the second of those.
+        #
+        # "Has an alert been declared since" needs no threshold and gets both
+        # right.
+        self.said_clear_at: int | None = None
         # When his own place last rang while ballistic was up.
         self.home_rang_at: int | None = None
         # ...and when it last rang for anything at all.
@@ -648,6 +664,13 @@ class Tracker:
             self.home_said_at = obs.ts
         if obs.official:
             self.official_seen = obs.ts
+        # Said once per alert. A declaration from the authoritative source re-arms
+        # it -- whether or not we announced that declaration, because what matters
+        # is that the alert is on again and its end will be worth saying.
+        if alarm == "clear":
+            self.said_clear_at = obs.ts
+        elif obs.official and obs.alert_state == "alert":
+            self.said_clear_at = None
         # A partial all-clear lifts one threat class, not the alert. Closing the
         # episode here would forget everything the night had established.
         if obs.alert_state == "clear" and not obs.partial_clear:

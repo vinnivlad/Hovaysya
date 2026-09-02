@@ -171,6 +171,16 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     # all-clears that were about somebody else's district, and he wrote on both
     # of them "вся надія на сервіси".
     if obs.alert_state == "clear" and obs.official:
+        # Once per alert. The official channel repeats itself -- three identical
+        # all-clears in sixteen seconds on 2024-06-12 -- and a second official
+        # source, which is the answer to that channel having seven subscribers,
+        # would do the same every single time.
+        #
+        # The episode cannot hold this: announcing an all-clear closes it, so by
+        # the time a repeat arrives there is nothing left to ask. See
+        # `Tracker.said_clear_at`.
+        if tracker.said_clear_at is not None:
+            return _silent("already-notified: all-clear already announced")
         return (_notify("alert", "clear", "official all-clear") if cfg.ring_all_clear
                 else _notify("info", "none", "official all-clear"))
     if obs.alert_state == "clear" and tracker.official_is_live(obs.ts):
