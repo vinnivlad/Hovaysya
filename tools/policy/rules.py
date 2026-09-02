@@ -96,9 +96,17 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     # A message stating no type inherits the episode's. "Жуляни" during a
     # ballistic wave is that wave, not a new drone — reading it in isolation
     # produced a false wake-up the user annotated "Ця балістика вже розбудила".
+    #
+    # ...but only while that class is fresh, and his argument for the limit is
+    # physical: "а якщо не балістики а крилатих ракет? Тоді ну зовсім нестиковка,
+    # телепортувались ті ракети чи що повз область?" On 2026-09-02 a siren was
+    # announced as "Тривога. Балістика." on a class the episode had held for
+    # twenty-five minutes, and what followed the siren was drones.
     threat = obs.threat
     inherited = False
-    if threat in ("none", "unknown") and ep is not None and ep.threat:
+    if (threat in ("none", "unknown") and ep is not None and ep.threat
+            and (not ep.threat_at
+                 or obs.ts - ep.threat_at <= cfg.inherit_class_s)):
         threat = ep.threat
         inherited = True
     # A bare "ракета" is a guess, not a class. `ракет` is the last rule in the

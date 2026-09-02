@@ -163,6 +163,10 @@ class Episode:
     # labeler has done this since the user pointed out that judging posts in
     # isolation is the wrong unit; the policy had not.
     threat: str | None = None
+    # When that class was last stated by a channel. An episode can be open for
+    # hours, so without this the class has no age and a siren twenty-five minutes
+    # later gets explained by it -- which is what happened on 2026-09-02.
+    threat_at: int = 0
     alert_announced: bool = False
     # Whether the siren we announced actually named a place. A bare "🛑 ТРИВОГА"
     # is usually his — 68% of scope-less sirens come from the Kyiv channel — but
@@ -749,6 +753,10 @@ class Tracker:
                 and obs.modality not in ("aftermath", "summary-news",
                                          "non-threat")):
             ep.threat = obs.effective_threat or obs.threat
+            # When, because the class is inherited by later messages that state
+            # none, and an inherited class has to be able to go stale. See the
+            # inheritance in `rules._decide`.
+            ep.threat_at = obs.ts
             # Named again as flying: whatever was lifted is back.
             ep.cleared.discard(ep.threat)
         if obs.says_new:

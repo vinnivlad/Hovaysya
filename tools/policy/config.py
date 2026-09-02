@@ -69,6 +69,7 @@ BOUNDS: dict[str, tuple[int, int]] = {
     "ring_memory_s": (60, 3600),
     "refractory_near_s": (30, 1800),
     "refractory_s": (60, 3600),
+    "inherit_class_s": (60, 3600),
     "silent_dedup_s": (5, 600),
     "home_dedup_s": (0, 600),
     "launch_dedup_s": (30, 1800),
@@ -163,6 +164,17 @@ class Config:
     # reported twice.
     refractory_near_s: int = 5 * 60
     refractory_s: int = 20 * 60
+    # How long a class stated by a channel may still explain a message that
+    # states none. His argument is physical rather than statistical: "а якщо не
+    # балістики а крилатих ракет? Тоді ну зовсім нестиковка, телепортувались ті
+    # ракети чи що повз область?" A cruise missile does not wait, so a class
+    # half an hour old describes something that is now somewhere else entirely.
+    #
+    # The same ten minutes the announcer's own memory uses, for the same reason
+    # and measured the same way: where the channels explain before a siren, the
+    # median lead is two minutes and ten minutes covers 77% of them. During a
+    # real wave the class is restated constantly, so this costs nothing there.
+    inherit_class_s: int = 600
     # Two identical silent lines seconds apart are one line.
     silent_dedup_s: int = 60
     # The only dedup left on the rule above -- "дедуп мінімальний". It exists for

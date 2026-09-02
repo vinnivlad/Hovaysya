@@ -2036,3 +2036,64 @@ def test_the_alert_requirement_does_not_silence_a_stream_without_the_official_ch
     o = observe(T0, "❗️❗Є інформація про пуск балістичної ракети з Криму.",
                 False, "mon1tor_ua")
     assert decide(o, tr).audible
+
+
+def test_an_inherited_class_goes_stale():
+    """His argument for the limit is physical rather than statistical: "а якщо не
+    балістики а крилатих ракет? Тоді ну зовсім нестиковка, телепортувались ті
+    ракети чи що повз область?" A cruise missile does not wait, so a class half
+    an hour old describes something that is now somewhere else.
+
+    On 2026-09-02 a siren was announced as "Тривога. Балістика." on a class the
+    episode had held for twenty-five minutes, and what followed the siren was
+    drones. He wanted `unknown` there, and that is what this produces: no class
+    in the sentence, because there is nothing honest to put in it.
+    """
+    from tools.policy.announce import Announcer
+    from tools.policy.config import load as load_config
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    cfg = load_config(warn=lambda _m: None)
+
+    def siren_after(gap: int) -> str:
+        tr, ann = Tracker(config=cfg), Announcer(config=cfg)
+        tr.official_source = True
+        said = None
+        for off, channel, text in (
+                (0, "mon1tor_ua", "❗️Пуск балістичних ракет з Брянської області."),
+                (gap, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога")):
+            o = observe(T0 + off, text, False, channel)
+            d = decide(o, tr)
+            tr.record(o, d.level if d.notify else None,
+                      d.alarm if d.notify else None, d.reason)
+            u = ann.announce(o, d)
+            if o.alert_state == "alert" and u:
+                said = u.text
+        return said or ""
+
+    # Fresh: the class is the whole point of carrying it.
+    assert "аліст" in siren_after(120), siren_after(120)
+    # Stale: nothing rather than something half an hour old.
+    assert "аліст" not in siren_after(cfg.inherit_class_s + 300)
+
+
+def test_a_wave_keeps_its_class_because_the_channels_restate_it():
+    """The cost of the limit, and the reason it is nearly free: during a real
+    wave the class is named again every couple of minutes, so each mention
+    refreshes it and a bare place name still inherits correctly."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    tr.official_source = True
+    script = [(0, "❗️Пуск балістичних ракет з Брянської області.")]
+    script += [(t, "‼️ Київ — спуск балістики!") for t in range(300, 1800, 300)]
+    script.append((1900, "Жуляни"))
+    for off, text in script:
+        o = observe(T0 + off, text, False, "mon1tor_ua")
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
+    # Half an hour in, a bare place name is still that wave.
+    assert o.effective_threat == "ballistic", o.effective_threat
