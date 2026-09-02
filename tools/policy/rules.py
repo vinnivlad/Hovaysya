@@ -357,6 +357,27 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             and obs.scope not in CITY_OR_NEARER):
         return _silent("too-far: carried class, another district")
 
+    # Nothing about ballistic while Kyiv has no alert on -- neither the bell nor
+    # the silent detail. His call, after a launch from Crimea aimed at Odesa woke
+    # him at 02:27 with no Kyiv siren anywhere.
+    #
+    # The condition is the *official* declaration rather than our own reading of
+    # the chats: it is the only source that declares rather than reports. And it
+    # applies only while that source is actually being watched, because on a
+    # stream without it `official_alert` is never set and this would silence
+    # every ballistic there is.
+    #
+    # What it costs is measured and small. Across the corpus 214 of 268 ballistic
+    # bells were already inside an alert; of the 54 outside, 40 were never
+    # followed by one -- news, chatter, and missiles aimed at Odesa -- and the
+    # remaining 14 led the siren by a median of one minute, which the siren then
+    # rings for itself.
+    if (threat == "ballistic" and cfg.ring_ballistic_needs_alert
+            and tracker.official_source
+            and not (ep is not None and ep.official_alert)
+            and obs.alert_state != "alert"):
+        return _silent("ballistic, but Kyiv has no alert on")
+
     # Cruise deliberately does not join this rule, and the reason is physical:
     # a cruise missile flies for hours, so its launch says nothing about when it
     # arrives or whether it is coming here at all. What matters is where it is

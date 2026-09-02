@@ -681,7 +681,11 @@ def test_the_loiter_markers_are_words_the_channels_actually_write():
     assert "вертаються" not in _LOITER_MARKERS
     assert "подовжують" not in _LOITER_MARKERS
     for t in ("🔄 2х намотують кола над Жулянами.",
-              "Намотав коло по Жулянах і знову на Рожни",
+              # Not "і знову на Рожни": Рожни became a real place on
+              # 2026-09-02, so the line started reading as a departure -- which
+              # is `heading` working correctly and this test measuring the wrong
+              # thing. The marker is what is under test, not the direction.
+              "Намотав коло по Жулянах і знову туди ж",
               "🔄 2х подовжують намотувати кола над Жулянами."):
         assert hints.heading(t) == "loitering", t
     assert hints.heading("2х вертаються з Жулян на Погреби.") == "away"

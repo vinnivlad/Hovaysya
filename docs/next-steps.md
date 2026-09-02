@@ -729,7 +729,7 @@ were left out on the numbers.
 A Shahed came at Zhuliany and one channel had it first: **KyivPolitic**, which is
 not in the list. It was measured once and left out, but on the 11-name ring, and
 the ring is 19 names now. He also found **rocketskyiv**, which he says posts only
-about missiles on Kyiv.
+about missiles on Kyiv, and **nebo_raketa**.
 
 What tonight's sample of KyivPolitic already settles, so tomorrow starts further
 along:

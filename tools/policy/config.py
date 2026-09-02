@@ -119,6 +119,18 @@ class Config:
     ring_cruise_city: bool = True
     # A launch after a recheck said the wave was over.
     ring_ballistic_after_recheck: bool = True
+    # Ballistic says nothing at all while Kyiv has no alert on. His call after
+    # a launch from Crimea aimed at Odesa woke him at 02:27 with no Kyiv siren
+    # anywhere: "мабуть таке краще не показувати, коли немає тривоги в Києві".
+    #
+    # Measured over the corpus before switching it on: 268 ballistic bells, 214
+    # of them inside a Kyiv alert. Of the 54 outside, 40 were never followed by
+    # an alert at all -- and reading them, 26 are news and chatter ("Британія
+    # передасть Україні далекобійні засоби", "дякую за такий великий донат"),
+    # 6 are real ballistic aimed at Odesa or Rzhyshchiv, and 8 are genuine
+    # launches with no stated target. The other 14 preceded a siren by a median
+    # of one minute, which is what this costs: the siren rings anyway.
+    ring_ballistic_needs_alert: bool = True
     # Ballistic over his own place rings every time it is named, however often.
     # "Жуляни завжди дзвонимо — головне правило", and it reversed six of his own
     # earlier labels: "Тихо з різницею в 10хв — я явно був не правий".

@@ -138,6 +138,19 @@ CITY = [
     # slot that resolved to nothing — the same method that found forty oblast
     # towns before. Both are ordinary nouns as well, and in these channels they
     # are never used as ordinary nouns.
+    # Kyiv names the channels use that this file did not know. Found by joining
+    # the OSM extract to the gazetteer and counting only what the channels
+    # actually write: 75 unrecognised names within 45 km, of which these are the
+    # ones with real mentions rather than a common noun caught by a stem.
+    #
+    # "Нова Забудова" is the one that mattered: "❗️Київ КР нова забудова Жуляни"
+    # and "...нова забудова Солом'янка" -- a cruise missile beside his own street,
+    # in a message the gazetteer could only half read.
+    _p("Нова Забудова", "city", "нова забудов"),
+    _p("Почайна", "city", "почайн"),
+    _p("Біличі", "city", "біличі"),
+    _p("Новобіличі", "city", "новобіличі"),
+    _p("Биківня", "city", "биківн"),
     _p("Берковець", "city", "берковец", "берковц"),
     _p("Вокзал", "city", "вокзал", landmark=True),
     # Мишоловка was ruled out of the near ring after the first night. Чоколівка
@@ -208,6 +221,28 @@ CITY = [
 OBLAST = [
     # Also ruled out of the near ring — "Віта Поштова: зовсім далеко".
     _p("Чабани", "oblast", "чабани"),
+    # The same pass, beyond the city. `Чайки` is his own example -- 46 mentions,
+    # 12 km, and it reads as one place with Vyshneve and Stoianka: "Проводять
+    # розвідку в районі Вишневе/Чайки/Стоянка."
+    #
+    # Two were checked and left out. `П'ятихатки` sits 700 m from home in OSM and
+    # looked like the closest gap of all, but every one of its five mentions is
+    # the Dnipropetrovsk town of that name. `Мила` is a real village and its only
+    # safe stem is a common adjective, which is the `Остер` problem again: a name
+    # that cannot be recognised safely is worse than one that is missing.
+    _p("Чайки", "oblast", "чайки"),
+    _p("Стоянка", "oblast", "стоянк"),
+    _p("Мархалівка", "oblast", "мархалівк"),
+    _p("Ходосівка", "oblast", "ходосівк"),
+    _p("Підгірці", "oblast", "підгірц"),
+    _p("Осещина", "oblast", "осещин"),
+    _p("Нові Петрівці", "oblast", "нові петрівц", "петрівц"),
+    _p("Чубинське", "oblast", "чубинськ"),
+    _p("Пухівка", "oblast", "пухівк"),
+    _p("Промвузол", "oblast", "промвузол"),
+    _p("Лютіж", "oblast", "лютіж"),
+    _p("Рожни", "oblast", "рожни"),
+    _p("Вороньків", "oblast", "вороньк"),
     # Found by comparing the OSM extract against this file: towns within 90 km
     # that the channels name and the gazetteer did not know at all. Counted in
     # the corpus first, which is the lesson Chokolivka taught -- a name nobody

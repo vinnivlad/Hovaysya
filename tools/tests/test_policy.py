@@ -1986,3 +1986,53 @@ def test_a_ring_name_used_as_an_origin_is_not_where_it_is():
     # ...and home stays whatever role it is given.
     assert "Жуляни" in say("⚠️Шахед з Жуляни на Борщагівку.")
     assert "Жуляни" in say("⚠️Реактивний шахед з Жуляни на Центр.")
+
+
+def test_ballistic_says_nothing_while_kyiv_has_no_alert():
+    """His call after 02:27 on 2026-09-02: a launch from Crimea aimed at Odesa
+    woke him with no Kyiv siren anywhere. "Мабуть таке краще не показувати, коли
+    немає тривоги в Києві."
+
+    Measured before switching it on. Of 268 ballistic bells in the corpus, 214
+    were already inside an alert. Of the 54 outside, 40 were never followed by
+    one -- 26 of those are news and chatter, including a thank-you for a
+    donation, 6 are missiles aimed at Odesa or Rzhyshchiv, and 8 are genuine
+    launches with no stated target. The remaining 14 led the siren by a median of
+    one minute, and the siren rings for itself.
+    """
+    from tools.policy.announce import Announcer
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    launch = "❗️❗Є інформація про пуск балістичної ракети з Криму."
+
+    tr = Tracker()
+    tr.official_source = True
+    o = observe(T0, launch, False, "mon1tor_ua")
+    quiet = decide(o, tr)
+    assert not quiet.notify, quiet.reason
+
+    # ...and with the siren on, it rings exactly as before.
+    tr, ann = Tracker(), Announcer()
+    tr.official_source = True
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (60, "mon1tor_ua", launch)):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
+    assert d.audible and d.alarm == "ballistic", d.reason
+
+
+def test_the_alert_requirement_does_not_silence_a_stream_without_the_official_channel():
+    """`official_alert` is only ever set by the channel that declares. Watching
+    the chats alone, requiring it would silence every ballistic there is."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    tr.official_source = False
+    o = observe(T0, "❗️❗Є інформація про пуск балістичної ракети з Криму.",
+                False, "mon1tor_ua")
+    assert decide(o, tr).audible
