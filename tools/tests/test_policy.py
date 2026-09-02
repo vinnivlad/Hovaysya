@@ -2078,22 +2078,40 @@ def test_an_inherited_class_goes_stale():
     assert "аліст" not in siren_after(cfg.inherit_class_s + 300)
 
 
-def test_a_wave_keeps_its_class_because_the_channels_restate_it():
-    """The cost of the limit, and the reason it is nearly free: during a real
-    wave the class is named again every couple of minutes, so each mention
-    refreshes it and a bare place name still inherits correctly."""
+def test_a_track_keeps_its_class_without_anybody_restating_it():
+    """The correction, made within an hour of shipping the limit. I had assumed
+    the channels restate the class every few minutes and wrote a test that
+    assumed it too. For ballistic they do -- "спуск балістики" over and over. For
+    a drone being tracked they do not: on 2026-09-02 they followed one from 15:34
+    to 15:50 writing nothing but place names, because everyone already knew what
+    was flying, and at 15:44:42 the sentences became a bare "Вишневе."
+
+    So the age limit applies to a siren and to nothing else. A siren declares a
+    new thing and needs explaining; an ordinary message during a track is the same
+    object seen again, and its class is not a guess.
+    """
+    from tools.policy.announce import Announcer
+    from tools.policy.config import load as load_config
     from tools.policy.episodes import Tracker, observe
     from tools.policy.rules import decide
 
-    tr = Tracker()
+    cfg = load_config(warn=lambda _m: None)
+    tr, ann = Tracker(config=cfg), Announcer(config=cfg)
     tr.official_source = True
-    script = [(0, "❗️Пуск балістичних ракет з Брянської області.")]
-    script += [(t, "‼️ Київ — спуск балістики!") for t in range(300, 1800, 300)]
-    script.append((1900, "Жуляни"))
+    said = None
+    # The class once, then twenty minutes of bare place names, as they write it.
+    script = [(0, "⚠️Реактивний шахед на Вишневе.")]
+    script += [(t, name) for t, name in
+               ((300, "Пирогів"), (600, "Хотів"), (900, "Васильків"),
+                (1200, "Вишневе"))]
     for off, text in script:
         o = observe(T0 + off, text, False, "mon1tor_ua")
         d = decide(o, tr)
         tr.record(o, d.level if d.notify else None,
                   d.alarm if d.notify else None, d.reason)
-    # Half an hour in, a bare place name is still that wave.
-    assert o.effective_threat == "ballistic", o.effective_threat
+        u = ann.announce(o, d)
+        if u:
+            said = u.text
+    # Twenty minutes with nobody naming the class, and the sentence still has it.
+    assert o.effective_threat == "shahed-jet", o.effective_threat
+    assert "шахед" in (said or "").lower(), said

@@ -104,9 +104,22 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     # twenty-five minutes, and what followed the siren was drones.
     threat = obs.threat
     inherited = False
+    # The age limit applies to a *siren* and to nothing else, and that boundary
+    # is the whole correction. A siren declares a new thing and needs explaining;
+    # an ordinary message during a track is the same object seen again, and its
+    # class is not a guess.
+    #
+    # The first version aged every inheritance and made things worse within the
+    # hour: on 2026-09-02 the channels tracked one drone from 15:34 to 15:50
+    # writing nothing but place names -- Пирогів, Хотів, Васильків, Вишневе --
+    # because everyone already knew what was flying. At 15:44:42, exactly ten
+    # minutes after the last message to use the word, the sentences lost their
+    # class and became a bare "Вишневе." He caught it: "з жодного каналу не
+    # прийшло що то реактивний дрон?" No, and they had no reason to.
+    stale = (ep is not None and ep.threat_at
+             and obs.ts - ep.threat_at > cfg.inherit_class_s)
     if (threat in ("none", "unknown") and ep is not None and ep.threat
-            and (not ep.threat_at
-                 or obs.ts - ep.threat_at <= cfg.inherit_class_s)):
+            and not (stale and obs.alert_state == "alert")):
         threat = ep.threat
         inherited = True
     # A bare "ракета" is a guess, not a class. `ракет` is the last rule in the

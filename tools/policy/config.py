@@ -164,8 +164,11 @@ class Config:
     # reported twice.
     refractory_near_s: int = 5 * 60
     refractory_s: int = 20 * 60
-    # How long a class stated by a channel may still explain a message that
-    # states none. His argument is physical rather than statistical: "а якщо не
+    # How long a class stated by a channel may still explain **a siren**. Not
+    # every message: during a track the channels write nothing but place names
+    # for ten minutes at a stretch, because everyone already knows what is
+    # flying, and aging that made the sentences say a bare "Вишневе." within an
+    # hour of shipping it. His argument is physical rather than statistical: "а якщо не
     # балістики а крилатих ракет? Тоді ну зовсім нестиковка, телепортувались ті
     # ракети чи що повз область?" A cruise missile does not wait, so a class
     # half an hour old describes something that is now somewhere else entirely.
