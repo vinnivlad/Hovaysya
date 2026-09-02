@@ -1,9 +1,12 @@
 package ua.hovaysya.ui
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -83,8 +86,24 @@ fun HovaysyaTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = scheme,
         typography = typography,
-        content = content,
-    )
+    ) {
+        // The `Surface` is here rather than in each screen, and it is not
+        // decoration. Outside one, Compose leaves `LocalContentColor` at its
+        // default -- **black** -- so any `Text` without an explicit colour comes
+        // out black on this near-black ground.
+        //
+        // Which is exactly what happened: `App` puts the four tabs inside a
+        // `Scaffold`, so they were fine, but the first-run screen returns before
+        // that and had no surface above it at all. Every word of the
+        // registration screen was black on black. Putting it in the theme means
+        // no screen can be added later that forgets it.
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = scheme.background,
+            contentColor = scheme.onBackground,
+            content = content,
+        )
+    }
 }
 
 /** The colour a state is owed. Unknown is muted, never calm. */

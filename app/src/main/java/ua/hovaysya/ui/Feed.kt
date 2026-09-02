@@ -55,7 +55,14 @@ fun HovaysyaFeed(store: Store) {
     LaunchedEffect(Unit) {
         while (true) {
             runCatching { store.api().verdicts() }
-                .onSuccess { rows = it; problem = null }
+                // Only what was actually said. `/decisions` carries every
+                // verdict including the silent ones, because the reason is what
+                // makes a decision arguable -- but a screen called "Ховайся"
+                // showing `too-far: oblast, not the city` is showing the
+                // machine's reasoning as though it were a message. He saw one
+                // with no text at all and said so.
+                .onSuccess { rows = it.filter { row -> row.said != null }
+                             problem = null }
                 .onFailure { problem = it.message ?: "немає зв'язку" }
             delay(15_000)
         }
@@ -64,7 +71,7 @@ fun HovaysyaFeed(store: Store) {
     Feed(
         title = "Ховайся",
         subtitle = "рішення, найновіші вгорі",
-        empty = "За останні дні рішень не було.",
+        empty = "За останні дні Ховайся нічого не казав.",
         problem = problem,
         isEmpty = rows.isEmpty(),
     ) {
@@ -102,15 +109,13 @@ fun HovaysyaFeed(store: Store) {
                         )
                     }
                 }
-                row.said?.let {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (row.level == "alert") FontWeight.SemiBold
-                                     else null,
-                    )
-                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    row.said ?: "",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (row.level == "alert") FontWeight.SemiBold
+                                 else null,
+                )
                 // The reason, because a decision nobody can question is not one
                 // that can be corrected -- which is how every rule here got fixed.
                 row.reason?.let {
@@ -122,7 +127,7 @@ fun HovaysyaFeed(store: Store) {
                     )
                 }
                 // And the post it decided on, folded in below.
-                row.text?.takeIf { row.said != null }?.let {
+                row.text?.let {
                     Spacer(Modifier.height(6.dp))
                     Text(
                         it.lines().joinToString(" ").take(180),
