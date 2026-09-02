@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Debug-only, merged over the main manifest, which declares no
-  `networkSecurityConfig` of its own -- so this is an addition rather than an
+  `networkSecurityConfig` of its own - so this is an addition rather than an
   override and needs no `tools:replace`.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">

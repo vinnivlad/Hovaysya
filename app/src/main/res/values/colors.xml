@@ -3,7 +3,7 @@
     <!--
       Matches `Ground` in ui/Theme.kt, and it is here a second time because the
       window manager paints this before any Kotlin runs. Get it wrong and
-      launching flashes the wrong colour on the way to the right one -- which at
+      launching flashes the wrong colour on the way to the right one - which at
       three in the morning is the whole difference.
 
       In `values/` and not `values-night/`: there is one theme, so a device set

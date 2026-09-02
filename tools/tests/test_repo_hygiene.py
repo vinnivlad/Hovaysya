@@ -39,3 +39,45 @@ def test_no_control_characters_hide_in_the_source():
                     f"{path.relative_to(REPO_ROOT)}:{number} "
                     f"{sorted(hex(ord(c)) for c in bad)}")
     assert not offenders, offenders
+def test_no_xml_comment_contains_a_double_hyphen():
+    """`--` is illegal inside an XML comment, and it broke his build.
+
+        Failed to compile resource file: network_security_config.xml
+        The string "--" is not permitted within comments.
+
+    I write `--` as a dash in prose, so it went into every resource file and
+    manifest I wrote, and nothing here could catch it: the Python suite never
+    parses those files, and only `aapt` does. He found it the way anybody would,
+    by the build failing on him.
+
+    Checked on the bytes rather than by parsing, so it holds for a manifest, a
+    vector drawable and a values file alike, and it costs nothing.
+    """
+    import re
+
+    offenders = []
+    for path in sorted(REPO_ROOT.glob("app/src/**/*.xml")):
+        text = path.read_text(encoding="utf-8")
+        for comment in re.finditer(r"<!--(.*?)-->", text, re.S):
+            if "--" in comment.group(1):
+                line = text[:comment.start()].count("\n") + 1
+                offenders.append(f"{path.relative_to(REPO_ROOT)}:{line}")
+    assert not offenders, offenders
+
+
+def test_every_xml_the_build_reads_actually_parses():
+    """The same class of fault, caught one level up: a resource file that is not
+    well-formed fails at `aapt` and not before, which on this machine means it
+    fails on him rather than on me. There is no Android SDK here, so parsing is
+    the most the Python suite can do -- and it is enough for the mistakes that
+    are made by hand."""
+    import xml.etree.ElementTree as ET
+
+    checked = 0
+    for path in sorted(REPO_ROOT.glob("app/src/**/*.xml")):
+        try:
+            ET.parse(path)
+        except ET.ParseError as exc:
+            raise AssertionError(f"{path.relative_to(REPO_ROOT)}: {exc}") from exc
+        checked += 1
+    assert checked >= 6, f"expected the app's resources, found {checked}"
