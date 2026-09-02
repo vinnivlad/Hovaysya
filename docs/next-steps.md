@@ -659,6 +659,8 @@ the bell matters. So:
 
     GET /messages?since=<seq>     the merged raw feed
     GET /decisions?since=<seq>    what Ховайся decided, for this recipient
+                                  and for nobody else -- the reason says
+                                  "my area" and the sentence names their ring
 
 Cursor-based, which is the pattern the watcher already uses against `t.me/s/`
 with `?after=<id>`, and an app that was offline closes the gap in one request.

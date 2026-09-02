@@ -6,6 +6,8 @@ is that nothing has to be installed:
     GET  /messages?since=<cursor>     the merged raw feed of every channel
     GET  /messages?back=30m           ...or just the last half hour, newest end
     GET  /decisions?since=<cursor>    what Ховайся decided, for this recipient
+                                      -- and for nobody else: the sentence names
+                                      their ring and the reason says "my area"
     GET  /config                      their settings
     PUT  /config                      change them
     GET  /health                      no token needed
@@ -212,14 +214,29 @@ def health(conn: sqlite3.Connection | None, log_dir: Path,
     }
 
 
-def decisions(log_dir: Path, since: str | None, limit: int,
+def decisions(log_dir: Path, who: str | None, since: str | None, limit: int,
               days: int = LOG_DAYS, now: float | None = None) -> dict:
-    """What the watcher said, from the newest log files only.
+    """What Ховайся decided **for this recipient**, from the newest logs only.
+
+    The filter is the whole point, and for a while it was missing -- his call,
+    from intuition rather than from the code: "decisions думаю теж приватне, воно
+    ж персональне". It is worse than private. `reason` reads "new target heading
+    into my area", where *my* is whoever the line was decided for, and the
+    sentence names their ring: 47 lines of 3907 named the watcher's own district.
+    Served unfiltered, every token holder got his address -- and an answer
+    computed from his home rather than from their own, which is simply wrong for
+    them.
 
     Read from the log rather than recomputed, because the app must see what
     actually happened -- including on a version of the policy that has since been
-    corrected.
+    corrected. A decision cannot be recomputed alone in any case: the episode it
+    belongs to is sequential.
+
+    A line with no owner belongs to nobody and reaches nobody. Those are the ones
+    written before the owner was recorded, and `LOG_DAYS` clears them on its own.
     """
+    if who is None:
+        return {"decisions": [], "next": since or ""}
     horizon = (now if now is not None else time.time()) - days * 86400
     try:
         files = sorted((p for p in log_dir.glob("*.jsonl")
@@ -242,7 +259,8 @@ def decisions(log_dir: Path, since: str | None, limit: int,
             key = f"{at}.{anchor}"
             # Logs overlap: a restart replays the last ninety minutes and the
             # catch-up pass writes those lines again.
-            if not at or key in seen or (since and key <= since):
+            if (not at or key in seen or (since and key <= since)
+                    or row.get("who") != who):
                 continue
             seen.add(key)
             out.append({"cursor": key, "at": at, "anchor": anchor,
@@ -308,7 +326,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, messages(self.server.db, since, limit,
                                      _parse_back((query.get("back") or [None])[0])))
         elif url.path == "/decisions":
-            self._send(200, decisions(self.server.log_dir, since, limit))
+            self._send(200, decisions(self.server.log_dir, who, since, limit))
         elif url.path == "/config":
             from ..policy.config import changed_from_default
 

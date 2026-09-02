@@ -210,9 +210,10 @@ def _say(session: Session, who, channel: str, message_id: int, ts: int,
         "alarm": decision.alarm,
         "reason": decision.reason,
         "said": utterance.text if utterance else None,
-        # Only when there is more than one, so a night's log of the single-
-        # recipient case reads exactly as it did before.
-        "who": who.name if len(session.recipients) > 1 else None,
+        # Always, even with one recipient. Left conditional it read exactly as
+        # before -- and the API had nothing to filter on the day a second person
+        # registered, so everyone was served the watcher's own decisions.
+        "who": who.name,
         "warm": warm or None,
     })
 

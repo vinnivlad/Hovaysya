@@ -168,6 +168,8 @@ inbound door both compulsory and writable.
     GET  /messages?since=<cursor>     the raw feed, cursor-paged
     GET  /messages?back=30m           ...or the last half hour, for a cold screen
     GET  /decisions?since=<cursor>    what Ховайся decided, for this recipient
+                                      and for nobody else -- the reason says
+                                      "my area", the sentence names their ring
     GET  /config · PUT /config        their settings
     GET  /health                      no token needed, and see below
 

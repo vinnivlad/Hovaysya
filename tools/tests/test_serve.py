@@ -204,13 +204,13 @@ def test_the_decision_log_is_deduplicated_across_files(tmp_path):
     catch-up pass writes those lines again."""
     d = tmp_path / "live"
     d.mkdir()
-    row = {"at": "2026-09-01T02:30:08+00:00", "anchor": "a/1",
+    row = {"at": "2026-09-01T02:30:08+00:00", "anchor": "a/1", "who": "оля",
            "level": "alert", "said": "Загроза: балістика. Жуляни."}
     (d / "1.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
     (d / "2.jsonl").write_text(json.dumps(row) + "\n"
                                + json.dumps({**row, "anchor": "b/2"}) + "\n",
                                encoding="utf-8")
-    page = decisions(d, None, 10, days=10 ** 6)
+    page = decisions(d, "оля", None, 10, days=10 ** 6)
     assert [x["anchor"] for x in page["decisions"]] == ["a/1", "b/2"]
 
 
@@ -219,12 +219,51 @@ def test_a_broken_line_in_the_log_does_not_take_the_endpoint_down(tmp_path):
     d.mkdir()
     (d / "1.jsonl").write_text(
         "{oops\n" + json.dumps({"at": "2026-09-01T00:00:00+00:00",
-                                "anchor": "a/1"}) + "\n", encoding="utf-8")
-    assert len(decisions(d, None, 10, days=10 ** 6)["decisions"]) == 1
+                                "anchor": "a/1", "who": "оля"}) + "\n", encoding="utf-8")
+    assert len(decisions(d, "оля", None, 10, days=10 ** 6)["decisions"]) == 1
 
 
 def test_a_missing_log_directory_is_an_empty_answer(tmp_path):
-    assert decisions(tmp_path / "absent", None, 10)["decisions"] == []
+    assert decisions(tmp_path / "absent", "оля", None, 10)["decisions"] == []
+
+
+def test_one_persons_decisions_never_reach_another(tmp_path):
+    """His call, made from intuition rather than from the code: "decisions думаю
+    теж приватне, воно ж персональне".
+
+    It is worse than private. `reason` reads "new target heading into my area",
+    where *my* is whoever the line was decided for, and the sentence names their
+    ring -- 47 lines of 3907 named the watcher's own district. Unfiltered, every
+    token holder got his address, and an answer computed from his home rather
+    than from their own, which is simply the wrong answer for them.
+    """
+    d = tmp_path / "live"
+    d.mkdir()
+    lines = [
+        {"at": "2026-09-01T02:30:08+00:00", "anchor": "a/1", "who": "я",
+         "level": "alarm", "reason": "my place, and ballistic is up",
+         "said": "Тривога. Балістика. Жуляни."},
+        {"at": "2026-09-01T02:30:08+00:00", "anchor": "a/1", "who": "оля",
+         "level": "info", "reason": "far from me",
+         "said": "Загроза: балістика."},
+    ]
+    (d / "1.jsonl").write_text(
+        "".join(json.dumps(x, ensure_ascii=False) + chr(10) for x in lines),
+        encoding="utf-8")
+
+    for name, said in (("я", "Тривога. Балістика. Жуляни."),
+                       ("оля", "Загроза: балістика.")):
+        page = decisions(d, name, None, 10, days=10 ** 6)
+        assert [x["said"] for x in page["decisions"]] == [said], name
+
+    # A line decided before the owner was recorded belongs to nobody at all.
+    (d / "2.jsonl").write_text(
+        json.dumps({"at": "2026-09-01T03:00:00+00:00", "anchor": "c/3",
+                    "said": "Тривога. Жуляни."}, ensure_ascii=False) + chr(10),
+        encoding="utf-8")
+    for name in ("я", "оля", None):
+        got = decisions(d, name, None, 10, days=10 ** 6)["decisions"]
+        assert "c/3" not in [x["anchor"] for x in got], name
 
 
 # --- the settings -----------------------------------------------------------
