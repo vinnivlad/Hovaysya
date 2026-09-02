@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -136,28 +136,50 @@ fun Settings(store: Store, bell: Bell, forgotten: () -> Unit) {
             Text("Як це відчувається", style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Три різні вібрації. Їх варто відчути зараз, бо вночі " +
+                "Пʼять сигналів. Їх варто відчути зараз, бо вночі " +
                     "розрізняти доведеться не дивлячись.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
-            Row {
-                OutlinedButton(onClick = {
+            // One row per bell, with the rhythm drawn beside it. The drawing is
+            // not decoration: it is what lets somebody check they felt the one
+            // they meant to press, which a row of identical buttons does not.
+            Bells(
+                "Тривога", "··· --- ···", "початок, як у Тривозі",
+                onRing = {
+                    bell.ring(context, bell.siren, "Повітряна тривога",
+                        "Тривога. Реактивний шахед. Бровари.")
+                },
+            )
+            Bells(
+                "В укриття", "▪▪▪▪▪▪▪▪▪▪▪▪", "балістика, або над домом",
+                onRing = {
                     bell.ring(context, bell.shelter, "В укриття",
                         "Тривога. Балістика. Жуляни.")
-                }) { Text("Укриття") }
-                Spacer(Modifier.width(8.dp))
-                OutlinedButton(onClick = {
-                    bell.ring(context, bell.alert, "Загроза сюди",
+                },
+            )
+            Bells(
+                "Загроза сюди", "·· ··", "летить у бік кола",
+                onRing = {
+                    bell.ring(context, bell.near, "Загроза сюди",
                         "Загроза: реактивний шахед. Вишневе.")
-                }) { Text("Загроза") }
-                Spacer(Modifier.width(8.dp))
-                OutlinedButton(onClick = {
+                },
+            )
+            Bells(
+                "Відбій", "▬▬▬▬▬", "один довгий, без ритму",
+                onRing = {
+                    bell.ring(context, bell.clear, "Відбій тривоги",
+                        "Відбій тривоги.")
+                },
+            )
+            Bells(
+                "Тихо", "—", "не будить",
+                onRing = {
                     bell.ring(context, bell.quiet, "Тихо",
                         "Дорозвідка по балістиці.")
-                }) { Text("Тихо") }
-            }
+                },
+            )
         }
 
         // --- where I live ---------------------------------------------------
@@ -241,6 +263,35 @@ fun Settings(store: Store, bell: Bell, forgotten: () -> Unit) {
             Text("Забути цей пристрій", color = MaterialTheme.colorScheme.error)
         }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/** One bell: what it means, how it feels, and a way to feel it now. */
+@Composable
+private fun Bells(
+    name: String,
+    rhythm: String,
+    meaning: String,
+    onRing: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(name, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                rhythm,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colourFor(Screen.WATCHING),
+            )
+            Text(
+                meaning,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        OutlinedButton(onClick = onRing) { Text("Відчути") }
     }
 }
 

@@ -9,7 +9,7 @@ The screens are the easy part. The product is **a bell at three in the morning
 that "не турбувати" does not swallow**, and that is native API surface:
 
     NotificationChannel   IMPORTANCE_HIGH · setVibrationPattern · setBypassDnd
-    VibrationEffect       three patterns that differ through a mattress
+    VibrationEffect       patterns that differ through a mattress
     FCM high priority     waking the process out of Doze
 
 React Native reaches all of it through native modules -- meaning the Kotlin gets
@@ -40,10 +40,10 @@ The default is `https://hovaysya.duckdns.org`. On first launch there is an
 **Інший сервер** field, and the same field is in Settings afterwards.
 
 From the emulator, the machine it runs on is `10.0.2.2`, so a local API is
-`http://10.0.2.2:8080`. Cleartext to a plain-HTTP address is blocked by default
-on Android 9 and up, so a local run needs either an `https` front or a debug
-network-security config -- which is deliberately not committed, because a
-release build must never carry one.
+`http://10.0.2.2:8080`. Android 9 and up refuse plain HTTP by default, so there
+is a network-security config permitting cleartext to that one address -- and it
+lives under `src/debug/`, which means a release build cannot carry it even by
+accident: the file is not in that variant's sources at all.
 
 Registration is open and creates a real recipient on whatever server it is
 pointed at. `python -m tools.serve.token --list` shows who exists and `--revoke`
@@ -54,11 +54,49 @@ removes a test one.
     Api.kt        the four endpoints. `HttpURLConnection` and `org.json`, both
                   in the platform, so there is no HTTP or JSON dependency at all
     Store.kt      the secret this phone made for itself, and where the server is
-    Bell.kt       the three channels and the vibration alphabet
+    Bell.kt       the five channels and the vibration alphabet
     ui/Now.kt     screen one: the worst thing in the air, what is only scouted
     ui/Feed.kt    screens two and three: what Ховайся said, and every channel
     ui/Setup.kt   the first run -- a name, a district, a radius
     ui/Settings.kt and the one thing that is not a preference, below
+
+## The alphabet
+
+    початок тривоги   ··· --- ···       SOS, as Тривога rings it
+    балістика         ▪▪▪▪▪▪▪▪▪▪▪▪      a dense stutter: the roof is not enough
+    летить сюди       ·· ··             two knocks
+    відбій            ▬▬▬▬▬             one long note, no rhythm at all
+    тихо              (nothing)
+
+The start is his: "3 коротких, 3 довгих, 3 коротких, так само як і в застосунку
+Тривога". The point is not the code -- it is that everyone here already knows
+that rhythm without being taught, so it is the one pattern this app must not
+invent for itself.
+
+The end being different is his too, and it exposed a real defect. The server
+marks an all-clear as `level="alert"` with `alarm="clear"`, because announcing it
+*is* an audible event -- so a mapping keyed on the level rang the raid pattern
+for the end of the raid. 72 of those in the live log. Being woken by what feels
+exactly like an alert, to be told the alert is over, is the worst thing in this
+list. `channelFor` now tests the all-clear before the level, and that order is
+the whole correction.
+
+Four things to tell apart half asleep, so each differs in *rhythm* rather than
+in length: nine structured pulses, twelve rapid ones, two quick ones, one note.
+The all-clear is a single pulse on purpose -- nothing else in the set is, so it
+cannot read as a warning at the moment of waking.
+
+Two calls in there that are worth disagreeing with if they are wrong. A raid that
+opens with ballistic rings the shelter pattern rather than SOS, because at that
+point the more urgent thing to say is not "a raid started". And the all-clear
+does **not** bypass night mode: somebody who slept through a raid does not need
+waking to hear it ended, and somebody awake and waiting gets it anyway. Both are
+one line to change.
+
+Every channel the server can ring with `level="alert"` bypasses night mode and
+none of the others do, and that division is not this app's to make twice: the
+server has already decided whether this person should be woken, and all that is
+left here is what it feels like.
 
 ## The trap worth knowing about
 
@@ -85,9 +123,10 @@ that the person has to go and do themselves.
 **Push.** Everything above is a screen being looked at; nothing wakes the phone.
 That needs FCM, which needs a Google account and a Firebase project -- no Play
 Developer account, no payment method -- and a `google-services.json` that must
-not be committed. Until then `Bell` can be exercised from Settings, which is the
-only way to check the alphabet at all: three patterns are distinguishable only
-if somebody has felt all three.
+not be committed. Until then `Bell` can be exercised from Settings, one row
+per bell with its rhythm drawn beside it -- which is the only way to check the
+alphabet at all: patterns are distinguishable only if somebody has felt every
+one of them.
 
 **A moving home.** "Можливо навіть автоматично, при переміщенні містом" needs
 location permission and a rule for when a move is real rather than a walk to the
