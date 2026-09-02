@@ -10,3 +10,13 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+# Gradle build output, and the IDE's own bookkeeping. `local.properties` holds
+# the Android SDK path, which differs on every machine and is written by the IDE.
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+*.apk
+*.keystore
+*.jks

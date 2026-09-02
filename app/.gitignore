@@ -1,10 +1,2 @@
-# Build output and machine-local paths. `local.properties` holds the Android SDK
-# location, which differs on every machine and is written by the IDE.
+# The rest is in the repository root's .gitignore, which now covers the build.
 build/
-.gradle/
-local.properties
-.idea/
-*.iml
-*.apk
-*.keystore
-*.jks

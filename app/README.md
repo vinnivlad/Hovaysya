@@ -22,15 +22,19 @@ the thing only the native path can do.
 
 The Android SDK and an emulator come with the IDE; nothing else is needed.
 
-1. Open **this directory** (`app/`) as a project -- not the repository root.
-   The Gradle build lives here, and `deploy/lean.sh` keeps this whole directory
-   off the servers.
-2. There is no `gradle-wrapper.jar`. It is a binary and this repository has
+1. Open **the repository root** as the project. The Gradle build lives there --
+   `settings.gradle.kts` includes `:app` -- so opening `app/` on its own finds
+   nothing to build. `deploy/lean.sh` still keeps this whole directory off the
+   servers.
+2. **JDK 17 or 21, not 25.** Gradle 8.9 runs on 17 through 22 and IntelliJ picks
+   its own default, which here was `openjdk-25` -- so the sync fails on the JVM
+   before it reaches any of this. Both usable versions are already in `~/.jdks`;
+   set it under Settings → Build Tools → Gradle → Gradle JVM.
+3. There is no `gradle-wrapper.jar`. It is a binary and this repository has
    never carried one; the distribution is pinned in
    `gradle/wrapper/gradle-wrapper.properties` and the IDE fetches it on first
    sync. For a working `./gradlew` on the command line, one `gradle wrapper`
    from any Gradle writes the jar.
-3. JDK 17 or 21. Both are already in `~/.jdks`; the IDE also ships one.
 4. `local.properties` with `sdk.dir=...` is written by the IDE and is
    gitignored, because that path differs on every machine.
 
