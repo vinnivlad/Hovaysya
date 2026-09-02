@@ -74,26 +74,48 @@ def decide_all(reading: Reading, recipients: list[Recipient]):
     return [(r, *r.decide(reading)) for r in recipients]
 
 
-def only(config: Config, name: str = "я") -> list[Recipient]:
-    """The one-recipient case, which is today's whole world."""
-    return [Recipient(name=name, config=config)]
+def only(config: Config, name: str | None = None) -> list[Recipient]:
+    """The one-recipient case, which is today's whole world.
+
+    The name is resolved when this is called rather than when it is defined,
+    because `TELEGRAM_NAME` is imported at the foot of this module -- see the
+    note there on why that import is where it is.
+    """
+    return [Recipient(name=name or TELEGRAM_NAME, config=config)]
 
 
 # Tokens and per-person config files live in `tokens.py`, which imports three
 # modules instead of ten. The API needs those and nothing else here; this module
 # is the part that decides, and deciding needs the rules.
-from .tokens import (DIR, config_of, hashed, index, name_for,  # noqa: F401
-                     save_config, shipped as _shipped)
+from .tokens import (DIR, TELEGRAM_NAME, config_of, hashed,  # noqa: F401
+                     index, name_for, save_config, shipped as _shipped)
 
 
-def from_dir(directory: Path = DIR, fallback: Config | None = None) -> list[Recipient]:
-    """Everyone with a config on disk, or the single fallback when there is none.
+def from_dir(directory: Path = DIR, fallback: Config | None = None,
+             telegram: str | None = TELEGRAM_NAME) -> list[Recipient]:
+    """The Telegram recipient, who always exists, plus everyone who registered.
 
-    Order is the index's, so a night's log reads the same way twice.
+    His call, and it settles what had been a conditional: "телеграм - нехай буде
+    користувач за замовченням який завжди вже створений в системі." So it is not
+    a fallback for an empty index -- it is a recipient, unconditionally, and its
+    settings are `hovaysya.json` rather than a file in this directory.
+
+    That used to appear only when the index was empty, which was invisible for as
+    long as nobody could register. Open registration would have made it a silent
+    fault: the first stranger to install the app would have taken its place, and
+    the Telegram bell -- the only delivery there is today -- would have stopped,
+    with nothing anywhere to say why.
+
+    Its name is reserved, so nobody can register under it and layer their own
+    settings over his. Pass `telegram=None` for the plain reading of the index.
+
+    Order puts it first and then follows the index, so a night's log reads the
+    same way twice.
     """
     names = list(dict.fromkeys(index(directory).values()))
     base = fallback if fallback is not None else _shipped()
-    if not names:
-        return only(base)
-    return [Recipient(name=n, config=config_of(n, directory, base=base))
-            for n in names]
+    people = [Recipient(name=n, config=config_of(n, directory, base=base))
+              for n in names if n != telegram]
+    if telegram is None:
+        return people or only(base)
+    return only(base, name=telegram) + people

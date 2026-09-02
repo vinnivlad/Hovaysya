@@ -102,3 +102,184 @@ def test_only_builds_the_world_as_it_is_today():
     people = only(ZHULIANY)
     assert len(people) == 1 and people[0].config is ZHULIANY
     assert isinstance(people[0].tracker, Tracker)
+# --- appearing without a restart --------------------------------------------
+
+RAID = (
+    (0, "alarm_kyiv", "🛑 Повітряна тривога в м. Київ"),
+    (60, "mon1tor_ua", "⚠️Реактивний шахед на Житомир."),
+    (90, "mon1tor_ua", "⚠️2 реактивні шахеди на Жуляни та Вишневе."),
+)
+
+
+def _corpus(tmp_path, at):
+    """A database holding one raid, timestamped to just before `at`."""
+    import sqlite3
+
+    from tools.export import store
+
+    conn = store.connect(tmp_path / "messages.db")
+    conn.row_factory = sqlite3.Row
+    for offset, channel, text in RAID:
+        conn.execute(
+            "INSERT INTO messages (channel, message_id, ts, date_utc, "
+            "text_raw, text_norm, fingerprint) VALUES (?,?,?,?,?,?,?)",
+            (channel, offset, at - 300 + offset, "", text, text,
+             f"f{offset}"))
+    conn.commit()
+    return conn
+
+
+def _dir_with(tmp_path, **configs):
+    """A recipients directory as the API would have written it."""
+    import json
+
+    from tools.policy import tokens as people
+
+    directory = tmp_path / "recipients"
+    directory.mkdir(exist_ok=True)
+    index = {}
+    for name, changes in configs.items():
+        index[people.hashed(name)] = name
+        (directory / f"{name}.json").write_text(
+            json.dumps(changes, ensure_ascii=False), encoding="utf-8")
+    people.write_index(index, directory)
+    return directory
+
+
+def test_somebody_who_registers_mid_raid_is_taken_on_next_poll(tmp_path):
+    """His answer to needing a restart: "чому б спостерігачу не перевіряти, чи
+    не зʼявився новий користувач, і просто не включати його в обробку на
+    наступній ітерації? Безшовно і не треба нічого перезапускати."
+    """
+    import time
+
+    from tools.live.run import Session, handle, refresh_recipients
+    from tools.policy.config import load as load_config
+    from tools.policy.recipients import TELEGRAM_NAME
+    from tools.policy.status import ALERT, snapshot
+
+    now = time.time()
+    conn = _corpus(tmp_path, now)
+    cfg = load_config(warn=lambda _m: None)
+
+    session = Session()
+    session.tracker.official_source = True
+    for offset, channel, text in RAID:
+        handle(session, channel, offset, int(now) - 300 + offset, text,
+               False, now)
+    assert snapshot(session.recipients[0], now=int(now))["state"] == ALERT
+
+    directory = _dir_with(tmp_path, оля={"home": "Виноградар"})
+    notes = refresh_recipients(session, conn, directory, cfg, now)
+
+    # He is still there. The fallback recipient used to appear only when the
+    # index was empty, so the first stranger to install the app would have
+    # replaced him and the Telegram bell -- the only delivery there is today --
+    # would have stopped with nothing in the log to say why.
+    assert [who.name for who in session.recipients] == [TELEGRAM_NAME, "оля"], notes
+    olya = session.recipients[1]
+    assert olya.config.home == "Виноградар"
+    # Warmed, so the screen tells the truth from the first moment rather than
+    # saying "без загроз" into a running raid.
+    assert snapshot(olya, now=int(now))["state"] == ALERT, notes
+    # And her tracker knows the siren is being watched. Set on the first
+    # recipient's tracker alone, everyone after the first would read a chat
+    # channel's "ТРИВОГА" as the siren itself.
+    assert olya.tracker.official_source is True
+
+
+def test_a_settings_change_is_picked_up_without_forgetting_the_raid(tmp_path):
+    """"Користувачі мають мати можливість змінювати свій конфіг. Можливо навіть
+    автоматично, при переміщенні містом." A watcher holding the old home would
+    ring for the old ring until a deploy.
+
+    The tracker survives it: the episode is about the sky, not about them, and
+    dropping it because somebody moved would forget the alert that is running.
+    """
+    import time
+
+    from tools.live.run import Session, handle, refresh_recipients
+    from tools.policy.config import load as load_config
+
+    now = time.time()
+    conn = _corpus(tmp_path, now)
+    cfg = load_config(warn=lambda _m: None)
+
+    directory = _dir_with(tmp_path, оля={"home": "Виноградар"})
+    session = Session()
+    refresh_recipients(session, conn, directory, cfg, now)
+    olya = [who for who in session.recipients if who.name == "оля"][0]
+    for offset, channel, text in RAID:
+        handle(session, channel, offset, int(now) - 300 + offset, text,
+               False, now)
+    episode = olya.tracker.episode
+    assert episode is not None
+
+    _dir_with(tmp_path, оля={"home": "Жуляни", "radius_km": 3})
+    notes = refresh_recipients(session, conn, directory, cfg, now)
+
+    assert "~оля" in notes, notes
+    assert olya in session.recipients, "the same person, not a new one"
+    assert olya.config.home == "Жуляни"
+    assert olya.tracker.config.home == "Жуляни"
+    assert olya.announcer.config.home == "Жуляни"
+    assert olya.tracker.episode is episode, "the raid was forgotten"
+
+
+def test_the_directory_is_only_read_when_it_changes(tmp_path):
+    """One `scandir` a poll is nothing beside seven HTTP fetches, but reloading
+    every poll would rebuild trackers for no reason."""
+    from tools.live.run import recipients_signature
+
+    directory = _dir_with(tmp_path, оля={"home": "Виноградар"})
+    first = recipients_signature(directory)
+    assert first == recipients_signature(directory)
+
+    _dir_with(tmp_path, оля={"home": "Виноградар"}, петро={"home": "Жуляни"})
+    assert recipients_signature(directory) != first
+    # A directory that is not there yet is not an error.
+    assert recipients_signature(tmp_path / "absent") == ()
+def test_the_telegram_recipient_is_a_user_that_always_exists(tmp_path):
+    """His call, and it settles what I had made conditional: "телеграм - нехай
+    буде користувач за замовченням який завжди вже створений в системі."
+
+    It is not a fallback for an empty index. `from_dir` used to return it only
+    when there were no names, which was invisible for as long as nobody could
+    register -- and open registration would have made it a silent fault: the
+    first stranger to install the app takes its place, and the Telegram bell,
+    the only delivery there is today, stops with nothing anywhere to say why.
+    """
+    from tools.policy.config import DEFAULTS
+    from tools.policy.recipients import TELEGRAM_NAME, from_dir
+
+    for configs in ({}, {"оля": {"home": "Виноградар"}},
+                    {"оля": {"home": "Виноградар"},
+                     "петро": {"home": "Жуляни"}}):
+        directory = _dir_with(tmp_path, **configs)
+        names = [who.name for who in from_dir(directory, fallback=DEFAULTS)]
+        assert names[0] == TELEGRAM_NAME, names
+        assert names.count(TELEGRAM_NAME) == 1, names
+        assert len(names) == len(configs) + 1, names
+        for path in directory.glob("*.json"):
+            if path.name != "index.json":
+                path.unlink()
+
+    # Its settings come from `hovaysya.json` and never from this directory, so
+    # there is nothing here for anybody to layer over his ring.
+    assert not (directory / f"{TELEGRAM_NAME}.json").exists()
+
+    # And the plain reading of the index is still available.
+    directory = _dir_with(tmp_path, оля={"home": "Виноградар"})
+    plain = [who.name for who in from_dir(directory, fallback=DEFAULTS,
+                                          telegram=None)]
+    assert plain == ["оля"], plain
+
+
+def test_nobody_can_register_as_the_telegram_recipient(tmp_path):
+    """A stranger under that name would have had their own settings file layered
+    over his ring, because that is where `config_of` looks."""
+    from tools.policy import tokens as people
+
+    for chosen in (people.TELEGRAM_NAME, people.TELEGRAM_NAME.upper()):
+        name = people.register(people.hashed(chosen), chosen, tmp_path)
+        assert name.casefold() != people.TELEGRAM_NAME.casefold(), name

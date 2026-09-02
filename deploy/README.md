@@ -187,6 +187,25 @@ does not know would render as a blank label, and the layout belongs to the app
 because this side cannot see the screen. An absent file is a real answer and says
 so, which is what a phone sees in the seconds after it registers.
 
+Nothing has to be restarted for a person to appear. The watcher compares the
+names, sizes and modification times of this directory between polls -- one
+`scandir` against seven HTTP fetches -- and takes on whoever registered, drops
+whoever left, and reloads changed settings. His design: "чому б спостерігачу не
+перевіряти, чи не зʼявився новий користувач, і просто не включати його в обробку
+на наступній ітерації? Безшовно і не треба нічого перезапускати."
+
+A newcomer is warmed from the corpus first, the same window and the same code
+path the watcher uses on its own start-up, so a phone that registers during a
+raid does not open on "без загроз". Understating is the worse direction: an app
+that says there are no threats while the sirens are on does not get a second
+chance. An existing person keeps their tracker through a settings change --
+the episode is about the sky, not about them.
+
+`telegram_channel` is a recipient that always exists, whether or not anybody has
+installed anything, and its settings are `hovaysya.json` rather than a file here.
+Its name is reserved, so nobody can register under it and layer their own ring
+over his.
+
 Registration is open, and everything else needs the token it hands back. Nobody
 administers anybody: a phone generates its own secret, keeps it, and sends only
 `sha256` of it, so this machine never holds anything that could impersonate a

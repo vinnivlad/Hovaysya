@@ -64,7 +64,16 @@ FALLBACK_NAME = "хтось"
 #
 # Registration gives it the same visible suffix a repeated name gets, so the
 # choice is kept rather than silently replaced.
-RESERVED_NAMES = frozenset({"index"})
+#
+# `telegram_channel` is reserved for the second reason: it is a user
+# that always exists rather than one that registered -- "телеграм - нехай буде
+# користувач за замовченням який завжди вже створений в системі" -- and its
+# settings are `hovaysya.json`. A stranger registering under that name would
+# have had their own file layered over his ring.
+# His name for it, and it says what it is rather than who: a delivery channel
+# that exists whether or not anybody has installed anything.
+TELEGRAM_NAME = "telegram_channel"
+RESERVED_NAMES = frozenset({"index", TELEGRAM_NAME})
 _NAME_DROP = re.compile(r"[^\w \-]", re.UNICODE)
 _NAME_SPACE = re.compile(r"\s+")
 

@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import signal
 import sqlite3
 import statistics
@@ -60,6 +61,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 LOG_DIR = REPO_ROOT / "data" / "live"
 # One JSON file per person, rewritten every poll: what the first screen shows.
 STATE_DIR = LOG_DIR / "state"
+# Written by the API when somebody registers or changes their settings, read here
+# between polls. The watcher never writes it.
+RECIPIENTS_DIR = REPO_ROOT / "data" / "recipients"
 TOKEN_HINT = "data/telegram-bot.token"
 
 # Quiet, there is nothing to be quick about: the channels post a few times an
@@ -160,9 +164,10 @@ class Session:
         beside them.
         """
         if not self.recipients:
-            from ..policy.recipients import Recipient
+            from ..policy.recipients import TELEGRAM_NAME, Recipient
 
-            self.recipients = [Recipient(name="я", config=self.tracker.config,
+            self.recipients = [Recipient(name=TELEGRAM_NAME,
+                                         config=self.tracker.config,
                                          tracker=self.tracker,
                                          announcer=self.announcer)]
 
@@ -348,6 +353,98 @@ def interval_hint(args, session: Session) -> float:
                interval_for("mon1tor_ua", session.tracker, args))
 
 
+def recipients_signature(directory: Path) -> tuple:
+    """Enough of the recipients directory to notice a change, and nothing more.
+
+    Names, sizes and modification times of the files the API writes. One
+    `scandir` a poll, which is nothing beside seven HTTP fetches, and it means
+    nobody has to be told to restart anything.
+    """
+    try:
+        return tuple(sorted(
+            (e.name, e.stat().st_size, e.stat().st_mtime_ns)
+            for e in os.scandir(directory) if e.name.endswith(".json")))
+    except OSError:
+        return ()
+
+
+def warm_one(who, conn, now: float) -> int:
+    """Replay the recent past into one person's tracker, telling them nothing.
+
+    Without this a phone that registers during a raid gets a screen saying there
+    are no threats, because its tracker has never seen a message. Understating is
+    the worse direction: an app that says "без загроз" while the sirens are on
+    does not get a second chance.
+
+    The same window and the same code path as the watcher's own start-up warm --
+    a Session of one, `warm=True` throughout -- so the decisions and the
+    announcer's memory advance exactly as they would have, and nothing is sent
+    about weather that has already passed. The log rows are discarded on purpose:
+    they were never said to this person, and `/decisions` claiming otherwise
+    would be a lie on the feed screen.
+    """
+    solo = Session(recipients=[who], tracker=who.tracker,
+                   announcer=who.announcer, notifier=None)
+    seen = 0
+    for row in conn.execute(
+            "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
+            "WHERE ts >= ? AND ts <= ? AND text_norm <> '' "
+            "ORDER BY ts, channel IN ('alarm_kyiv')",
+            (int(now) - WARM_WINDOW_S, int(now))):
+        handle(solo, row["channel"], row["message_id"], row["ts"],
+               row["text_norm"], row["reply_to"] is not None, now, warm=True)
+        seen += 1
+    return seen
+
+
+def refresh_recipients(session: Session, conn, directory: Path,
+                       fallback, now: float) -> list[str]:
+    """Take on whoever appeared, drop whoever left, reload changed settings.
+
+    His answer to needing a restart, and it is the better one: "чому б
+    спостерігачу не перевіряти, чи не зʼявився новий користувач, і просто не
+    включати його в обробку на наступній ітерації? Безшовно і не треба нічого
+    перезапускати."
+
+    Settings are the change that matters most often, and the one I would have
+    missed: somebody moving across the city rewrites their own `home`, and a
+    watcher holding the old one keeps ringing for the old ring until a deploy --
+    "можливо навіть автоматично, при переміщенні містом".
+
+    An existing person keeps their tracker and announcer through a settings
+    change. The episode is about the sky rather than about them, and throwing it
+    away because they moved would forget the alert that is running.
+    """
+    fresh = {who.name: who for who in from_dir(directory, fallback=fallback)}
+    have = {who.name: who for who in session.recipients}
+    notes = []
+
+    for name, who in have.items():
+        if name not in fresh:
+            notes.append(f"-{name}")
+        elif fresh[name].config != who.config:
+            who.config = fresh[name].config
+            who.tracker.config = who.config
+            who.announcer.config = who.config
+            notes.append(f"~{name}")
+
+    for name, who in fresh.items():
+        if name not in have:
+            who.tracker.official_source = session.tracker.official_source
+            notes.append(f"+{name} ({warm_one(who, conn, now)} прогріто)")
+
+    # Order stays the index's, so a night's log reads the same way twice.
+    session.recipients = [have.get(name) or fresh[name] for name in fresh]
+    # `session.tracker` decides the polling interval and the heartbeat word. If
+    # the person it belongs to has gone, it stops being fed and the watch would
+    # quietly drop to the quiet interval while a raid was on.
+    if session.recipients and session.tracker not in (
+            who.tracker for who in session.recipients):
+        session.tracker = session.recipients[0].tracker
+        session.announcer = session.recipients[0].announcer
+    return notes
+
+
 def write_state(session: Session, directory: Path, now: float) -> None:
     """One file per person, so the app has a screen to open rather than a feed.
 
@@ -460,10 +557,11 @@ def main(argv: list[str] | None = None) -> int:
     # normal case; a broken one prints a line and changes nothing, because a
     # typo must never be the reason the watch is not running at 3 a.m.
     cfg = load_config(Path(args.config))
-    # Everyone with settings of their own, or just him when there are none --
-    # which is what runs today. The directory is written by the API, so a person
-    # who changes their ring in the app is picked up at the next restart, and the
-    # deploy already restarts.
+    # Everyone with settings of their own, or just him when there are none. The
+    # directory is written by the API, and the loop re-reads it between polls, so
+    # somebody who registers or moves their home is taken on within one interval
+    # -- see `refresh_recipients`. Nothing has to be restarted for a person to
+    # appear.
     people = from_dir(fallback=cfg)
     session = Session(notifier=None if args.no_telegram else Notifier(),
                       recipients=people,
@@ -471,7 +569,14 @@ def main(argv: list[str] | None = None) -> int:
                       announcer=people[0].announcer)
     # The official channel speaks only when the siren changes, so "has it spoken
     # lately" is not the same question as "is it being watched".
-    session.tracker.official_source = bool(OFFICIAL_CHANNELS & set(channels))
+    # Every recipient's tracker, not only the first. It answers "is the
+    # authoritative source in this stream", which is a fact about the run rather
+    # than about a person -- and set on `session.tracker` alone, everybody after
+    # the first would treat a chat channel's "ТРИВОГА" as the siren itself.
+    # Dormant while there was one recipient, and registration is what wakes it.
+    watching_official = bool(OFFICIAL_CHANNELS & set(channels))
+    for who in people:
+        who.tracker.official_source = watching_official
     stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
     log_path = LOG_DIR / f"{stamp}.jsonl"
 
@@ -553,6 +658,9 @@ def main(argv: list[str] | None = None) -> int:
 
     last_beat = time.time()
     last_poll = time.time()
+    # Already taken on at start-up, so the first pass through the loop has
+    # nothing to do unless somebody registered in the meantime.
+    last_recipients = recipients_signature(RECIPIENTS_DIR)
     while not _STOP:
         # Was the machine asleep? Then this batch is catch-up, not live.
         overslept = time.time() - last_poll
@@ -560,6 +668,13 @@ def main(argv: list[str] | None = None) -> int:
         if slept:
             print(f"  · машина спала ~{overslept / 60:.0f} хв — "
                   f"наздоганяю тихо", flush=True)
+        signature = recipients_signature(RECIPIENTS_DIR)
+        if signature != last_recipients:
+            last_recipients = signature
+            for note in refresh_recipients(session, conn, RECIPIENTS_DIR, cfg,
+                                           time.time()):
+                print(f"  · отримувачі: {note}", flush=True)
+
         poll_once(client, conn, watchers, session, warm=slept, args=args)
         last_poll = time.time()
         write_log(session, log_path)
