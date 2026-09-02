@@ -213,6 +213,19 @@ CITY = [
     _p("Лісовий масив", "city", "лісовий"),
     _p("Лівобережний масив", "city", "лівобережн"),
     _p("Харківський масив", "city", "харківський масив"),
+    # The massif on its own, which is how his channels write it: "якщо точно
+    # «Харківський», без область - то це житловий масив Харківський."
+    #
+    # `exact` and the full nominative, both deliberately narrow. Only 9 of the 92
+    # mentions are bare -- the other 91 write the phrase in full and are already
+    # resolved by the longer stem above -- and two of the nine are Kharkiv
+    # oblast's own raion. So a wider stem would buy nothing and cost those:
+    # `харківськ` would take "Харківському районах", and dropping `exact` would
+    # take it too.
+    #
+    # `ambiguous` for the rest. "Харківщина: 1х БпЛА Харківський район Пісочин"
+    # names the oblast beside the raion, and that is what settles whose.
+    _p("Харківський", "city", "харківський", exact=True, ambiguous=True),
     _p("Дарницький масив", "city", "дарницький масив"),
     # `мінський масив` missed the instrumental — "над Мінським масивом". Bare
     # Minsk never occurs in these channels.

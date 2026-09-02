@@ -50,6 +50,12 @@ HAND: dict[str, tuple[float, float, str]] = {
     # ring, and the bearings differ by 11.7 degrees against a 90 degree sector --
     # so no decision anywhere turns on the choice, and the simpler answer wins.
     "ПОХ": (50.43026, 30.64798, "hand:darnytsia"),
+    # The bare form of "Харківський масив", which is the same place, so it takes
+    # the same point rather than a second guess at one. Without this it would be
+    # a name that resolves and cannot be measured -- and since the ring is
+    # kilometres and not names, that is worse than not knowing it at all: it
+    # would count as a Kyiv mention while contributing nothing to the distance.
+    "Харківський": (50.41175, 30.65812, "hand:kharkivskyi-masyv"),
     "Вокзал": (50.44019, 30.48901, "n440084976"),       # Київ-Пасажирський
     "Десна": (50.92478, 30.77298, "w167051677"),        # 59 км, Броварський бік
     # ТРЦ Проспект, from a plus code he pasted -- "FJ3P+V6 Киев", which is the

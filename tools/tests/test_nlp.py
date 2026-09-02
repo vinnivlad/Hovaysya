@@ -1472,3 +1472,46 @@ def test_a_generated_stem_does_not_lose_the_flags_it_was_declared_with():
 
     exact = _p("ТСТ", "city", "тст", exact=True)
     assert exact.exact, "the flags must survive `_p` itself, by keyword"
+def test_kharkivskyi_alone_is_the_kyiv_massif_and_not_the_oblast():
+    """His rule: "якщо точно «Харківський», без область - то це житловий масив
+    Харківський."
+
+    Measured before following it, and the corpus corrected my first guess. I
+    expected a widespread fault -- 92 mentions resolving as another region -- and
+    91 of them write "Харківський масив" in full and were already right. Only
+    nine are bare, and two of *those* are Kharkiv oblast's own raion.
+
+    So the entry is as narrow as it can be: the full nominative, `exact`, so
+    that "Харківському районах" is untouched and the longer "харківський масив"
+    still wins its own span. Four real reports move to Kyiv, two of them threat
+    reports that had been filed as somebody else's business.
+    """
+    from tools.nlp.gazetteer import find_places, resolve_scope
+
+    for ours in ("Харківський", "Харківський/ Рембаза",
+                 "Знову на Бортничі/Харківський"):
+        assert resolve_scope(ours) == "city", ours
+
+    # The full phrase resolves through the longer entry, unchanged.
+    said = "⚠️Реактивний шахед на Харківський масив/Бортничі."
+    assert "Харківський масив" in [p.name for p in find_places(said)]
+    assert resolve_scope(said) == "city"
+
+    # And theirs stays theirs. The first is out of reach of the stem entirely;
+    # the second is reached and then settled by the oblast named beside it,
+    # which is what `ambiguous` is for.
+    for theirs in (
+        "⚠️ по одному БпЛА у Богодухівському та Харківському районах.",
+        "Харківщина: 1х БпЛА Богодухів 1х БпЛА Харківський район Пісочин.",
+        "💥Удари які готував противник було нанесено по Харківській області.",
+    ):
+        assert resolve_scope(theirs) == "elsewhere", theirs
+
+
+def test_the_bare_massif_is_measurable_and_not_merely_recognised():
+    """A name that resolves without a coordinate is worse than one that does not
+    resolve at all: it counts as a Kyiv mention and contributes nothing to the
+    distance, so it can only ever pull a decision the wrong way."""
+    from tools.nlp.coords import POINTS
+
+    assert POINTS["Харківський"] == POINTS["Харківський масив"]
