@@ -8,6 +8,8 @@ is that nothing has to be installed:
     GET  /decisions?since=<cursor>    what Ховайся decided, for this recipient
                                       -- and for nobody else: the sentence names
                                       their ring and the reason says "my area"
+    GET  /places                      every name the policy knows, for the
+                                      first screen's home picker
     GET  /config                      their settings
     PUT  /config                      change them
     GET  /health                      no token needed
@@ -272,6 +274,42 @@ def decisions(log_dir: Path, who: str | None, since: str | None, limit: int,
     return {"decisions": out, "next": out[-1]["cursor"] if out else (since or "")}
 
 
+def places() -> dict:
+    """Every name the policy knows, so the picker can only offer names it parses.
+
+    Read from the gazetteer itself rather than from a generated copy of it. A copy
+    would be one more thing to keep in step and its failure would be quiet: a
+    picker offering a district the rules no longer recognise, or a home with no
+    coordinate, which leaves `Config.centre()` returning None and the radius
+    silently empty while the ring falls back to the hand list.
+
+    `home` is the flag the first screen needs. 230 names are known and 162 have a
+    point, because some deliberately cannot have one -- Правий берег is half a
+    city, Київщина is the oblast -- and those can be reported as a threat but not
+    lived in. `tiers` is the gazetteer's own order, so the picker groups by it
+    rather than inventing an order of its own.
+
+    Two modules join the process here, `gazetteer` and `coords`, and both are
+    data: neither pulls in `hints`, which is where every fault in this project has
+    lived. Imported inside the function so a service nobody asks for a picker
+    stays at six modules -- but after the first request they are resident, and
+    this is a lazy import rather than a smaller service.
+    """
+    from ..nlp.coords import POINTS
+    from ..nlp.gazetteer import PLACES, TIERS
+
+    out = []
+    for place in PLACES:
+        point = POINTS.get(place.name)
+        out.append({"name": place.name, "tier": place.tier,
+                    "lat": point[0] if point else None,
+                    "lon": point[1] if point else None,
+                    "home": point is not None,
+                    "landmark": place.landmark or None})
+    out.sort(key=lambda r: r["name"])
+    return {"places": out, "tiers": list(TIERS)}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "hovaysya"
     sys_version = ""
@@ -327,6 +365,8 @@ class Handler(BaseHTTPRequestHandler):
                                      _parse_back((query.get("back") or [None])[0])))
         elif url.path == "/decisions":
             self._send(200, decisions(self.server.log_dir, who, since, limit))
+        elif url.path == "/places":
+            self._send(200, places())
         elif url.path == "/config":
             from ..policy.config import changed_from_default
 

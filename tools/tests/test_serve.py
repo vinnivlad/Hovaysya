@@ -421,3 +421,54 @@ def test_the_window_reaches_the_endpoint(api):
     # Percent-encoding, because a hand-typed URL is exactly where this arrives.
     assert call(api, "/messages?back=%D0%BD%D0%BE%D0%BD%D1%81%D0%B5%D0%BD%D1%81")[0] == 200
     assert call(api, "/messages?back=-5")[0] == 200
+# --- the home picker --------------------------------------------------------
+
+
+def test_every_name_offered_as_a_home_can_actually_be_one():
+    """The invariant the first screen rests on, and the reason `/places` reads the
+    gazetteer instead of a generated copy.
+
+    A home with no coordinate is not an error anyone sees: `Config.centre()`
+    returns None, the radius contributes nothing, and the ring quietly falls back
+    to the hand list -- so the person gets somebody else's ring and no message
+    says so. Offering only names that survive `centre()` is what stops that, and
+    it has to be checked against the real gazetteer rather than a fixture,
+    because the failure arrives when the two drift.
+    """
+    from dataclasses import replace
+
+    from tools.policy.config import DEFAULTS
+    from tools.serve.api import places
+
+    page = places()
+    offered = [p for p in page["places"] if p["home"]]
+    assert len(offered) > 100, len(offered)
+
+    for p in offered:
+        centre = replace(DEFAULTS, home=p["name"]).centre()
+        assert centre is not None, p["name"]
+        assert centre == (p["lat"], p["lon"]), p["name"]
+
+
+def test_a_name_that_cannot_be_a_point_is_not_offered_as_a_home():
+    """Правий берег is half a city and Київщина is the oblast. Both are real
+    threats to report and neither is a place to live, which is why `coords.py`
+    leaves them out on purpose rather than substituting a centre."""
+    from tools.serve.api import places
+
+    by_name = {p["name"]: p for p in places()["places"]}
+    for name in ("Правий берег", "Київщина"):
+        assert by_name[name]["home"] is False, name
+        assert by_name[name]["lat"] is None, name
+
+
+def test_the_picker_is_offered_the_gazetteers_own_tier_order():
+    """So the app groups "мій район / поруч / місто / область" the way the policy
+    ranks them, rather than inventing an order that disagrees with the rules."""
+    from tools.nlp.gazetteer import PLACES, TIERS
+    from tools.serve.api import places
+
+    page = places()
+    assert page["tiers"] == list(TIERS)
+    assert {p["name"] for p in page["places"]} == {p.name for p in PLACES}
+    assert {p["tier"] for p in page["places"]} <= set(TIERS)
