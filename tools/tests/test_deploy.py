@@ -92,7 +92,12 @@ def test_the_installers_do_not_refer_to_units_that_are_gone():
 
     root = Path(__file__).resolve().parents[2] / "deploy"
     for script in sorted(root.glob("*.sh")):
-        body = script.read_text(encoding="utf-8")
+        # Comments stripped first, or the test trips over its own explanation --
+        # which it did: the comment saying "there is no deploy/x.service" read as
+        # a script reading deploy/x.service.
+        body = "\n".join(
+            line for line in script.read_text(encoding="utf-8").splitlines()
+            if not line.lstrip().startswith("#"))
         for name in re.findall(r"hovaysya[\w-]*\.(?:service|timer)", body):
             if f'"$REPO/deploy/$unit"' in body or f"deploy/{name}" in body:
                 assert (root / name).exists(), \

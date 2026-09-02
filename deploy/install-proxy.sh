@@ -55,9 +55,11 @@ case "$HOST" in
 *.duckdns.org)
 	DUCK_NAME="${HOST%%.duckdns.org}"
 	if [ -r "$REPO/data/duckdns.token" ]; then
-		sed "s#/home/ubuntu/hovaysya#$REPO#g; s#User=ubuntu#User=$(stat -c %U "$REPO")#" \
-			"$REPO/deploy/hovaysya-duckdns.service" > /etc/systemd/system/hovaysya-duckdns.service 2>/dev/null \
-			|| cat > /etc/systemd/system/hovaysya-duckdns.service <<UNIT
+		# Written inline: there is no `deploy/hovaysya-duckdns.service` to copy,
+		# and the `sed ... || cat` form that used to be here meant the first half
+		# never ran. A test now checks that no script reads a unit file which is
+		# not in the repository, because that is how this was found.
+		cat > /etc/systemd/system/hovaysya-duckdns.service <<UNIT
 [Unit]
 Description=Keep the DuckDNS name pointing here
 After=network-online.target
