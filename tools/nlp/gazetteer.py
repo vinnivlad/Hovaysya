@@ -24,7 +24,7 @@ Tiers are relative to the reference location, Zhuliany:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 # Tiers, ordered most to least relevant. Order matters: resolution returns the
 # most relevant tier present in a message, because "Жуляни та Троєщина" is about
@@ -58,19 +58,31 @@ class Place:
     # so does Dnipro; every second city has a Shevchenkivskyi. Alone it means
     # ours, but a named oblast in the same message means theirs.
     ambiguous: bool = False
+    # The word must *be* the stem rather than start with it. For an abbreviation
+    # there is no inflection to allow for, and three letters are a prefix of far
+    # too much: `пох` matches "походу", "Похоже" and "похолодання", which in the
+    # corpus is 9 wrong hits against 11 right ones. Everything else here is long
+    # enough that a prefix is already unambiguous.
+    exact: bool = False
 
 
 def _p(name: str, tier: str, *stems: str, landmark: bool = False,
-       origin: bool = False, ambiguous: bool = False) -> Place:
+       origin: bool = False, ambiguous: bool = False,
+       exact: bool = False) -> Place:
     """Declare a place. Stems are normalised the same way message text is.
 
     Apostrophes are stripped here so an entry can be written the readable way
     (`солом'ян`) while still matching text where the apostrophe is a different
     character, or absent.
     """
+    # By keyword, not by position. Adding `exact` to the end of the signature
+    # and forgetting it here is exactly what happened, and the failure was
+    # silent: every ПОХ entry came out with `exact=False` and matched "походу"
+    # anyway. Positional flags are a trap that only springs when a flag is added.
     return Place(name, tier,
                  tuple(_strip_apostrophes(s).lower() for s in stems),
-                 landmark, origin, ambiguous)
+                 landmark=landmark, origin=origin, ambiguous=ambiguous,
+                 exact=exact)
 
 
 # The near ring — the places whose trouble is the user's trouble.
@@ -165,6 +177,12 @@ CITY = [
     _p("Оболонь", "city", "оболон"),
     _p("Дарниця", "city", "дарниц"),
     _p("Позняки", "city", "позняк"),
+    # What the channels call Позняки + Осокорки + Харківський together, which is
+    # most of Darnytskyi raion. `exact` because three letters are a prefix of too
+    # much: as a stem it would take "походу", "Похоже" and "похолодання" -- 9
+    # wrong against 11 right in the corpus. As a whole word it takes only the 11,
+    # and an abbreviation has no inflected forms to allow for anyway.
+    _p("ПОХ", "city", "пох", exact=True),
     _p("Лук'янівка", "city", "лук'янів", "лукянів"),
     _p("Виноградар", "city", "виноградар", "виноград"),
     _p("Святошин", "city", "святошин"),
@@ -478,7 +496,12 @@ def _with_alternations(place: Place) -> Place:
     if not extra:
         return place
     merged = tuple(dict.fromkeys(place.stems + tuple(extra)))
-    return Place(place.name, place.tier, merged)
+    # `replace`, because rebuilding by hand dropped `landmark`, `origin` and
+    # `ambiguous` -- silently, for any name whose stem ends in -ів, -їв or -іл.
+    # Nothing in the list is hit by it today, which is precisely why it would
+    # have waited for a name that is: an origin place that stopped being one
+    # makes a country-wide threat read as a targeted one.
+    return replace(place, stems=merged)
 
 
 # Named landmarks with a fixed address. These were missing entirely, and the
@@ -584,7 +607,9 @@ def _stem_matches(flat: str) -> list[tuple[int, int, int, Place]]:
             while start != -1:
                 if _at_word_start(flat, start):
                     end = _word_end(flat, start + len(stem))
-                    found.append((len(stem), start, end, place))
+                    # An exact place is the whole word or nothing.
+                    if not place.exact or end == start + len(stem):
+                        found.append((len(stem), start, end, place))
                 start = flat.find(stem, start + 1)
     return found
 

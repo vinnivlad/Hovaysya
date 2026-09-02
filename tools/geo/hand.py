@@ -39,6 +39,17 @@ HAND: dict[str, tuple[float, float, str]] = {
     "ТЕЦ-6": (50.53123, 30.66698, "w106296381"),
     "ТЕЦ-2": (50.44796, 30.63725, "n11443564769"),
     "Лавіна": (50.49553, 30.36058, "w446901282"),
+    # ПОХ is what the channels call Позняки + Осокорки + Харківський, which is
+    # most of Darnytskyi raion -- his instruction: "це по суті Дарницький район,
+    # став ті самі координати". So it takes Дарниця's own point rather than a
+    # centroid of the three.
+    #
+    # Checked before following it, because the ring is measured in kilometres:
+    # the centroid of Позняки and Осокорки sits 3.4 km south-west of Дарниця,
+    # which is 13.5 km from Zhuliany against 15.2. Both are far outside the 6 km
+    # ring, and the bearings differ by 11.7 degrees against a 90 degree sector --
+    # so no decision anywhere turns on the choice, and the simpler answer wins.
+    "ПОХ": (50.43026, 30.64798, "hand:darnytsia"),
     "Вокзал": (50.44019, 30.48901, "n440084976"),       # Київ-Пасажирський
     "Десна": (50.92478, 30.77298, "w167051677"),        # 59 км, Броварський бік
     # ТРЦ Проспект, from a plus code he pasted -- "FJ3P+V6 Киев", which is the

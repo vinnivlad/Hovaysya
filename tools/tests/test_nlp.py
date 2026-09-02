@@ -1414,3 +1414,61 @@ def test_only_the_class_reads_the_trimmed_text():
     assert "шахед" not in without_denials(line).lower()
     assert [p.name for p in find_places(line)] == ["Київ"]
     assert modality_hint(line) == "live-threat"
+# --- an abbreviation is a whole word ----------------------------------------
+
+
+def test_poh_is_the_word_and_not_a_prefix_of_one():
+    """His toponym: "ПОХ. Це по суті Дарницький район... Це Позняки + Осокорки
+    + Харківський."
+
+    Three letters cannot be a stem here. As a prefix `пох` takes "походу",
+    "Похоже" and "похолодання" -- 9 wrong hits in the corpus against 11 right
+    ones, so half of everything it found would have been a place that was never
+    named. As a whole word it takes exactly the 11, and an abbreviation has no
+    inflected forms to allow for anyway, which is what makes `exact` free here
+    and wrong for every other entry.
+    """
+    from tools.nlp.gazetteer import find_places
+
+    for said in ("ПОХ", "ПОХ!", "На ПОХ!", "ПОХ - увага!", "ПОХ увага",
+                 "Маневри, вже на Південний міст, ПОХ"):
+        assert "ПОХ" in [p.name for p in find_places(said)], said
+
+    for not_said in ("походу вже все", "Похоже на маневр", "похолодання",
+                     "Епоха", "непохитною", "епох"):
+        assert "ПОХ" not in [p.name for p in find_places(not_said)], not_said
+
+
+def test_poh_carries_a_point_so_it_can_be_measured():
+    """Every relevance decision resolves against a distance, so a name with no
+    coordinate contributes nothing to the ring however often it is said.
+
+    It takes Дарниця's own point rather than a centroid of the three massifs,
+    which is what he asked for -- and checked before following: the centroid
+    sits 3.4 km away, 13.5 km from home against 15.2, both far outside the 6 km
+    ring, with bearings 11.7 degrees apart against a 90 degree sector. Nothing
+    turns on it.
+    """
+    from tools.nlp.coords import POINTS
+
+    assert POINTS["ПОХ"] == POINTS["Дарниця"]
+
+
+def test_a_generated_stem_does_not_lose_the_flags_it_was_declared_with():
+    """`_with_alternations` rebuilt the place by hand -- `Place(name, tier,
+    merged)` -- which silently dropped `landmark`, `origin` and `ambiguous` for
+    any name whose stem ends in -ів, -їв or -іл.
+
+    Nothing in the list is hit by it today, which is exactly why it would have
+    waited for a name that is: an origin place that quietly stopped being one
+    makes a country-wide threat read as a targeted one.
+    """
+    from tools.nlp.gazetteer import _p, _with_alternations
+
+    marked = _p("Тестів", "oblast", "тестів", origin=True, ambiguous=True)
+    grown = _with_alternations(marked)
+    assert "тестов" in grown.stems, grown.stems
+    assert grown.origin and grown.ambiguous, grown
+
+    exact = _p("ТСТ", "city", "тст", exact=True)
+    assert exact.exact, "the flags must survive `_p` itself, by keyword"
