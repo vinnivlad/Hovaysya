@@ -337,29 +337,30 @@ def test_a_window_returns_the_newest_of_it_not_the_oldest(db):
     assert page["next"].startswith("101.")
 
 
-def test_a_window_shorter_than_the_silence_comes_back_empty(db):
-    """Ten minutes of quiet is normal -- twenty-two times a day -- so an empty
-    window is an answer, not a fault."""
+def test_an_empty_window_still_says_where_to_poll_from(db):
+    """The defect his question found, and he restated it more plainly than I
+    had: "якщо за минулі 30хв нічого не було, то курсора нема."
+
+    That is exactly what happened. `?back=30m` on a quiet stretch returned no
+    messages *and* an empty cursor, so an app opened during one -- which is about
+    twenty-two times a day -- had no way forward except replaying the corpus from
+    January 2024. An empty window is a normal answer; an empty cursor is a dead
+    end.
+
+    It is also why there is no `?since=head` any more. That existed to fetch a
+    bare cursor, and he asked what it was for: "воно ж ніколи не поверне нічого,
+    хіба ні?" It never did, and once this answers with a cursor of its own there
+    was nothing left for it to do.
+    """
     from tools.serve.api import messages
 
     conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
-    page = messages(conn, None, 10, back=60, now=10_000)
-    assert page["messages"] == []
-
-
-def test_head_gives_a_cursor_and_no_history(db):
-    """For an app that wants only what happens next. Without it the only way in
-    was a cursor, and a cursor never held means January 2024."""
-    from tools.serve.api import messages
-
-    conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    page = messages(conn, "head", 10)
-    assert page["messages"] == []
-    assert page["next"].startswith("101.")
+    quiet = messages(conn, None, 10, back=60, now=10_000)
+    assert quiet["messages"] == []
+    assert quiet["next"].startswith("101."), "an empty window must still give a cursor"
     # ...and polling from it returns nothing until something new arrives.
-    assert messages(conn, page["next"], 10)["messages"] == []
+    assert messages(conn, quiet["next"], 10)["messages"] == []
 
 
 @pytest.mark.parametrize("given,seconds", [

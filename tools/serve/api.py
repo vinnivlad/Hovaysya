@@ -5,7 +5,6 @@ is that nothing has to be installed:
 
     GET  /messages?since=<cursor>     the merged raw feed of every channel
     GET  /messages?back=30m           ...or just the last half hour, newest end
-    GET  /messages?since=head         ...or nothing, and a cursor to poll from
     GET  /decisions?since=<cursor>    what Ховайся decided, for this recipient
     GET  /config                      their settings
     PUT  /config                      change them
@@ -105,7 +104,7 @@ def messages(conn: sqlite3.Connection | None, since: str | None,
              now: float | None = None) -> dict:
     """The feed, or an empty one when there is no corpus on this machine.
 
-    Three ways in, and the app needs all three:
+    Two ways in, and the app needs both:
 
     `since=<cursor>`  everything after what it already has. The ordinary poll.
     `back=30m`        the last half hour, for a screen opened cold. Returns the
@@ -113,11 +112,14 @@ def messages(conn: sqlite3.Connection | None, since: str | None,
                       because a screen is not an archive: half an hour during an
                       attack is 300 messages and the last 200 are the ones worth
                       showing.
-    `since=head`      nothing, and a cursor to poll forward from. For an app that
-                      wants only what happens next.
 
     A cursor the app has never had means the beginning, which is January 2024 --
     so without `back` a fresh screen had to walk 27 000 messages to reach tonight.
+
+    `back` always answers with a cursor, including when the window is empty, and
+    that is what makes it enough on its own. There was a third way in briefly --
+    `since=head`, a bare cursor and no messages -- and it went when he asked what
+    it was for: nothing, once this one carries a cursor too.
 
     B is a fresh box with no database until something copies one there, and the
     settings endpoint has nothing to do with the corpus. A service that refuses to
@@ -127,13 +129,6 @@ def messages(conn: sqlite3.Connection | None, since: str | None,
     if conn is None:
         return {"messages": [], "next": since or "", "corpus": False}
 
-    if since == "head":
-        row = conn.execute(
-            "SELECT ts, channel, message_id FROM messages WHERE text_norm <> '' "
-            "ORDER BY ts DESC, channel DESC, message_id DESC LIMIT 1").fetchone()
-        return {"messages": [],
-                "next": _cursor(row[0], row[1], row[2]) if row else ""}
-
     if back is not None:
         floor = int((time.time() if now is None else now) - back)
         rows = conn.execute(
@@ -142,6 +137,24 @@ def messages(conn: sqlite3.Connection | None, since: str | None,
             "ORDER BY ts DESC, channel DESC, message_id DESC LIMIT ?",
             (floor, limit)).fetchall()
         rows = list(reversed(rows))
+        if not rows:
+            # An empty window is normal -- ten minutes of silence happens about
+            # twenty-two times a day -- but it must still hand over somewhere to
+            # poll from, or an app that opened during one of those has no way
+            # forward at all except replaying the corpus from January 2024.
+            #
+            # This is also what made `?since=head` unnecessary. It existed to
+            # fetch a bare cursor, and he asked what it was for: "воно ж ніколи
+            # не поверне нічого, хіба ні?" It never did, and once `back` answers
+            # with a cursor of its own there is nothing left for it to do.
+            newest = conn.execute(
+                "SELECT ts, channel, message_id FROM messages "
+                "WHERE text_norm <> '' "
+                "ORDER BY ts DESC, channel DESC, message_id DESC "
+                "LIMIT 1").fetchone()
+            return {"messages": [],
+                    "next": _cursor(newest[0], newest[1], newest[2])
+                            if newest else ""}
     else:
         ts, channel, mid = _parse_cursor(since)
         rows = conn.execute(
