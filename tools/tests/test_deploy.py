@@ -76,3 +76,31 @@ def test_the_watcher_unit_still_holds_the_ballast():
     """It is what keeps the instance from being reclaimed, and it lives in the
     unit rather than in the code because it is a property of where this runs."""
     assert "--memory-floor-mb 260" in _text("hovaysya.service")
+
+
+def test_the_installers_do_not_refer_to_units_that_are_gone():
+    """A `str.replace` I did not assert on left `install-api.sh` sed-ing a unit
+    file that the same commit deleted: "sed: can't read
+    .../hovaysya-api-update.service: No such file or directory", on his machine
+    rather than on mine.
+
+    The check is mechanical because the mistake was: every `deploy/*.service`
+    and `deploy/*.timer` a script reads has to exist.
+    """
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2] / "deploy"
+    for script in sorted(root.glob("*.sh")):
+        body = script.read_text(encoding="utf-8")
+        for name in re.findall(r"hovaysya[\w-]*\.(?:service|timer)", body):
+            if f'"$REPO/deploy/$unit"' in body or f"deploy/{name}" in body:
+                assert (root / name).exists(), \
+                    f"{script.name} reads deploy/{name}, which is not there"
+        # ...and the loop form, where the name is only in the `for` list.
+        for block in re.findall(r"for unit in ([^;]+); do(.*?)done", body, re.S):
+            if "$REPO/deploy/$unit" not in block[1]:
+                continue
+            for name in block[0].split():
+                assert (root / name).exists(), \
+                    f"{script.name} loops over deploy/{name}, which is not there"

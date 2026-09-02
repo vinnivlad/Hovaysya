@@ -54,10 +54,16 @@ sed "s#/home/ubuntu/hovaysya#$REPO#g; s#PRIVATE_IP#$PRIVATE_IP#" \
 	"$REPO/deploy/api.service" > /etc/systemd/system/hovaysya-api.service
 
 echo "== автооновлення"
-for unit in hovaysya-api-update.service hovaysya-api-update.timer; do
-	sed "s#/home/ubuntu/hovaysya#$REPO#g; s#User=ubuntu#User=$OWNER#" \
-		"$REPO/deploy/$unit" > "/etc/systemd/system/$unit"
-done
+# No timer of its own. `deploy/update.sh` with no arguments asks systemd which
+# hovaysya services are enabled and restarts those, so the watcher's existing
+# `hovaysya-update.timer` already covers this service once it is enabled.
+#
+# A second timer is what this replaced, and it was a fault rather than
+# untidiness: two timers pulling and merging in the same working tree every
+# ten minutes can collide, and one of them was needless.
+systemctl disable --now hovaysya-api-update.timer 2>/dev/null || true
+rm -f /etc/systemd/system/hovaysya-api-update.service \
+      /etc/systemd/system/hovaysya-api-update.timer
 
 # The update timer runs as the checkout's owner, who may not restart a system
 # unit: systemd answers "Interactive authentication required". Nobody is at the
