@@ -9,9 +9,15 @@ Type=simple
 User=hovaysya-api
 Group=hovaysya-api
 WorkingDirectory=/home/ubuntu/hovaysya
-# Bound to localhost. Caddy terminates TLS in front and talks to it here, so
-# nothing in this unit handles a certificate or a private key.
-ExecStart=/usr/bin/python3 -X utf8 -m tools.serve.api --host 127.0.0.1 --port 8080
+# Bound to this machine's private VCN address, because Caddy is on the *other*
+# machine now: the app talks TLS to B, B proxies over the private network to A,
+# and A answers from the database the watcher has just written. Nothing is
+# replicated and nothing is stale -- his constraint, and the reason for the
+# shape: "якщо треба чекати поки щось запушиться, а потім поки застосунок
+# опитає - то сенс застосунку губиться".
+#
+# `%H` is not enough here; the address is written in by install-api.sh.
+ExecStart=/usr/bin/python3 -X utf8 -m tools.serve.api --host PRIVATE_IP --port 8080
 Restart=always
 RestartSec=5
 
@@ -38,12 +44,18 @@ SystemCallFilter=@system-service
 CapabilityBoundingSet=
 # Read the corpus and the decision log; write only where settings live.
 #
-# This does *not* stop the service reading a secret in the same tree -- I claimed
-# it did, and `ReadOnlyPaths` grants read access, so the claim was backwards. What
-# actually keeps the bot token away from it is that the token is on the other
-# machine: B has no bot, no chat id, and nothing to post with.
+# Read the corpus and the decision log; write only where settings live.
+#
+# The bot token is now on *this* machine, so the argument that used to keep it
+# away -- it lives on the other box -- is gone. `ReadOnlyPaths` grants read
+# access, so it has to be named and denied explicitly. This is the one real cost
+# of moving the API onto A, and it is paid here rather than argued away.
 ReadOnlyPaths=/home/ubuntu/hovaysya
 ReadWritePaths=/home/ubuntu/hovaysya/data/recipients
+InaccessiblePaths=/home/ubuntu/hovaysya/data/telegram-bot.token
+InaccessiblePaths=/home/ubuntu/hovaysya/data/telegram-chat.id
+InaccessiblePaths=/home/ubuntu/hovaysya/data/runbook.md
+InaccessiblePaths=/home/ubuntu/hovaysya/data/duckdns.token
 MemoryMax=192M
 TasksMax=64
 

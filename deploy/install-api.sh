@@ -1,74 +1,69 @@
 #!/bin/sh
-# Set up the API and the TLS in front of it, on the box that has the open port.
+# Set up the API on A, beside the watcher.
 #
-# Run on the *second* instance, not the one running the watcher. The reason is in
-# deploy/README.md: the machine reachable from the internet is not the machine
-# holding the bot token, and the bell must not travel through anything that can
-# be attacked from outside.
+# It reads the database the watcher has just written, so there is nothing to
+# replicate and nothing to be stale -- his constraint, and the reason for this
+# shape: "якщо треба чекати поки щось запушиться, а потім поки застосунок
+# опитає - то сенс застосунку губиться".
 #
-#     sudo ./deploy/install-api.sh hovaysya.duckdns.org
+# TLS lives on B. Run `deploy/install-proxy.sh <host> <this machine's 10.x>`
+# there afterwards.
 #
-# Idempotent. Running it again re-reads the unit and reloads Caddy.
+#     sudo ./deploy/install-api.sh              # finds the private address
+#     sudo ./deploy/install-api.sh 10.0.0.42    # or takes it
+#
+# Idempotent: running it again rewrites the unit and restarts the service.
 set -eu
-
-HOST="${1:-}"
-if [ -z "$HOST" ]; then
-	echo "потрібне ім'я хоста, напр. ./deploy/install-api.sh hovaysya.duckdns.org" >&2
-	echo "Let's Encrypt не видає сертифікат на голий IP." >&2
-	exit 2
-fi
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "== окремий користувач для сервісу"
-id -u hovaysya-api >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin hovaysya-api
+# The API binds to this machine's private VCN address -- the only place Caddy on
+# B can reach it from, and the only place anything can. Never 0.0.0.0: that would
+# put it on the public interface, which is the whole thing this arrangement
+# avoids.
+if [ -n "${1:-}" ]; then
+	PRIVATE_IP="$1"
+else
+	PRIVATE_IP="$(hostname -I | tr ' ' '\012' | grep -E '^10\.' | head -1)"
+fi
+if [ -z "$PRIVATE_IP" ]; then
+	echo "не знайшов приватної адреси 10.x — передай її аргументом" >&2
+	exit 2
+fi
 
-# The repo sits in somebody's home, and Ubuntu creates a home as 0750 -- owner and
-# owning group only. Without this the service dies with 200/CHDIR: "Changing to
-# the requested working directory failed: Permission denied", which reads like a
-# systemd sandbox problem and is really a POSIX one.
-#
-# Joining the group rather than `chmod o+x` on the home directory: the group is
-# already the boundary the files were created with, and widening the home to
-# everyone would be a broader change than this needs.
+echo "== окремий користувач для сервісу"
+id -u hovaysya-api >/dev/null 2>&1 \
+	|| useradd --system --no-create-home --shell /usr/sbin/nologin hovaysya-api
+
+# The repo sits in somebody's home, and Ubuntu creates a home as 0750 -- owner
+# and owning group only. Without this the service dies with 200/CHDIR: "Changing
+# to the requested working directory failed: Permission denied", which reads like
+# a systemd sandbox problem and is really a POSIX one.
 OWNER="$(stat -c %U "$REPO")"
 OWNER_GROUP="$(stat -c %G "$REPO")"
 usermod -aG "$OWNER_GROUP" hovaysya-api
-echo "  hovaysya-api додано в групу $OWNER_GROUP (власник репозиторію: $OWNER)"
+echo "  hovaysya-api додано в групу $OWNER_GROUP (власник: $OWNER)"
 
-# Two parties write here and only one of them is the service: `tools.serve.token`
-# is run by a person, and `0750 hovaysya-api:hovaysya-api` locked that person out.
-# So the group is the repository owner's, and setgid keeps it that way for
-# whatever either of them creates later.
+# Two parties write here and only one is the service: `tools.serve.token` is run
+# by a person, and 0750 hovaysya-api:hovaysya-api locked that person out. Setgid
+# keeps the group for whatever either of them creates later.
 install -d -o hovaysya-api -g "$OWNER_GROUP" -m 2770 "$REPO/data/recipients"
 
-echo "== Caddy"
-if ! command -v caddy >/dev/null 2>&1; then
-	apt-get update
-	apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
-	curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key \
-		| gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-	echo "deb [signed-by=/usr/share/keyrings/caddy-stable-archive-keyring.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main" \
-		> /etc/apt/sources.list.d/caddy-stable.list
-	apt-get update
-	apt-get install -y caddy
-fi
+echo "== сервіс на $PRIVATE_IP:8080"
+sed "s#/home/ubuntu/hovaysya#$REPO#g; s#PRIVATE_IP#$PRIVATE_IP#" \
+	"$REPO/deploy/api.service" > /etc/systemd/system/hovaysya-api.service
 
-echo "== Caddyfile для $HOST"
-sed "s/hovaysya\.duckdns\.org/$HOST/" "$REPO/deploy/Caddyfile" > /etc/caddy/Caddyfile
-install -d -o caddy -g caddy /var/log/caddy
-
-echo "== сервіс і автооновлення"
-sed "s#/home/ubuntu/hovaysya#$REPO#g" "$REPO/deploy/api.service" > /etc/systemd/system/hovaysya-api.service
+echo "== автооновлення"
 for unit in hovaysya-api-update.service hovaysya-api-update.timer; do
-	sed "s#/home/ubuntu/hovaysya#$REPO#g; s#User=ubuntu#User=$OWNER#" 		"$REPO/deploy/$unit" > "/etc/systemd/system/$unit"
+	sed "s#/home/ubuntu/hovaysya#$REPO#g; s#User=ubuntu#User=$OWNER#" \
+		"$REPO/deploy/$unit" > "/etc/systemd/system/$unit"
 done
 
 # The update timer runs as the checkout's owner, who may not restart a system
 # unit: systemd answers "Interactive authentication required". Nobody is at the
-# keyboard, so the grant is passwordless, and its narrowness is its safety -- one
-# command, one unit. A malformed sudoers file locks the machine out of sudo
-# entirely, so it is validated before being installed.
+# keyboard at 3 a.m., so the grant is passwordless, and its narrowness is its
+# safety -- one command, one unit. A malformed sudoers file locks the machine out
+# of sudo entirely, so it is validated before being installed.
 sudoers="$(mktemp)"
 cat > "$sudoers" <<SUDO
 # Installed by deploy/install-api.sh. Lets the update timer restart the API.
@@ -82,76 +77,38 @@ else
 	exit 1
 fi
 rm -f "$sudoers"
-systemctl daemon-reload
-systemctl enable hovaysya-api hovaysya-api-update.timer
-systemctl start hovaysya-api-update.timer
-# `restart`, not `enable --now`: a unit already stuck in a restart loop counts as
-# starting, so `--now` does nothing and the second run of this script looks like
-# it changed nothing at all.
-systemctl restart hovaysya-api
-sleep 2
-systemctl is-active --quiet hovaysya-api 	&& echo "  сервіс піднявся" 	|| { echo "  ! сервіс не піднявся:"; journalctl -u hovaysya-api -n 8 --no-pager; }
 
-# Caddy needs 80 for the ACME challenge and 443 to serve. Oracle's own security
-# list has to allow them too, and that is a click in the dashboard rather than a
-# command here -- iptables alone will look like it worked and time out.
-echo "== порти"
-iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 80 -j ACCEPT
-iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+echo "== порт 8080, лише з приватної мережі"
+# The VCN's own rules decide who may reach it; this only stops the host firewall
+# from dropping what the VCN allowed. The source is deliberately the subnet
+# rather than anywhere: an NSG on this instance should narrow it to B alone.
+iptables -C INPUT -s 10.0.0.0/16 -p tcp --dport 8080 -j ACCEPT 2>/dev/null \
+	|| iptables -I INPUT -s 10.0.0.0/16 -p tcp --dport 8080 -j ACCEPT
 command -v netfilter-persistent >/dev/null 2>&1 && netfilter-persistent save || true
 
-echo "== оновлювач DuckDNS"
-# Only if the hostname is a DuckDNS one and the token has been placed. Without
-# this the name silently stops pointing here the first time the address changes,
-# and that failure looks exactly like a quiet night.
-case "$HOST" in
-*.duckdns.org)
-	DUCK_NAME="${HOST%%.duckdns.org}"
-	if [ -r "$REPO/data/duckdns.token" ]; then
-		cat > /etc/systemd/system/hovaysya-duckdns.service <<UNIT
-[Unit]
-Description=Keep the DuckDNS name pointing here
-After=network-online.target
-
-[Service]
-Type=oneshot
-WorkingDirectory=$REPO
-ExecStart=$REPO/deploy/duckdns.sh $DUCK_NAME
-UNIT
-		cat > /etc/systemd/system/hovaysya-duckdns.timer <<UNIT
-[Unit]
-Description=Keep the DuckDNS name pointing here
-
-[Timer]
-OnBootSec=1min
-OnUnitActiveSec=15min
-
-[Install]
-WantedBy=timers.target
-UNIT
-		systemctl daemon-reload
-		systemctl enable --now hovaysya-duckdns.timer
-		systemctl start hovaysya-duckdns.service || echo "  ! перший апдейт не вдався — перевір токен"
-	else
-		echo "  пропускаю: нема $REPO/data/duckdns.token"
-	fi
-	;;
-*)
-	echo "  пропускаю: $HOST не з duckdns.org"
-	;;
-esac
-
-systemctl reload caddy 2>/dev/null || systemctl restart caddy
+systemctl daemon-reload
+systemctl enable hovaysya-api hovaysya-api-update.timer
+# `restart`, not `enable --now`: a unit already stuck in a restart loop counts as
+# starting, so `--now` does nothing and a second run of this script looks like it
+# changed nothing at all.
+systemctl restart hovaysya-api
+systemctl start hovaysya-api-update.timer
+sleep 2
+if systemctl is-active --quiet hovaysya-api; then
+	echo "  сервіс піднявся"
+else
+	echo "  ! сервіс не піднявся:"
+	journalctl -u hovaysya-api -n 10 --no-pager
+	exit 1
+fi
 
 echo
-echo "готово. Далі:"
-echo "  1. у дашборді Oracle дозволь 80 і 443 у security list цього інстанса"
-echo "  2. python3 -m tools.serve.token --name <хто>   — і збережи токен"
-echo "  3. curl https://$HOST/health"
+echo "готово: API слухає $PRIVATE_IP:8080 — приватну мережу, не інтернет."
 echo
-echo "далі оновлюється саме, раз на 10 хвилин, як і вартовий."
-echo "виняток — Caddyfile: він генерується цим скриптом, тож зміна в ньому"
-echo "вимагає запустити install-api.sh ще раз."
+echo "далі:"
+echo "  1. NSG на цьому інстансі: впустити 8080 з приватної адреси B"
+echo "  2. python3 -m tools.serve.token --name <хто>   — показується один раз"
+echo "  3. на B: sudo ./deploy/install-proxy.sh <хост> $PRIVATE_IP"
 echo
-echo "і окремо, один раз у дашборді: зарезервуй публічний IP цього інстанса,"
-echo "бо ephemeral змінюється при зупинці — оновлювач це підхопить, але з паузою"
+echo "оновлюється саме, раз на 10 хвилин, як і вартовий."
+echo "виняток — сам цей скрипт: зміна в api.service вимагає запустити його знову."

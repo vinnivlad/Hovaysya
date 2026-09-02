@@ -16,10 +16,24 @@ hovaysya.duckdns.org {
 	# What guards the token instead: 32 bytes from `secrets.token_urlsafe`, which
 	# is not guessable at any rate, and fail2ban if it ever seems necessary.
 
-	# `/health` stays open for `systemctl` and for a check from outside; every
-	# other path needs the bearer token, which the API itself verifies.
-	reverse_proxy 127.0.0.1:8080 {
+	# The API is on the *other* machine, reached over the private VCN address --
+	# so nothing is replicated and the app reads the database the watcher has
+	# just written. `install-api.sh` writes the address in.
+	#
+	# `/health` stays open for a check from outside; every other path needs the
+	# bearer token, which the API itself verifies. And health is the point of
+	# this arrangement rather than a detail: if A is down there is nothing worth
+	# showing, so the app has to be able to see that.
+	reverse_proxy PRIVATE_IP:8080 {
 		header_up X-Real-IP {remote_host}
+		# A dead or slow A must look dead rather than hang the app.
+		transport http {
+			dial_timeout 3s
+			response_header_timeout 5s
+		}
+		health_uri /health
+		health_interval 30s
+		health_timeout 5s
 	}
 
 	header {

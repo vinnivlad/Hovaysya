@@ -76,26 +76,52 @@ def call(base, path, token=TOKEN, method="GET", body=None):
 # --- what may be reached without a token ------------------------------------
 
 
-def test_health_needs_nothing_and_says_almost_nothing(api):
-    """It exists for a `systemctl` check, so it must not become a way to learn
-    who uses this. `corpus` is the one fact it carries, because a box can be
-    perfectly healthy and still have no feed to serve."""
+def test_health_says_whether_the_watch_is_alive(api, tmp_path):
+    """His question decides what this endpoint is for: "реально, якщо А не
+    працює, то який взагалі сенс?" An endpoint that answers `{"ok": true}` while
+    the watcher is dead is worse than one that does not answer -- the app would
+    show a calm sky and the phone would stay silent, which is what a quiet night
+    looks like.
+
+    It reports ages rather than a verdict. The threshold is the app's business,
+    and the app is the only part that knows whether anyone is looking."""
     code, body = call(api, "/health", token=None)
-    assert code == 200 and body == {"ok": True, "corpus": True}
+    assert code == 200 and body["ok"] is True and body["corpus"] is True
+    # The channels are never quiet for long, so age is the signal.
+    assert isinstance(body["message_age_s"], int)
 
 
-def test_a_missing_corpus_does_not_stop_the_service(tmp_path, who):
-    """It did, and that cost an hour. `mode=ro` on a file that is not there
-    raises, and B is a fresh box with no database until something copies one --
-    while `/config`, the reason the port exists at all, needs no corpus."""
+def test_health_reports_a_dead_watcher_rather_than_hiding_it(tmp_path, db, who):
+    """No decision log at all, and a corpus that stops: both have to be visible
+    as numbers the app can act on."""
     import threading
 
-    httpd = serve("127.0.0.1", 0, tmp_path / "absent.db", tmp_path / "live", who)
+    from tools.serve.api import health, serve
+
+    httpd = serve("127.0.0.1", 0, db, tmp_path / "no-logs", who)
+    try:
+        out = health(httpd.db, tmp_path / "no-logs", now=2_000_000_000)
+        assert out["decision_age_s"] is None          # nothing ever written
+        assert out["message_age_s"] > 10_000          # the corpus is ancient
+    finally:
+        httpd.server_close()
+
+
+def test_an_empty_corpus_does_not_stop_the_service(tmp_path, who):
+    """A missing database once killed the service outright, and that cost an
+    hour: `mode=ro` on a file that is not there raises, and B is a fresh box
+    until A hands something over -- while `/config`, the reason the port exists
+    at all, needs no corpus.
+
+    B now creates the file so it can receive a push, so the state to survive is
+    an *empty* corpus rather than an absent one."""
+    import threading
+
+    httpd = serve("127.0.0.1", 0, tmp_path / "fresh.db", tmp_path / "live", who)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{httpd.server_address[1]}"
     try:
-        assert call(base, "/health", token=None)[1] == {"ok": True,
-                                                       "corpus": False}
+        assert call(base, "/health", token=None)[1]["corpus"] is False
         assert call(base, "/messages")[1]["messages"] == []
         assert call(base, "/config", method="PUT",
                     body={"home": "Оболонь"})[0] == 200

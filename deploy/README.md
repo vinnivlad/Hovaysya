@@ -133,105 +133,118 @@ overrides the half-hour restart cooldown, because a settings-only change is a
 restart on the same commit -- exactly what the cooldown would otherwise swallow.
 Unchanged settings say nothing.
 
-## The API, and why it lives on a second machine
+## The API, and the two machines
 
-`tools/serve/api.py` is what the app talks to: the merged raw feed, the decisions,
-and one person's settings. It exists because config editing needs it -- "користувачі
-мають мати можливість змінювати свій конфіг" -- which makes the port both compulsory
-and writable.
+`tools/serve/api.py` is what the app talks to: the merged raw feed, the
+decisions, and one person's settings. It exists because config editing needs it
+-- "користувачі мають мати можливість змінювати свій конфіг" -- which makes the
+inbound door both compulsory and writable.
 
     GET  /messages?since=<cursor>     the raw feed, cursor-paged
     GET  /decisions?since=<cursor>    what Ховайся decided, for this recipient
-    GET  /config                      their settings
-    PUT  /config                      change them
-    GET  /health                      no token needed
+    GET  /config · PUT /config        their settings
+    GET  /health                      no token needed, and see below
 
-**Today the instance has no inbound service at all**, and that is half the reason
-it is safe to keep a bot token there. Serving this means the first inbound door on
-a public IP, so it goes on a second instance:
+**The API runs on A and the certificate lives on B.** The app talks TLS to B,
+Caddy proxies over the private VCN address to A, and A answers out of the
+database the watcher wrote a second ago.
 
-| | A, the watcher | B, the API |
+That is the second design. The first replicated the corpus from A to B, and he
+killed it in one sentence: "якщо треба чекати поки щось запушиться, а потім поки
+застосунок опитає - то сенс застосунку губиться." He was right, and the
+arithmetic agrees -- a push on a timer plus an app poll is minutes of lag on a
+screen whose whole job is to be current during an attack, and no interval fixes
+that, it only makes it smaller. Proxying is zero.
+
+| | A | B |
 | --- | --- | --- |
-| inbound | SSH only | 80 and 443 |
-| holds | the bot token, the decisions, the bell | a copy of the corpus, the settings |
-| worth stealing | everything | public messages |
-| in the path to the bell | yes | no |
+| runs | the watcher, the API | Caddy, and nothing else |
+| inbound | SSH, and 8080 from B's private address | 80 and 443 from anywhere |
+| holds | everything | a certificate |
 
-His first instinct was to move the *bot* off the exposed box instead. Right
-instinct, wrong direction: the bell would then travel watcher -> write -> B polls
--> Telegram, and a dead B or a lagging poll looks exactly like a quiet night. A
-bot token is not account access, it can only post to his own channel, and
-@BotFather revokes it in seconds. So the exposed thing moves, not the secret.
+**What this costs, stated rather than argued away.** A now accepts inbound
+connections. Only from the private network, not the internet -- but if B were
+compromised the attacker could reach A's API: the corpus, which is public, and
+the recipient configs, which are not. Not the bot token, not SSH. Compare the
+alternative we refused, where B pulled over SSH and holding B meant holding A.
 
-**A pushes to B, never the reverse.** If B pulled over SSH it would hold a key
-into A, and compromising the public box would hand over the private one.
+The bot token is on A now, so the argument that used to keep it away from the
+service -- it lives on the other box -- is gone. `ReadOnlyPaths` grants *read*
+access, so the unit names each secret and denies it with `InaccessiblePaths`.
+
+**The bell never goes through any of this.** A decides and calls FCM directly:
+detection is a measured 6 s and the push about one. The proxy path carries only
+the screens, which are read by somebody the bell has already woken.
+
+### /health is the point, not a detail
+
+His question settled the shape: "реально, якщо А не працює, то який взагалі
+сенс?" A service that answers `{"ok": true}` while the watcher is dead is worse
+than one that does not answer at all -- the app would show a calm sky and the
+phone would stay silent, which is exactly what a quiet night looks like.
+
+    {"ok": true, "corpus": true, "message_age_s": 14, "decision_age_s": 3}
+
+Both ages are read off the filesystem the watcher writes to, so nothing has to be
+shared or agreed. Seven channels produce about 1100 messages a day, so minutes in
+`message_age_s` mean the poll loop has stopped; `decision_age_s` is the same
+signal from the other end and survives the channels themselves going quiet.
+
+Numbers rather than a verdict, because the threshold is the app's business and
+the app is the only part that knows whether anyone is looking. Caddy also probes
+`/health` every 30 s, so a dead A becomes a fast 502 instead of a hang.
 
 ### Setting it up
 
-On B, once:
+On **A**:
 
-    git clone https://github.com/vinnivlad/Hovaysya.git ~/hovaysya
-    cd ~/hovaysya && sudo ./deploy/install-api.sh hovaysya.duckdns.org
+    cd ~/hovaysya && git pull
+    sudo ./deploy/install-api.sh                  # finds its own 10.x address
+    python3 -m tools.serve.token --name <who>      # printed once
 
-A hostname is not optional: **Let's Encrypt will not issue for a bare IP.** A free
-DuckDNS name is enough, and Caddy handles the certificate and its renewal, so
-nothing in this repository touches a private key.
+On **B**:
 
-Two things the script cannot do:
+    sudo ./deploy/install-proxy.sh hovaysya.duckdns.org <A's 10.x address>
 
-- **open 80 and 443 in Oracle's security list**, which is a click in the dashboard.
-  `iptables` alone will look like it worked and then time out.
-- **mint a token**: `python3 -m tools.serve.token --name <who>`. Printed once and
-  never recoverable; only its SHA-256 is stored, because the same machine could
-  one day hold other secrets. Minting again for the same name revokes the old one.
+A hostname is not optional: **Let's Encrypt will not issue for a bare IP.** A
+free DuckDNS name is enough, `deploy/duckdns.sh` keeps it current on a timer, and
+Caddy handles the certificate and its renewal -- so nothing in this repository
+touches a private key.
 
-Then `curl https://<host>/health` should answer `{"ok": true, "corpus": …}`.
+Three things the scripts cannot do, all of them clicks in the dashboard:
 
-After that it updates itself, on the same ten-minute timer as the watcher and
-through the same `deploy/update.sh` -- which now takes the unit to restart as an
-argument rather than existing twice. **One exception**: the Caddyfile is generated
-into `/etc/caddy` by `install-api.sh`, so a change to it in git needs that script
-run again. Restarting Caddy from a timer that never rewrote its config would look
-like a deploy and change nothing.
+- **80 and 443 for B**, in an NSG on B rather than the subnet's security list --
+  both instances share `public subnet-hovaysya-vcn`, so opening it there would
+  open the watcher too.
+- **8080 for A, from B's private address only.** The script opens the host
+  firewall for the whole subnet; the NSG is what narrows it to one machine.
+- **Reserve B's public IP.** An ephemeral one changes on stop, and the DuckDNS
+  updater would follow it only after a pause.
+
+Then `curl https://<host>/health` should answer with the ages above.
 
 ### What protects it
-
-The service refuses rather than trusts, at four levels:
 
 - **A token on every path but `/health`**, compared with `hmac.compare_digest`.
 - **The config loader is the trust boundary.** It was written so a typo could not
   take the watch down at 3 a.m.; the same code now stands between a hostile body
-  and the decision, which is why `MAX_RING` and `MAX_NAME` exist. A ring of 50 000
-  names was once accepted and moved one decision from 0.03 ms to 0.3 ms -- 30 ms a
-  message at a hundred recipients, a denial of service written in JSON. What lands
+  and the decision, which is why `MAX_RING` and `MAX_NAME` exist -- a ring of
+  50 000 names was once accepted and moved one decision from 0.03 ms to 0.3 ms,
+  which at a hundred recipients is a denial of service written in JSON. What lands
   on disk is what the loader accepted, never the body as sent.
 - **A read-only database handle**, said in the connection URI rather than left to
   the code.
-- **A systemd jacket** tighter than the watcher's, because this is the process
-  reachable from outside: its own unprivileged user, `ProtectSystem=strict`, an
-  empty capability set, and `ReadWritePaths` covering only where settings live.
-
-  It does **not** keep a secret in the same tree out of reach -- I wrote that it
-  did, and it is backwards: `ReadOnlyPaths` grants read access. What keeps the bot
-  token away from this service is that the token is on the other machine. B has no
-  bot, no chat id and nothing to post with, which is the whole reason the split is
-  worth its second runtime.
-
-  Two duller things had to be right before any of that mattered, and both showed
-  up as the same `200/CHDIR` exit: `ProtectHome` must be `read-only` rather than
-  `yes`, since `yes` makes `/home` inaccessible and the working directory is under
-  it; and the service user has to be in the group that owns the repository,
-  because Ubuntu creates a home directory as `0750` and nobody else may even
-  traverse it. The second one reads like a systemd sandbox problem and is really a
-  POSIX one.
+- **A systemd jacket** tighter than the watcher's: its own unprivileged user,
+  `ProtectSystem=strict`, an empty capability set, `ReadWritePaths` covering only
+  where settings live, and `InaccessiblePaths` over each secret by name.
 
 There is no rate limit, and that was a correction rather than a choice: the
 Caddyfile had one until I checked, and `rate_limit` is a third-party module the
-packaged Caddy cannot parse -- the directive fails the config at startup, which is
-a bad way to find out. Adding it means building Caddy with xcaddy, a second
-toolchain on the box for a service whose only unauthenticated path returns
-`{"ok": true}`. The token is 32 bytes from `secrets.token_urlsafe` and is not
-guessable at any rate; fail2ban is the answer if the log ever suggests otherwise.
+packaged Caddy cannot parse -- the directive fails the config at startup. Adding
+it means building Caddy with xcaddy, a second toolchain for a service whose only
+unauthenticated path returns four numbers. The token is 32 bytes from
+`secrets.token_urlsafe` and is not guessable at any rate; fail2ban is the answer
+if the log ever suggests otherwise.
 
 ## How you find out it worked
 

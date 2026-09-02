@@ -31,6 +31,7 @@ import argparse
 import json
 import sqlite3
 import time
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -87,6 +88,47 @@ def messages(conn: sqlite3.Connection | None, since: str | None,
     return {"messages": out,
             "next": _cursor(rows[-1]["ts"], rows[-1]["channel"],
                             rows[-1]["message_id"]) if rows else (since or "")}
+
+
+def health(conn: sqlite3.Connection | None, log_dir: Path,
+           now: float | None = None) -> dict:
+    """Whether the watch is actually running, not whether this process is up.
+
+    His question, and it settles the whole design: "реально, якщо А не працює, то
+    який взагалі сенс?" A service that answers `{"ok": true}` while the watcher is
+    dead is worse than one that does not answer at all -- the app would show a
+    calm sky and the phone would stay silent, which is exactly what a quiet night
+    looks like.
+    
+    So this reports the two clocks the app can act on, both read off the
+    filesystem the watcher writes to rather than from any shared state:
+
+    `message_age_s`  since the newest message was stored. The channels are never
+                     quiet for long -- 1100 messages a day across seven of them --
+                     so minutes here mean the poll loop has stopped.
+    `decision_age_s` since the watcher last wrote a decision line. It writes one
+                     per message, so this is the same signal seen from the other
+                     end, and it survives the channels themselves going quiet.
+
+    Numbers rather than a verdict, because the threshold is the app's business
+    and it is the only part that knows whether anyone is looking.
+    """
+    now = time.time() if now is None else now
+    newest = None
+    if conn is not None:
+        row = conn.execute("SELECT max(ts) FROM messages").fetchone()
+        newest = row[0] if row and row[0] else None
+    try:
+        logs = max((p.stat().st_mtime for p in log_dir.glob("*.jsonl")),
+                   default=None)
+    except OSError:
+        logs = None
+    return {
+        "ok": True,
+        "corpus": newest is not None,
+        "message_age_s": round(now - newest) if newest else None,
+        "decision_age_s": round(now - logs) if logs else None,
+    }
 
 
 def decisions(log_dir: Path, since: str | None, limit: int,
@@ -150,11 +192,14 @@ class Handler(BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
-    def _who(self) -> str | None:
+    def _token(self) -> str | None:
         auth = self.headers.get("Authorization") or ""
-        if not auth.startswith("Bearer "):
-            return None
-        return people.name_for(auth[7:].strip(), self.server.recipients_dir)
+        return auth[7:].strip() if auth.startswith("Bearer ") else None
+
+    def _who(self) -> str | None:
+        token = self._token()
+        return people.name_for(token, self.server.recipients_dir) if token else None
+
 
     def _limit(self, query: dict) -> int:
         try:
@@ -168,10 +213,7 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(url.query)
 
         if url.path == "/health":
-            # `corpus` says whether the feed can be served at all, which is the
-            # one thing that can be true or false about this box while it is
-            # otherwise perfectly healthy.
-            self._send(200, {"ok": True, "corpus": self.server.db is not None})
+            self._send(200, health(self.server.db, self.server.log_dir))
             return
 
         who = self._who()
@@ -250,7 +292,9 @@ def serve(host: str, port: int, db: Path, log_dir: Path,
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", default="127.0.0.1",
-                    help="127.0.0.1 by default: Caddy is in front.")
+                    help="On A this is the private VCN address, so Caddy on B "
+                         "can reach it and nothing else can. 127.0.0.1 is the "
+                         "safe default and means only this machine.")
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--db", default=str(DB_PATH))
     ap.add_argument("--logs", default=str(LOG_DIR))
