@@ -4,6 +4,8 @@ Four endpoints and no framework, because the watcher's whole deployment property
 is that nothing has to be installed:
 
     GET  /messages?since=<cursor>     the merged raw feed of every channel
+    GET  /messages?back=30m           ...or just the last half hour, newest end
+    GET  /messages?since=head         ...or nothing, and a cursor to poll from
     GET  /decisions?since=<cursor>    what Ховайся decided, for this recipient
     GET  /config                      their settings
     PUT  /config                      change them
@@ -59,6 +61,34 @@ def _cursor(ts: int, channel: str, message_id: int) -> str:
     return f"{ts}.{channel}.{message_id}"
 
 
+def _parse_back(raw: str | None) -> int | None:
+    """A window in seconds, from `1800`, `30m` or `2h`. None if not asked for.
+
+    Opening the screen with nothing loaded is the case this exists for: "коли я
+    відкриваю скрін, я хочу бачити останні повідомлення за 30хв". Without it the
+    only way in was a cursor, and a cursor the app has never had means the
+    beginning of the corpus -- January 2024, and 27 000 messages to walk before
+    reaching tonight.
+    """
+    if not raw:
+        return None
+    raw = raw.strip().lower()
+    unit = 1
+    if raw.endswith("m"):
+        unit, raw = 60, raw[:-1]
+    elif raw.endswith("h"):
+        unit, raw = 3600, raw[:-1]
+    elif raw.endswith("s"):
+        raw = raw[:-1]
+    try:
+        seconds = int(float(raw)) * unit
+    except ValueError:
+        return None
+    # A day is the ceiling: past that it is an archive request, and the cursor is
+    # the honest way to ask for one.
+    return max(60, min(86400, seconds))
+
+
 def _parse_cursor(raw: str | None) -> tuple[int, str, int]:
     """A cursor we did not issue means "from the beginning", never an error."""
     if not raw:
@@ -71,8 +101,23 @@ def _parse_cursor(raw: str | None) -> tuple[int, str, int]:
 
 
 def messages(conn: sqlite3.Connection | None, since: str | None,
-             limit: int) -> dict:
+             limit: int, back: int | None = None,
+             now: float | None = None) -> dict:
     """The feed, or an empty one when there is no corpus on this machine.
+
+    Three ways in, and the app needs all three:
+
+    `since=<cursor>`  everything after what it already has. The ordinary poll.
+    `back=30m`        the last half hour, for a screen opened cold. Returns the
+                      *newest* messages in the window rather than the oldest,
+                      because a screen is not an archive: half an hour during an
+                      attack is 300 messages and the last 200 are the ones worth
+                      showing.
+    `since=head`      nothing, and a cursor to poll forward from. For an app that
+                      wants only what happens next.
+
+    A cursor the app has never had means the beginning, which is January 2024 --
+    so without `back` a fresh screen had to walk 27 000 messages to reach tonight.
 
     B is a fresh box with no database until something copies one there, and the
     settings endpoint has nothing to do with the corpus. A service that refuses to
@@ -81,12 +126,30 @@ def messages(conn: sqlite3.Connection | None, since: str | None,
     """
     if conn is None:
         return {"messages": [], "next": since or "", "corpus": False}
-    ts, channel, mid = _parse_cursor(since)
-    rows = conn.execute(
-        "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
-        "WHERE text_norm <> '' AND (ts, channel, message_id) > (?, ?, ?) "
-        "ORDER BY ts, channel, message_id LIMIT ?",
-        (ts, channel, mid, limit)).fetchall()
+
+    if since == "head":
+        row = conn.execute(
+            "SELECT ts, channel, message_id FROM messages WHERE text_norm <> '' "
+            "ORDER BY ts DESC, channel DESC, message_id DESC LIMIT 1").fetchone()
+        return {"messages": [],
+                "next": _cursor(row[0], row[1], row[2]) if row else ""}
+
+    if back is not None:
+        floor = int((time.time() if now is None else now) - back)
+        rows = conn.execute(
+            "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
+            "WHERE text_norm <> '' AND ts >= ? "
+            "ORDER BY ts DESC, channel DESC, message_id DESC LIMIT ?",
+            (floor, limit)).fetchall()
+        rows = list(reversed(rows))
+    else:
+        ts, channel, mid = _parse_cursor(since)
+        rows = conn.execute(
+            "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
+            "WHERE text_norm <> '' AND (ts, channel, message_id) > (?, ?, ?) "
+            "ORDER BY ts, channel, message_id LIMIT ?",
+            (ts, channel, mid, limit)).fetchall()
+
     out = [{"channel": r["channel"], "id": r["message_id"], "ts": r["ts"],
             "text": r["text_norm"], "reply": r["reply_to"]} for r in rows]
     return {"messages": out,
@@ -229,7 +292,8 @@ class Handler(BaseHTTPRequestHandler):
         since = (query.get("since") or [None])[0]
         limit = self._limit(query)
         if url.path == "/messages":
-            self._send(200, messages(self.server.db, since, limit))
+            self._send(200, messages(self.server.db, since, limit,
+                                     _parse_back((query.get("back") or [None])[0])))
         elif url.path == "/decisions":
             self._send(200, decisions(self.server.log_dir, since, limit))
         elif url.path == "/config":

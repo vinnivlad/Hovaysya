@@ -315,3 +315,69 @@ def test_the_database_handle_cannot_write(db, who, tmp_path):
             httpd.db.execute("DELETE FROM messages")
     finally:
         httpd.server_close()
+
+
+# --- opening the screen cold -------------------------------------------------
+
+
+def test_a_window_returns_the_newest_of_it_not_the_oldest(db):
+    """His case: "коли я відкриваю скрін, я хочу бачити останні повідомлення за
+    30хв". A screen is not an archive -- half an hour during an attack is three
+    hundred messages, and the last two hundred are the ones worth showing.
+    """
+    from tools.serve.api import messages
+
+    conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    # The fixture's rows sit at ts 99..101; `now` is set just past them.
+    page = messages(conn, None, 2, back=3600, now=200)
+    # Newest two, but handed over oldest-first so the app can append.
+    assert [m["text"] for m in page["messages"]] == ["друге", "третє"]
+    # ...and the cursor points at the newest, ready for the next poll.
+    assert page["next"].startswith("101.")
+
+
+def test_a_window_shorter_than_the_silence_comes_back_empty(db):
+    """Ten minutes of quiet is normal -- twenty-two times a day -- so an empty
+    window is an answer, not a fault."""
+    from tools.serve.api import messages
+
+    conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    page = messages(conn, None, 10, back=60, now=10_000)
+    assert page["messages"] == []
+
+
+def test_head_gives_a_cursor_and_no_history(db):
+    """For an app that wants only what happens next. Without it the only way in
+    was a cursor, and a cursor never held means January 2024."""
+    from tools.serve.api import messages
+
+    conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    page = messages(conn, "head", 10)
+    assert page["messages"] == []
+    assert page["next"].startswith("101.")
+    # ...and polling from it returns nothing until something new arrives.
+    assert messages(conn, page["next"], 10)["messages"] == []
+
+
+@pytest.mark.parametrize("given,seconds", [
+    ("1800", 1800), ("30m", 1800), ("2h", 7200),
+    # Clamped up to a minute: anything shorter is a poll, and a poll has a
+    # cursor. Clamped down at a day: past that it is an archive request.
+    ("45s", 60), ("0", 60), ("999h", 86400),
+    ("нонсенс", None), ("", None), (None, None),
+])
+def test_a_window_is_parsed_or_ignored_never_an_error(given, seconds):
+    from tools.serve.api import _parse_back
+
+    assert _parse_back(given) == seconds
+
+
+def test_the_window_reaches_the_endpoint(api):
+    code, body = call(api, "/messages?back=30m")
+    assert code == 200 and isinstance(body["messages"], list)
+    # Percent-encoding, because a hand-typed URL is exactly where this arrives.
+    assert call(api, "/messages?back=%D0%BD%D0%BE%D0%BD%D1%81%D0%B5%D0%BD%D1%81")[0] == 200
+    assert call(api, "/messages?back=-5")[0] == 200

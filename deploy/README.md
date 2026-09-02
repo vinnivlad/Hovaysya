@@ -141,6 +141,8 @@ decisions, and one person's settings. It exists because config editing needs it
 inbound door both compulsory and writable.
 
     GET  /messages?since=<cursor>     the raw feed, cursor-paged
+    GET  /messages?back=30m           ...or the last half hour, for a cold screen
+    GET  /messages?since=head         ...or nothing, and a cursor to poll from
     GET  /decisions?since=<cursor>    what Ховайся decided, for this recipient
     GET  /config · PUT /config        their settings
     GET  /health                      no token needed, and see below
@@ -200,6 +202,26 @@ daily. This paragraph said the opposite until the first live `/health` answered
 Numbers rather than a verdict, because the threshold is the app's business and
 the app is the only part that knows whether anyone is looking. Caddy also probes
 `/health` every 30 s, so a dead A becomes a fast 502 instead of a hang.
+
+### Three ways into the feed
+
+A cursor the app has never held means the beginning of the corpus -- January 2024,
+and 27 000 messages to walk before reaching tonight. So opening a screen cold
+needed its own way in, which is his: "коли я відкриваю скрін, я хочу бачити
+останні повідомлення за 30хв".
+
+    ?since=<cursor>   everything after what it already has. The ordinary poll.
+    ?back=30m         the last half hour. Also 1800, 2h, 45s -- clamped to
+                      between a minute and a day, and ignored if unparseable.
+    ?since=head       nothing, and a cursor to poll forward from.
+
+ returns the **newest** messages in the window, not the oldest, and hands
+them over oldest-first so the app can append. A screen is not an archive: half an
+hour during an attack is three hundred messages and the last two hundred are the
+ones worth showing.
+
+An empty window is an answer rather than a fault -- ten minutes of silence happens
+about twenty-two times a day.
 
 ### Setting it up
 
