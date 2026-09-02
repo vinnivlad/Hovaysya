@@ -96,26 +96,27 @@ def messages(conn: sqlite3.Connection | None, since: str | None,
 
 def health(conn: sqlite3.Connection | None, log_dir: Path,
            now: float | None = None) -> dict:
-    """Whether the watch is actually running, not whether this process is up.
+    """Whether the watch is running, not whether this process is up.
 
     His question, and it settles the whole design: "реально, якщо А не працює, то
     який взагалі сенс?" A service that answers `{"ok": true}` while the watcher is
     dead is worse than one that does not answer at all -- the app would show a
     calm sky and the phone would stay silent, which is exactly what a quiet night
     looks like.
-    
-    So this reports the two clocks the app can act on, both read off the
-    filesystem the watcher writes to rather than from any shared state:
 
-    `message_age_s`  since the newest message was stored. The channels are never
-                     quiet for long -- 1100 messages a day across seven of them --
-                     so minutes here mean the poll loop has stopped.
-    `decision_age_s` since the watcher last wrote a decision line. It writes one
-                     per message, so this is the same signal seen from the other
-                     end, and it survives the channels themselves going quiet.
+    `poll_age_s` is the signal to act on. The watcher rewrites its decision log
+    after every poll cycle, whether or not anything arrived, so this is the age of
+    the poll loop itself: seconds while it runs, unbounded when it stops. Nothing
+    is shared or agreed -- it is read off the file the watcher writes.
 
-    Numbers rather than a verdict, because the threshold is the app's business
-    and it is the only part that knows whether anyone is looking.
+    `message_age_s` is information, not health, and the corpus says why. Measured
+    over two weeks of seven channels: the median gap between messages is 23 s,
+    but silences longer than ten minutes happen 307 times -- about twenty-two a
+    day -- and the longest was six hours. An app treating minutes here as a fault
+    would cry wolf daily. I had documented the opposite; the data corrected it.
+
+    Numbers rather than a verdict, because the threshold is the app's business and
+    it is the only part that knows whether anyone is looking.
     """
     now = time.time() if now is None else now
     newest = None
@@ -123,15 +124,15 @@ def health(conn: sqlite3.Connection | None, log_dir: Path,
         row = conn.execute("SELECT max(ts) FROM messages").fetchone()
         newest = row[0] if row and row[0] else None
     try:
-        logs = max((p.stat().st_mtime for p in log_dir.glob("*.jsonl")),
-                   default=None)
+        polled = max((p.stat().st_mtime for p in log_dir.glob("*.jsonl")),
+                     default=None)
     except OSError:
-        logs = None
+        polled = None
     return {
         "ok": True,
         "corpus": newest is not None,
+        "poll_age_s": round(now - polled) if polled else None,
         "message_age_s": round(now - newest) if newest else None,
-        "decision_age_s": round(now - logs) if logs else None,
     }
 
 

@@ -53,7 +53,14 @@ def who(tmp_path):
 
 @pytest.fixture
 def api(db, who, tmp_path):
-    httpd = serve("127.0.0.1", 0, db, tmp_path / "live", who)
+    # A log directory with something in it, because that is the running state:
+    # the watcher rewrites its log after every poll, so an empty directory means
+    # a watcher that has never polled -- which `poll_age_s` reports as None and
+    # which a separate test covers.
+    live = tmp_path / "live"
+    live.mkdir()
+    (live / "now.jsonl").write_text("", encoding="utf-8")
+    httpd = serve("127.0.0.1", 0, db, live, who)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{httpd.server_address[1]}"
     httpd.shutdown()
@@ -83,12 +90,14 @@ def test_health_says_whether_the_watch_is_alive(api, tmp_path):
     show a calm sky and the phone would stay silent, which is what a quiet night
     looks like.
 
-    It reports ages rather than a verdict. The threshold is the app's business,
-    and the app is the only part that knows whether anyone is looking."""
+    `poll_age_s` is the one to act on: the watcher rewrites its log after every
+    poll cycle whether or not anything arrived. `message_age_s` is information --
+    silences over ten minutes happen twenty-two times a day."""
     code, body = call(api, "/health", token=None)
     assert code == 200 and body["ok"] is True and body["corpus"] is True
     # The channels are never quiet for long, so age is the signal.
     assert isinstance(body["message_age_s"], int)
+    assert isinstance(body["poll_age_s"], int)
 
 
 def test_health_reports_a_dead_watcher_rather_than_hiding_it(tmp_path, db, who):
@@ -101,7 +110,7 @@ def test_health_reports_a_dead_watcher_rather_than_hiding_it(tmp_path, db, who):
     httpd = serve("127.0.0.1", 0, db, tmp_path / "no-logs", who)
     try:
         out = health(httpd.db, tmp_path / "no-logs", now=2_000_000_000)
-        assert out["decision_age_s"] is None          # nothing ever written
+        assert out["poll_age_s"] is None              # never polled
         assert out["message_age_s"] > 10_000          # the corpus is ancient
     finally:
         httpd.server_close()

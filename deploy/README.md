@@ -183,12 +183,19 @@ His question settled the shape: "реально, якщо А не працює, 
 than one that does not answer at all -- the app would show a calm sky and the
 phone would stay silent, which is exactly what a quiet night looks like.
 
-    {"ok": true, "corpus": true, "message_age_s": 14, "decision_age_s": 3}
+    {"ok": true, "corpus": true, "poll_age_s": 3, "message_age_s": 585}
 
-Both ages are read off the filesystem the watcher writes to, so nothing has to be
-shared or agreed. Seven channels produce about 1100 messages a day, so minutes in
-`message_age_s` mean the poll loop has stopped; `decision_age_s` is the same
-signal from the other end and survives the channels themselves going quiet.
+**`poll_age_s` is the one to act on.** The watcher rewrites its decision log
+after every poll cycle whether or not anything arrived, so this is the age of the
+poll loop itself: seconds while it runs, unbounded when it stops. Nothing has to
+be shared or agreed -- it is read off the file the watcher writes.
+
+**`message_age_s` is information, not health**, and the corpus is what says so.
+Over two weeks of seven channels the median gap between messages is 23 s, but
+silences longer than ten minutes happen 307 times -- about twenty-two a day -- and
+the longest was six hours. An app treating minutes here as a fault would cry wolf
+daily. This paragraph said the opposite until the first live `/health` answered
+`585` and the data was checked.
 
 Numbers rather than a verdict, because the threshold is the app's business and
 the app is the only part that knows whether anyone is looking. Caddy also probes
