@@ -36,7 +36,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from ..policy import recipients as people
+# Deliberately `tokens` and not `recipients`: the second pulls in the ordered
+# rules, the episode machinery and `hints`, and this process needs a hash
+# comparison and a database. The service facing the internet carries the least
+# code that can do its job.
+from ..policy import tokens as people
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DB_PATH = REPO_ROOT / "data" / "messages.db"

@@ -87,12 +87,11 @@ iptables -C INPUT -s 10.0.0.0/16 -p tcp --dport 8080 -j ACCEPT 2>/dev/null \
 command -v netfilter-persistent >/dev/null 2>&1 && netfilter-persistent save || true
 
 systemctl daemon-reload
-systemctl enable hovaysya-api hovaysya-api-update.timer
+systemctl enable hovaysya-api
 # `restart`, not `enable --now`: a unit already stuck in a restart loop counts as
 # starting, so `--now` does nothing and a second run of this script looks like it
 # changed nothing at all.
 systemctl restart hovaysya-api
-systemctl start hovaysya-api-update.timer
 sleep 2
 if systemctl is-active --quiet hovaysya-api; then
 	echo "  сервіс піднявся"

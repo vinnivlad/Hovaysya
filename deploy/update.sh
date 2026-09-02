@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # Pull main and restart the named units only if something actually changed.
 #
-#     ./deploy/update.sh                 # the watcher, on A
-#     ./deploy/update.sh hovaysya-api    # the API, on B
+#     ./deploy/update.sh                 # every enabled hovaysya unit
+#     ./deploy/update.sh hovaysya-api    # or just the named ones
 #
 # One script for both boxes rather than a copy per box: what it has to get right
 # -- pull only, restart only on a real change, sudo without a prompt -- is the
 # same on either, and a copy would drift.
+#
+# With no arguments it *asks systemd* which units to restart rather than being
+# told. That is not cleverness, it is the fix for a real fault: installing the
+# API on A left two update timers on one working tree, both pulling and merging
+# every ten minutes, which can collide and is needless either way. Discovery
+# means one timer, and neither installer can undo the other's arrangement.
 #
 # Restarting unconditionally would drop the episode state every ten minutes,
 # and the watcher rebuilds it from the last 90 minutes of the database on every
@@ -15,7 +21,17 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-units=("${@:-hovaysya}")
+if [ "$#" -gt 0 ]; then
+    units=("$@")
+else
+    # Enabled hovaysya services, minus the update machinery itself: restarting
+    # the timer that is running us would be a fine way to lose a deploy.
+    mapfile -t units < <(
+        systemctl list-unit-files 'hovaysya*.service' --state=enabled --no-legend             | awk '{print $1}' | grep -v -- '-update' | sed 's/\.service$//')
+fi
+if [ "${#units[@]}" -eq 0 ]; then
+    units=()
+fi
 
 before=$(git rev-parse HEAD)
 git fetch --quiet origin main
@@ -27,7 +43,7 @@ if [ "$before" = "$after" ]; then
     exit 0
 fi
 
-echo "${units[*]}: ${before:0:7} -> ${after:0:7}"
+echo "${units[*]:-нічого перезапускати}: ${before:0:7} -> ${after:0:7}"
 git log --oneline "$before..$after" | sed 's/^/  /'
 
 # The timer runs this as the checkout's owner, and an ordinary user may not
