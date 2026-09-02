@@ -52,10 +52,14 @@ CapabilityBoundingSet=
 # of moving the API onto A, and it is paid here rather than argued away.
 ReadOnlyPaths=/home/ubuntu/hovaysya
 ReadWritePaths=/home/ubuntu/hovaysya/data/recipients
-InaccessiblePaths=/home/ubuntu/hovaysya/data/telegram-bot.token
-InaccessiblePaths=/home/ubuntu/hovaysya/data/telegram-chat.id
-InaccessiblePaths=/home/ubuntu/hovaysya/data/runbook.md
-InaccessiblePaths=/home/ubuntu/hovaysya/data/duckdns.token
+# The leading `-` means "if it is there". Without it systemd refuses to start
+# the unit at all -- "Failed to set up mount namespacing: ... No such file or
+# directory" -- and `duckdns.token` only exists on B, so denying it by absolute
+# path made the service unstartable on the very machine it now runs on.
+InaccessiblePaths=-/home/ubuntu/hovaysya/data/telegram-bot.token
+InaccessiblePaths=-/home/ubuntu/hovaysya/data/telegram-chat.id
+InaccessiblePaths=-/home/ubuntu/hovaysya/data/runbook.md
+InaccessiblePaths=-/home/ubuntu/hovaysya/data/duckdns.token
 MemoryMax=192M
 TasksMax=64
 
