@@ -17,6 +17,7 @@ re-fetched that already completed, and nothing is duplicated if it is.
 from __future__ import annotations
 
 import argparse
+import pathlib
 import sys
 import time
 from datetime import datetime, timezone
@@ -63,7 +64,12 @@ def print_status(conn) -> None:
 
 
 def run(args: argparse.Namespace) -> int:
-    conn = store.connect(DB_PATH)
+    # A candidate channel is measured before it is trusted, and measuring it must
+    # not touch the corpus: the eval replays every night from that file, so a
+    # channel dropped into it would silently rewrite the history every number in
+    # this project is checked against.
+    db = pathlib.Path(getattr(args, "db", None) or DB_PATH)
+    conn = store.connect(db)
 
     if args.status:
         print_status(conn)
@@ -81,7 +87,7 @@ def run(args: argparse.Namespace) -> int:
     progress = Progress()
     started = time.monotonic()
 
-    print(f"Exporting {len(channels)} channel(s) -> {DB_PATH}")
+    print(f"Exporting {len(channels)} channel(s) -> {db}")
     print(f"  rate {args.rps} req/s, {args.workers} workers, block {args.block_size}\n")
 
     total = 0
@@ -134,6 +140,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Global request rate. 1.25 req/s was measured clean; 2.0 is the "
         "default. Throughput is bounded by this, not by --workers.",
     )
+    p.add_argument("--db", default=None,
+                   help="Write somewhere other than the corpus. Use it for a "
+                        "candidate channel: the eval replays the corpus, so a "
+                        "channel dropped into it rewrites every measurement.")
     p.add_argument("--workers", type=int, default=4, help="Concurrent block walkers.")
     p.add_argument(
         "--block-size",
