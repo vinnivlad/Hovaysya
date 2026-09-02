@@ -109,3 +109,32 @@ def test_the_installers_do_not_refer_to_units_that_are_gone():
             for name in block[0].split():
                 assert (root / name).exists(), \
                     f"{script.name} loops over deploy/{name}, which is not there"
+
+
+def test_the_lean_checkout_keeps_everything_the_backend_needs():
+    """His requirement once the app joins the repository: "щоб тільки бекенд
+    качався і деплоївся на серверах". The split is in the checkout rather than in
+    the history -- one repository, because every decision and the API contract the
+    app depends on live in the same `git log` as the code that implements them.
+
+    The risk is the obvious one: excluding a directory the watcher imports would
+    take the watch down at the next deploy. So the list is checked against what
+    the code actually reaches for.
+    """
+    lean = _text("lean.sh")
+    for needed in ("tools", "deploy", "docs", "labels"):
+        assert needed in lean, f"{needed} must survive the sparse checkout"
+    # `hovaysya.json` is a root file, and cone mode keeps those whatever happens
+    # -- but the watcher will not start without it, so say so out loud.
+    assert "hovaysya.json" in lean
+    assert "--cone" in lean, "pattern mode is slower and harder to reason about"
+
+
+def test_both_installers_thin_the_checkout():
+    for script in ("install.sh", "install-api.sh"):
+        body = _text(script)
+        assert "lean.sh" in body, f"{script} must apply the sparse checkout"
+        # As the owner, not as root: git would write .git/info/sparse-checkout
+        # root-owned and the update timer, which runs as the owner, could not
+        # read it.
+        assert "SUDO_USER" in body

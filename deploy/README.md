@@ -48,6 +48,31 @@ Finally:
     journalctl -u hovaysya -n 50         # the live feed
     systemctl list-timers hovaysya-update
 
+## Only the backend on a server
+
+Once the Android client lives in this repository, a server should carry what it
+runs and nothing else -- his requirement: "щоб тільки бекенд качався і деплоївся
+на серверах". The app source, and one day its signing config, have no business on
+a box reachable from the internet.
+
+**One repository, and the split is in the checkout.** `deploy/lean.sh` sets a
+cone-mode sparse checkout to `tools deploy docs labels`; both installers run it,
+as the checkout owner rather than as root, because git would otherwise write the
+sparse config root-owned and the update timer could not read it. `git pull` is
+unchanged and needs no flags -- sparse configuration lives in the repository and
+every later pull respects it.
+
+Two repositories were the alternative and lose on the thing this project is
+arranged around: every decision, every measurement and the reason it was taken sit
+in one `git log`, and the API contract the app depends on is documented beside
+the code that implements it. Split them and those drift.
+
+Renaming `tools/` to `backend/` was considered and skipped. It touches 325
+imports, 7 places in the deploy and 13 in the documentation, and buys nothing the
+sparse checkout does not already give -- it selects `tools/` exactly as it would
+select `backend/`. On a system that deploys itself every ten minutes, a
+mechanical rename of that size is a poor trade for a tidier name.
+
 ## The idle-reclamation problem, which is real here
 
 Oracle reclaims an Always Free instance when CPU, network **and** memory all sit

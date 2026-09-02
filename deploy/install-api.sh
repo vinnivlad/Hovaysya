@@ -16,6 +16,15 @@
 set -eu
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
+# Only the backend on a server: the app source has no business on a box that
+# is reachable from the internet. Runs as the checkout owner rather than
+# root, or git writes its config as root and the update timer cannot read it.
+if [ -n "${SUDO_USER:-}" ]; then
+	sudo -u "$SUDO_USER" "$(dirname "$0")/lean.sh" || true
+else
+	"$(dirname "$0")/lean.sh" || true
+fi
+
 
 # The API binds to this machine's private VCN address -- the only place Caddy on
 # B can reach it from, and the only place anything can. Never 0.0.0.0: that would

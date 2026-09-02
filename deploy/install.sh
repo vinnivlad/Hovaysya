@@ -9,6 +9,15 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 here="$(cd "$(dirname "$0")" && pwd)"
+# Only the backend on a server: the app source has no business on a box that
+# is reachable from the internet. Runs as the checkout owner rather than
+# root, or git writes its config as root and the update timer cannot read it.
+if [ -n "${SUDO_USER:-}" ]; then
+	sudo -u "$SUDO_USER" "$(dirname "$0")/lean.sh" || true
+else
+	"$(dirname "$0")/lean.sh" || true
+fi
+
 root="$(dirname "$here")"
 user="${SUDO_USER:-ubuntu}"
 
