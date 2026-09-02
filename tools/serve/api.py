@@ -8,6 +8,8 @@ is that nothing has to be installed:
     GET  /decisions?since=<cursor>    what Ховайся decided, for this recipient
                                       -- and for nobody else: the sentence names
                                       their ring and the reason says "my area"
+    GET  /state                       what the first screen shows: the worst
+                                      thing in the air, what is only scouted
     GET  /places                      every name the policy knows, for the
                                       first screen's home picker
     GET  /config                      their settings
@@ -338,6 +340,27 @@ def places() -> dict:
     return {"places": out, "tiers": list(TIERS)}
 
 
+def state(state_dir: Path, who: str) -> dict:
+    """One person's current state, as the watcher last wrote it.
+
+    Read rather than computed, and that is the whole point: the answer needs the
+    episode, which is sequential and lives in the watcher. This process opens one
+    file -- the one the token names -- and parses no Ukrainian at all.
+
+    An absent file is a real answer and not an error. It means the watcher has
+    not written for this person yet, which is what a phone sees in the seconds
+    after it registers, so the app is told plainly instead of being handed
+    "quiet" and telling somebody there are no threats.
+    """
+    path = state_dir / f"{Path(who).name}.json"
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"state": None, "at": None,
+                "note": "спостерігач ще не писав для цього отримувача"}
+    return raw if isinstance(raw, dict) else {"state": None, "at": None}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "hovaysya"
     sys_version = ""
@@ -421,6 +444,8 @@ class Handler(BaseHTTPRequestHandler):
                                      _parse_back((query.get("back") or [None])[0])))
         elif url.path == "/decisions":
             self._send(200, decisions(self.server.log_dir, who, since, limit))
+        elif url.path == "/state":
+            self._send(200, state(self.server.log_dir / "state", who))
         elif url.path == "/places":
             self._send(200, places())
         elif url.path == "/config":

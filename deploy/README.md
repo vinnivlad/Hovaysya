@@ -170,11 +170,22 @@ inbound door both compulsory and writable.
     GET  /decisions?since=<cursor>    what Ховайся decided, for this recipient
                                       and for nobody else -- the reason says
                                       "my area", the sentence names their ring
+    GET  /state                       the first screen: the worst thing in the
+                                      air, what is only being scouted, what has
+                                      been lifted
     GET  /places                      every name the policy knows, and which
                                       of them can be a home
     GET  /config · PUT /config        their settings
     POST /register                    a device takes itself in
     GET  /health                      no token needed, and see below
+
+`/state` is read from a file the watcher rewrites every poll, one per person, and
+never computed here: the answer needs the episode, which is sequential and lives
+in the watcher. It carries facts and the Ukrainian word for each class, not a
+finished line -- the vocabulary belongs to the server because a class the app
+does not know would render as a blank label, and the layout belongs to the app
+because this side cannot see the screen. An absent file is a real answer and says
+so, which is what a phone sees in the seconds after it registers.
 
 Registration is open, and everything else needs the token it hands back. Nobody
 administers anybody: a phone generates its own secret, keeps it, and sends only

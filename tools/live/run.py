@@ -58,6 +58,8 @@ from .version import startup_note
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LOG_DIR = REPO_ROOT / "data" / "live"
+# One JSON file per person, rewritten every poll: what the first screen shows.
+STATE_DIR = LOG_DIR / "state"
 TOKEN_HINT = "data/telegram-bot.token"
 
 # Quiet, there is nothing to be quick about: the channels post a few times an
@@ -346,6 +348,22 @@ def interval_hint(args, session: Session) -> float:
                interval_for("mon1tor_ua", session.tracker, args))
 
 
+def write_state(session: Session, directory: Path, now: float) -> None:
+    """One file per person, so the app has a screen to open rather than a feed.
+
+    Rewritten every poll rather than on change: it is a few hundred bytes and
+    the alternative is remembering what changed, which is the kind of bookkeeping
+    that goes wrong quietly. `/state` reads whichever file the token names.
+    """
+    from ..policy.status import SAID_ON_SCREEN, write
+
+    for who in session.recipients:
+        said = [{"at": row["at"], "level": row["level"], "text": row["said"]}
+                for row in session.log
+                if row.get("said") and row.get("who") == who.name]
+        write(directory, who, said=said[-SAID_ON_SCREEN:], now=int(now))
+
+
 def write_log(session: Session, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as fh:
@@ -545,6 +563,7 @@ def main(argv: list[str] | None = None) -> int:
         poll_once(client, conn, watchers, session, warm=slept, args=args)
         last_poll = time.time()
         write_log(session, log_path)
+        write_state(session, STATE_DIR, last_poll)
 
         if time.time() - last_beat > HEARTBEAT_S:
             last_beat = time.time()
@@ -559,6 +578,7 @@ def main(argv: list[str] | None = None) -> int:
             time.sleep(min(0.5, max(0.0, deadline - time.time())))
 
     write_log(session, log_path)
+    write_state(session, STATE_DIR, time.time())
     summarise(session, started)
     if session.notifier and session.notifier.enabled:
         print(f"  на телефон надіслано: {session.notifier.sent}"

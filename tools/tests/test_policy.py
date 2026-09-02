@@ -2140,3 +2140,125 @@ def test_the_episode_declares_each_field_once():
     dupes = {n for n in declared if declared.count(n) > 1}
     assert not dupes, dupes
     assert {f.name for f in dataclasses.fields(Episode)} >= set(declared)
+# --- the first screen -------------------------------------------------------
+
+
+def _screen(script, cfg=None, at=None):
+    """Run a script of (offset, text[, channel]) through one person and look.
+
+    The channel matters and defaults to a chat one: a siren has to come from
+    `alarm_kyiv` for `alert_announced` to be set, and without that the recheck
+    rule returns "recheck: no alert running" and nothing reaches the screen.
+    """
+    from tools.policy.config import load as load_config
+    from tools.policy.episodes import read
+    from tools.policy.recipients import Recipient
+    from tools.policy.status import snapshot
+
+    cfg = cfg if cfg is not None else load_config(warn=lambda _m: None)
+    who = Recipient(name="я", config=cfg)
+    who.tracker.official_source = True
+    last = 0
+    for step in script:
+        off, text = step[0], step[1]
+        channel = step[2] if len(step) > 2 else "mon1tor_ua"
+        who.decide(read(T0 + off, text, False, channel))
+        last = off
+    return snapshot(who, now=T0 + (at if at is not None else last)), who
+
+
+def test_no_episode_is_exactly_no_threats():
+    """"Показує що без загроз коли тривоги нема." An episode opens on any live
+    threat, so `watching` is not `alert` -- calling it one would be the
+    overstatement `state_word` was fixed for: an app that overstates once is
+    discounted afterwards."""
+    from tools.policy.status import QUIET
+
+    screen, _ = _screen([(0, "Доброго ранку. Обстановка спокійна.")])
+    assert screen["state"] == QUIET
+    assert screen["top"] is None
+    assert screen["recon"] == [] and screen["cleared"] == []
+
+
+def test_what_is_scouted_does_not_become_the_headline():
+    """His example, in the channels' own words: "Дрони, Балістика Дорозвідка".
+
+    Drones are in the air and ballistic has been re-checked, so the drones are
+    the headline and the ballistic is the second line. Serving `rechecked` as
+    part of the threat would have inverted that -- ballistic outranks a shahed
+    on the ladder, so the screen would have shouted about the thing that had
+    just been reported clear.
+    """
+    screen, _ = _screen([
+        (0, "🛑 Повітряна тривога в м. Київ", "alarm_kyiv"),
+        (60, "⚠️Реактивний шахед на Житомир."),
+        (120, "📡По балістиці чисто."),
+    ])
+    assert screen["top"]["word"] == "реактивний шахед", screen["top"]
+    assert [x["class"] for x in screen["recon"]] == ["ballistic"], screen["recon"]
+    # And the headline is not the thing that was just reported clear, which is
+    # what made this screen unreachable until the denial cut learned the
+    # channels' recheck words.
+    assert screen["threat"]["class"] != "ballistic", screen["threat"]
+
+
+def test_a_scouting_line_leaves_the_screen_but_not_the_dedup():
+    """`Episode.rechecked` has no age on purpose: "have we said this already in
+    this episode" stays true all night. Reading it as "what is being scouted
+    now" was my mistake, and the corpus says how big: 41% of 417 entries sit
+    there past ten minutes, 14% past thirty, the longest three hours. On 17% of
+    the screens that had any, the line was stale -- median 34 minutes old.
+
+    So the screen ages it and the dedup does not, which is why they are two
+    fields rather than one.
+    """
+    from tools.policy.status import RECON_FRESH_S
+
+    script = [
+        (0, "🛑 Повітряна тривога в м. Київ", "alarm_kyiv"),
+        (60, "⚠️Реактивний шахед на Житомир."),
+        (120, "📡По балістиці чисто."),
+    ]
+    fresh, who = _screen(script, at=120 + RECON_FRESH_S - 1)
+    assert [x["class"] for x in fresh["recon"]] == ["ballistic"]
+
+    stale, who = _screen(script, at=120 + RECON_FRESH_S + 1)
+    assert stale["recon"] == [], stale["recon"]
+    # Gone from the screen, still remembered as said.
+    assert "ballistic" in who.tracker.episode.rechecked
+
+
+def test_the_screen_carries_the_word_for_every_class_it_can_name():
+    """The vocabulary is served with the state because a class the server knows
+    and the app does not renders as a blank label -- a threat with no name, on
+    the one screen whose job is to name it."""
+    from tools.policy.announce import CLASS_WORD
+    from tools.policy.episodes import THREAT_LEVEL
+    from tools.policy.status import _named
+
+    for cls in THREAT_LEVEL:
+        if cls in ("none", "unknown"):
+            continue
+        named = _named([cls])
+        assert named, cls
+        assert named[0]["word"] and named[0]["word"] != cls, cls
+        assert named[0]["word"] == CLASS_WORD[cls], cls
+
+
+def test_the_state_file_is_replaced_whole(tmp_path):
+    """A phone reading a half-written file is a crash on the screen whose whole
+    job is to be trusted at three in the morning."""
+    import json
+
+    from tools.policy.status import write
+
+    _, who = _screen([(0, "🛑 Повітряна тривога в м. Київ", "alarm_kyiv"),
+                      (60, "⚠️Реактивний шахед на Житомир.")])
+    path = write(tmp_path, who, said=[{"at": "x", "level": "alert",
+                                       "text": "Тривога."}], now=T0 + 60)
+    assert path.name == "я.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["top"]["class"] == "shahed-jet"
+    assert payload["said"][-1]["text"] == "Тривога."
+    # No temporary files left behind.
+    assert [p.name for p in tmp_path.iterdir()] == ["я.json"]
