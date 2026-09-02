@@ -191,7 +191,6 @@ class Episode:
     # minutes later went out silently — the warning silencing the event.
     launched: set[str] = field(default_factory=set)
     last_launch: int | None = None
-    cleared: bool = False
     # How close a cruise missile has been reported in this episode: 0 none,
     # 1 oblast, 2 city, 3 the ring. A rise rings once, the way the threat ladder
     # does -- his rule, because waking only when they reach the city is late.
@@ -622,8 +621,13 @@ class Tracker:
         # A partial all-clear lifts one threat class, not the alert. Closing the
         # episode here would forget everything the night had established.
         if obs.alert_state == "clear" and not obs.partial_clear:
-            if self.episode is not None:
-                self.episode.cleared = True
+            # No marker on the way out. It used to set `cleared = True` here --
+            # a bool into what a second declaration below had already made a
+            # `set[str]`, so `ep.cleared.add()` would have raised on the next
+            # partial all-clear. It never did, only because this closes the
+            # episode in the same breath and `self.closed` is read by nobody.
+            # An episode that ended in a full all-clear is recognisable by
+            # there being no episode.
             self._close()
             return
 

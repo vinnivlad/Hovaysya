@@ -2115,3 +2115,28 @@ def test_a_track_keeps_its_class_without_anybody_restating_it():
     # Twenty minutes with nobody naming the class, and the sentence still has it.
     assert o.effective_threat == "shahed-jet", o.effective_threat
     assert "шахед" in (said or "").lower(), said
+def test_the_episode_declares_each_field_once():
+    """`cleared` was declared twice -- `bool` and then `set[str]` -- and a
+    dataclass keeps the last, so the bool was dead and the one assignment to it
+    put the wrong type in a live field. Nothing raised, only because that
+    assignment closed the episode in the same breath and nobody reads a closed
+    one. Found while designing `/state`, which serves this field.
+
+    Pinned on the declaration rather than on the crash it did not cause: the
+    class is long enough that a duplicate is easy to add again and invisible in
+    a diff.
+    """
+    import dataclasses
+    import inspect
+    import re
+
+    from tools.policy.episodes import Episode
+
+    assert isinstance(Episode(opened_at=0).cleared, set)
+
+    body = inspect.getsource(Episode)
+    body = body[:body.index("    @property")]
+    declared = re.findall(r"^    ([a-z_]+):", body, re.M)
+    dupes = {n for n in declared if declared.count(n) > 1}
+    assert not dupes, dupes
+    assert {f.name for f in dataclasses.fields(Episode)} >= set(declared)
