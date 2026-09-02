@@ -60,6 +60,28 @@ removes a test one.
     ui/Setup.kt   the first run -- a name, a district, a radius
     ui/Settings.kt and the one thing that is not a preference, below
 
+## One theme, dark
+
+His call, and the right one for this app rather than a preference: "зроби його в
+темних тонах, наче він в dark-mode. Це буде одна і єдина тема в ньому."
+
+The screen that matters is opened in a dark room, at arm's length, in the first
+seconds after being woken. A light theme there is not a different taste -- it is
+a flash of white in the face of somebody who has just been told a missile is
+coming, and it costs them the seconds their eyes need to read the one word on
+the screen.
+
+So there is no `values-night`, and the dark values live in plain `values/`: a
+phone set to light mode has to get this theme too. The ground colour is written
+twice on purpose -- once in `ui/Theme.kt` and once in `res/values/colors.xml`,
+because the window manager paints it before any Kotlin runs, and getting that
+one wrong means launching flashes the wrong colour on the way to the right one.
+
+Being the only theme is also why the palette can be tuned rather than
+compromised. The ground is not pure black -- on OLED that makes type edges bloom
+-- the text is a warm off-white so a 46sp headline does not glare, and saturation
+is spent in exactly one place: the state.
+
 ## The alphabet
 
     початок тривоги   ··· --- ···       SOS, as Тривога rings it

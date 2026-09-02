@@ -1,15 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   A platform parent rather than a Material one, so this does not pull in the
-  `com.google.android.material` library for a theme that Compose immediately
-  replaces. All the colour that matters is in `ui/Theme.kt`; this exists to give
-  the window a background before the first frame, so launching does not flash
-  white on the way to a dark screen -- which at night is the whole difference.
+  `com.google.android.material` library for a theme Compose replaces on the first
+  frame. This exists to give the window a ground before that frame, so launching
+  does not flash light on the way to a dark screen.
+
+  The dark parent in `values/` and no `values-night/` at all: the app has one
+  theme, so a phone set to light mode must still get this one.
 -->
 <resources>
-    <style name="Theme.Hovaysya" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.Hovaysya" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/ground</item>
         <item name="android:statusBarColor">@color/ground</item>
         <item name="android:navigationBarColor">@color/ground</item>
+        <!-- Light glyphs on the status bar, which is what a dark ground needs.
+             Already the default under a dark parent, said out loud because the
+             parent is the only thing keeping it true. The navigation-bar twin is
+             deliberately absent: it arrived in API 27 and minSdk here is 26, and
+             its default is the same anyway. -->
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

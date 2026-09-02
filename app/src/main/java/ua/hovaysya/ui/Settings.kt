@@ -302,7 +302,11 @@ private fun Card(bad: Boolean = false, content: @Composable () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(
-                if (bad) MaterialTheme.colorScheme.error.copy(alpha = 0.10f)
+                // 10% of a red read as almost nothing over a near-black
+                // ground -- a tint tuned as half of a light/dark pair. With one
+                // dark theme it can be set for the ground it actually sits on,
+                // and this card has to say "something is wrong" at a glance.
+                if (bad) MaterialTheme.colorScheme.error.copy(alpha = 0.18f)
                 else MaterialTheme.colorScheme.surfaceVariant
             )
             .padding(16.dp),

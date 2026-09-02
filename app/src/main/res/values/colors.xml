@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Matches `Ground` in ui/Theme.kt. Two places for one colour, because one
-         of them is read by the window manager before any Kotlin runs. -->
-    <color name="ground">#FFF7F6F3</color>
-    <!-- The launcher icon keeps one identity in both themes: an app is found
-         by its icon, and a two-faced one is harder to find, not easier. -->
+    <!--
+      Matches `Ground` in ui/Theme.kt, and it is here a second time because the
+      window manager paints this before any Kotlin runs. Get it wrong and
+      launching flashes the wrong colour on the way to the right one -- which at
+      three in the morning is the whole difference.
+
+      In `values/` and not `values-night/`: there is one theme, so a device set
+      to light mode gets this too.
+    -->
+    <color name="ground">#FF0E0F11</color>
+
+    <!-- The launcher icon keeps one identity: an app is found by its icon. -->
     <color name="icon_ground">#FF2E3A38</color>
 </resources>

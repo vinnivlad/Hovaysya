@@ -1,10 +1,8 @@
 package ua.hovaysya.ui
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -13,60 +11,61 @@ import androidx.compose.ui.unit.sp
 import ua.hovaysya.Screen
 
 /**
- * The palette is decided by the circumstance rather than by taste: this screen
- * is read in the dark, half awake, in the first second after being woken. So
- * saturation is spent in exactly one place -- the state -- and everything else
- * is a neutral with a slight cast towards it, which is what stops the page
- * looking assembled from defaults.
+ * One theme, dark, whatever the phone is set to. His call: "зроби його в темних
+ * тонах, наче він в dark-mode. Це буде одна і єдина тема в ньому."
+ *
+ * Which is the right call for this app rather than a preference, and worth
+ * writing down: the screen that matters is opened in a dark room, at arm's
+ * length, in the first seconds after being woken. A light theme is not a
+ * different taste there -- it is a flash of white in the face of somebody who
+ * has just been told a missile is coming, and it costs them the seconds their
+ * eyes need to read the one word on the screen.
+ *
+ * Being the only theme also means the palette can be tuned for it instead of
+ * being half of a pair. Saturation is spent in exactly one place -- the state --
+ * and the neutrals carry a slight cast towards it, which is what keeps the page
+ * from reading as assembled from defaults.
+ *
+ * `res/values/colors.xml` holds the ground colour a second time, because the
+ * window manager paints it before any Kotlin runs. There is no `values-night`:
+ * with one theme it would be a copy, and a copy is somewhere for the two to
+ * drift apart.
  */
 
-// Grounds. Not pure black: an OLED pure black makes the type edges bloom, and
-// this is read at arm's length in a dark room.
-private val NightGround = Color(0xFF111214)
-private val NightRaised = Color(0xFF1B1D21)
-private val DayGround = Color(0xFFF7F6F3)
-private val DayRaised = Color(0xFFFFFFFF)
+// Not pure black. On OLED it makes type edges bloom, which is the opposite of
+// legible at the moment this screen is read.
+private val Ground = Color(0xFF0E0F11)
+private val Raised = Color(0xFF191B1F)
+private val Outline = Color(0xFF2E3136)
 
-// The three states, and each has to be recognisable before the words are.
-private val Calm = Color(0xFF5B7C74)      // nothing is flying
-private val Watch = Color(0xFFC98A2B)     // something is up, not here
-private val Danger = Color(0xFFD5442C)    // it concerns me
+// Warm off-white rather than white: softer at night, and it stops the display
+// line from glaring when it fills half the screen.
+private val Text = Color(0xFFECEAE6)
+private val Muted = Color(0xFF8B8D93)
 
-private val NightText = Color(0xFFECEAE6)
-private val NightMuted = Color(0xFF8E9096)
-private val DayText = Color(0xFF1A1B1D)
-private val DayMuted = Color(0xFF6B6C70)
+// The three states, each recognisable before its word is read.
+private val Calm = Color(0xFF5F8479)      // nothing is flying
+private val Watch = Color(0xFFD4952F)     // something is up, not here
+private val Danger = Color(0xFFE8503A)    // it concerns me
 
-private val night = darkColorScheme(
+private val scheme = darkColorScheme(
     primary = Watch,
     onPrimary = Color(0xFF14150F),
-    background = NightGround,
-    onBackground = NightText,
-    surface = NightGround,
-    onSurface = NightText,
-    surfaceVariant = NightRaised,
-    onSurfaceVariant = NightMuted,
+    secondary = Calm,
+    background = Ground,
+    onBackground = Text,
+    surface = Ground,
+    onSurface = Text,
+    surfaceVariant = Raised,
+    onSurfaceVariant = Muted,
     error = Danger,
-    onError = Color(0xFFFFF3F0),
-    outline = Color(0xFF34373C),
+    onError = Color(0xFF1A0D0A),
+    outline = Outline,
+    outlineVariant = Outline,
 )
 
-private val day = lightColorScheme(
-    primary = Watch,
-    onPrimary = Color(0xFF14150F),
-    background = DayGround,
-    onBackground = DayText,
-    surface = DayGround,
-    onSurface = DayText,
-    surfaceVariant = DayRaised,
-    onSurfaceVariant = DayMuted,
-    error = Danger,
-    onError = Color(0xFFFFF3F0),
-    outline = Color(0xFFD8D5CE),
-)
-
-// One display size that is deliberately larger than Material's largest: the top
-// line has to be legible without focusing.
+// One display size deliberately larger than Material's largest: the top line has
+// to be legible without focusing.
 private val typography = Typography(
     displayLarge = TextStyle(
         fontSize = 46.sp, lineHeight = 50.sp, fontWeight = FontWeight.Bold),
@@ -82,7 +81,7 @@ private val typography = Typography(
 @Composable
 fun HovaysyaTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (isSystemInDarkTheme()) night else day,
+        colorScheme = scheme,
         typography = typography,
         content = content,
     )
@@ -94,5 +93,5 @@ fun colourFor(state: String?): Color = when (state) {
     Screen.ALERT -> Danger
     Screen.WATCHING -> Watch
     Screen.QUIET -> Calm
-    else -> MaterialTheme.colorScheme.onSurfaceVariant
+    else -> Muted
 }
