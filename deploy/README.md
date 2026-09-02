@@ -170,8 +170,31 @@ inbound door both compulsory and writable.
     GET  /decisions?since=<cursor>    what Ховайся decided, for this recipient
                                       and for nobody else -- the reason says
                                       "my area", the sentence names their ring
+    GET  /places                      every name the policy knows, and which
+                                      of them can be a home
     GET  /config · PUT /config        their settings
+    POST /register                    a device takes itself in
     GET  /health                      no token needed, and see below
+
+Registration is open, and everything else needs the token it hands back. Nobody
+administers anybody: a phone generates its own secret, keeps it, and sends only
+`sha256` of it, so this machine never holds anything that could impersonate a
+phone. The person picks their own name -- it is a label for the log rather than a
+credential, which is what makes `--list` an answer to "хто є користувачі" and
+what lets one person's night be looked at on its own.
+
+    curl -s -X POST https://hovaysya.duckdns.org/register \
+         -H 'Content-Type: application/json' \
+         -d '{"hash":"<sha256 of the secret>","name":"оля"}'
+    -> {"name": "оля"}          201, or "оля-4f7k" if the name is taken
+
+Two things about that being open, said plainly rather than implied. `MAX_RECIPIENTS`
+bounds how many people this holds, because the push sender walks every
+registration on every alert -- so the ceiling is also the denial: fill it and the
+next real person is locked out. `REGISTER_PER_MIN` is what makes filling it slow
+and visible in the journal instead of instant and quiet, and `--list` and
+`--revoke` are how junk leaves. It is not a defence against a determined
+stranger.
 
 **The API runs on A and the certificate lives on B.** The app talks TLS to B,
 Caddy proxies over the private VCN address to A, and A answers out of the

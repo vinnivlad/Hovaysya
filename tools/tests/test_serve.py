@@ -472,3 +472,118 @@ def test_the_picker_is_offered_the_gazetteers_own_tier_order():
     assert page["tiers"] == list(TIERS)
     assert {p["name"] for p in page["places"]} == {p.name for p in PLACES}
     assert {p["tier"] for p in page["places"]} <= set(TIERS)
+# --- taking yourself in -----------------------------------------------------
+
+
+def _reg(tmp_path, secret, name):
+    from tools.policy import tokens as people
+
+    return people.register(people.hashed(secret), name, tmp_path)
+
+
+def test_a_phone_takes_itself_in_and_the_token_it_made_works(tmp_path):
+    """Open registration, on his instruction: "нащо ти намагаєшся робити так щоб
+    я адміністрував всіх користувачів? Нехай собі ставлять застосунок, самі
+    вибирають дім і все."
+
+    The phone generates the secret and sends only its sha256, so this machine
+    never holds anything that could impersonate a phone -- the property
+    `token.py` has always had, kept when the minting moved off the terminal.
+    """
+    from tools.policy import tokens as people
+
+    assert _reg(tmp_path, "s3cret", "Оля") == "Оля"
+    assert people.name_for("s3cret", tmp_path) == "Оля"
+    assert people.name_for("s3cre", tmp_path) is None
+    # And the secret itself is nowhere on disk.
+    stored = (tmp_path / "index.json").read_text(encoding="utf-8")
+    assert "s3cret" not in stored
+
+
+def test_a_hash_already_registered_cannot_be_claimed_again(tmp_path):
+    """Two names on one hash would make `name_for` answer with whichever the
+    dict happened to yield first -- an identity takeover for anyone who learned
+    a hash, which is the one thing this file is allowed to leak."""
+    from tools.policy import tokens as people
+
+    _reg(tmp_path, "s3cret", "Оля")
+    with pytest.raises(people.Refused) as caught:
+        _reg(tmp_path, "s3cret", "не Оля")
+    assert caught.value.code == 409
+    assert people.name_for("s3cret", tmp_path) == "Оля"
+
+
+def test_a_recipient_cannot_be_called_the_index(tmp_path):
+    """The hole open registration made, and it locks everybody out at once.
+
+    A person's name is a filename here, so a device registering as "index" would
+    be handed `index.json` as its settings file and its first `PUT /config`
+    would overwrite the index -- with no error anywhere, and no way back short of
+    re-registering every phone.
+    """
+    from tools.policy import tokens as people
+
+    for chosen in ("index", "INDEX", "  index  "):
+        name = _reg(tmp_path, chosen, chosen)
+        assert name.casefold() != "index", chosen
+        assert people._config_path(name, tmp_path).name != "index.json", chosen
+    # Three devices in, and the index still knows all three.
+    assert len(people.index(tmp_path)) == 3
+
+
+def test_a_chosen_name_cannot_reach_out_of_the_directory(tmp_path):
+    """The name arrives from the network now, not from a person at a terminal."""
+    from tools.policy import tokens as people
+
+    name = _reg(tmp_path, "s", "../../etc/passwd")
+    path = people._config_path(name, tmp_path)
+    assert path.parent == tmp_path, path
+    assert ".." not in name and "/" not in name, name
+
+
+def test_two_people_who_pick_one_name_get_two(tmp_path):
+    """His warning: "май на увазі що імена можуть повторюватись". The suffix is
+    visible on purpose -- it is what lets him say "глянь олю" when there are two
+    and mean one of them."""
+    from tools.policy import tokens as people
+
+    assert _reg(tmp_path, "a", "Оля") == "Оля"
+    second = _reg(tmp_path, "b", "оля")
+    assert second != "Оля" and second.startswith("оля-"), second
+    assert len(people.index(tmp_path)) == 2
+
+
+def test_the_ceiling_refuses_rather_than_growing(tmp_path):
+    """The push sender walks every registration on every alert, so unbounded
+    growth costs delivery time to the people who are really there."""
+    from tools.policy import tokens as people
+
+    for i in range(3):
+        people.register(people.hashed(str(i)), f"p{i}", tmp_path, ceiling=3)
+    with pytest.raises(people.Refused) as caught:
+        people.register(people.hashed("x"), "ще один", tmp_path, ceiling=3)
+    assert caught.value.code == 507
+
+
+def test_a_malformed_hash_is_refused_before_anything_is_written(tmp_path):
+    from tools.policy import tokens as people
+
+    for bad in (None, "", "деде", "z" * 64, "AB" * 32, "a" * 63):
+        with pytest.raises(people.Refused) as caught:
+            people.register(bad, "x", tmp_path)
+        assert caught.value.code == 400, bad
+    assert not (tmp_path / "index.json").exists()
+
+
+def test_registration_is_throttled_by_attempts_not_by_successes():
+    """`MAX_RECIPIENTS` being a ceiling makes the ceiling itself the denial --
+    fill it and the next real person is locked out. This is what makes filling it
+    slow and visible in the journal instead of instant and quiet. It counts
+    attempts, because a flood of malformed bodies is the thing being slowed."""
+    from tools.serve.api import may_register
+
+    now = 1_000_000.0
+    assert all(may_register(now, per_min=3) for _ in range(3))
+    assert not may_register(now, per_min=3)
+    # And it is a window, not a quota.
+    assert may_register(now + 61, per_min=3)

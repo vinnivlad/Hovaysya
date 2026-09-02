@@ -27,11 +27,13 @@ def _write(directory, index: dict) -> None:
     The install script creates it owned by the service and group-writable by the
     repository owner. A bare PermissionError traceback here sends the reader
     looking at Python instead of at `ls -ld`.
+
+    The write itself lives in `policy.tokens`, so a person at a terminal and the
+    open registration endpoint replace this file the same way -- atomically, and
+    leaving it readable by the group.
     """
     try:
-        directory.mkdir(parents=True, exist_ok=True)
-        (directory / "index.json").write_text(
-            json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
+        people.write_index(index, directory)
     except PermissionError:
         raise SystemExit(
             f"нема прав писати в {directory}\n"
@@ -72,6 +74,11 @@ def main() -> None:
 
     if not args.name:
         raise SystemExit("потрібен --name, --revoke або --list")
+
+    # This path does not go through `people.register`, so the reserved name has
+    # to be refused here too: a recipient called "index" owns `index.json`.
+    if args.name.casefold() in people.RESERVED_NAMES:
+        raise SystemExit(f"{args.name!r} не можна — так називається сам індекс")
 
     token = secrets.token_urlsafe(32)
     index = {d: n for d, n in index.items() if n != args.name}

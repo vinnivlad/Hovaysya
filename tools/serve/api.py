@@ -12,6 +12,8 @@ is that nothing has to be installed:
                                       first screen's home picker
     GET  /config                      their settings
     PUT  /config                      change them
+    POST /register                    a device takes itself in -- no token,
+                                      because this is where a token begins
     GET  /health                      no token needed
 
 **This process must never be the reason the watch stops.** It shares nothing with
@@ -35,7 +37,9 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import threading
 import time
+from collections import deque
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -51,6 +55,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DB_PATH = REPO_ROOT / "data" / "messages.db"
 LOG_DIR = REPO_ROOT / "data" / "live"
 
+# Registrations a minute, all sources together. `MAX_RECIPIENTS` bounds how many
+# people this can hold, which makes the ceiling itself the denial -- fill it and
+# the next real person is locked out. This is what makes filling it slow and
+# visible in the journal instead of instant and quiet. Deliberately global rather
+# than per address: Caddy is the only client this process sees, so a per-IP
+# counter would have to trust a forwarded header to mean anything.
+REGISTER_PER_MIN = 5
+
 MAX_LIMIT = 500
 DEFAULT_LIMIT = 200
 MAX_BODY = 64 * 1024
@@ -58,6 +70,22 @@ MAX_BODY = 64 * 1024
 # and an app away longer than this has nothing useful to catch up on -- whatever
 # was flying has landed.
 LOG_DAYS = 3
+
+
+_registrations: deque = deque()
+_throttle = threading.Lock()
+
+
+def may_register(now: float, per_min: int = REGISTER_PER_MIN) -> bool:
+    """Whether to take another registration, counting attempts rather than
+    successes -- a flood of malformed bodies is the thing being slowed down."""
+    with _throttle:
+        while _registrations and now - _registrations[0] > 60:
+            _registrations.popleft()
+        if len(_registrations) >= per_min:
+            return False
+        _registrations.append(now)
+        return True
 
 
 def _cursor(ts: int, channel: str, message_id: int) -> str:
@@ -319,15 +347,43 @@ class Handler(BaseHTTPRequestHandler):
         # One line per request on stdout, so journalctl is the access log.
         print(f"  {self.address_string()} {fmt % args}")
 
-    def _send(self, code: int, payload: dict) -> None:
+    def _send(self, code: int, payload: dict, close: bool = False) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        # Refusing a request whose body we never read leaves those bytes in the
+        # connection, and this speaks HTTP/1.1, so the next request on it would
+        # start mid-JSON and fail as something else entirely. Saying so in a
+        # header is the honest fix; draining a body we have already decided to
+        # reject is the wrong favour to do a caller who sent a large one.
+        if close:
+            self.close_connection = True
+            self.send_header("Connection", "close")
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(body)
+
+    def _body(self) -> dict | None:
+        """The request body as an object, or None with the refusal already sent."""
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length < 0 or length > MAX_BODY:
+            self._send(413, {"error": f"тіло більше за {MAX_BODY} байт"},
+                       close=True)
+            return None
+        try:
+            raw = json.loads(self.rfile.read(length).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            self._send(400, {"error": "не JSON"})
+            return None
+        if not isinstance(raw, dict):
+            self._send(400, {"error": "очікував обʼєкт"})
+            return None
+        return raw
 
     def _token(self) -> str | None:
         auth = self.headers.get("Authorization") or ""
@@ -377,28 +433,44 @@ class Handler(BaseHTTPRequestHandler):
 
     do_HEAD = do_GET
 
+    def do_POST(self) -> None:
+        # The one endpoint that takes no token, because it is where a token
+        # begins. Open on his instruction: "нехай собі ставлять застосунок, самі
+        # вибирають дім і все."
+        if urlparse(self.path).path != "/register":
+            self._send(404, {"error": "нема такого"}, close=True)
+            return
+        if not may_register(time.time()):
+            self._send(429, {"error": "занадто часто, спробуй за хвилину"},
+                       close=True)
+            return
+        raw = self._body()
+        if raw is None:
+            return
+        try:
+            name = people.register(raw.get("hash"), raw.get("name"),
+                                   self.server.recipients_dir)
+        except people.Refused as exc:
+            self._send(exc.code, {"error": exc.message})
+            return
+        except OSError as exc:
+            self._send(500, {"error": f"не записалось: {exc}"})
+            return
+        # In the journal, because the ceiling being the denial means he needs to
+        # be able to see it being filled.
+        print(f"  + зареєстрували {name}")
+        self._send(201, {"name": name})
+
     def do_PUT(self) -> None:
         if urlparse(self.path).path != "/config":
-            self._send(404, {"error": "нема такого"})
+            self._send(404, {"error": "нема такого"}, close=True)
             return
         who = self._who()
         if who is None:
-            self._send(401, {"error": "потрібен токен"})
+            self._send(401, {"error": "потрібен токен"}, close=True)
             return
-        try:
-            length = int(self.headers.get("Content-Length") or 0)
-        except ValueError:
-            length = -1
-        if length < 0 or length > MAX_BODY:
-            self._send(413, {"error": f"тіло більше за {MAX_BODY} байт"})
-            return
-        try:
-            raw = json.loads(self.rfile.read(length).decode("utf-8"))
-        except (ValueError, UnicodeDecodeError):
-            self._send(400, {"error": "не JSON"})
-            return
-        if not isinstance(raw, dict):
-            self._send(400, {"error": "очікував обʼєкт"})
+        raw = self._body()
+        if raw is None:
             return
 
         from ..policy.config import changed_from_default
