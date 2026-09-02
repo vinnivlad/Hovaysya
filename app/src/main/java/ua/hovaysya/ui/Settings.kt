@@ -14,7 +14,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,7 +57,6 @@ fun Settings(store: Store, bell: Bell, forgotten: () -> Unit) {
     var radius by remember { mutableStateOf(6f) }
     var saved by remember { mutableStateOf<String?>(null) }
     var problem by remember { mutableStateOf<String?>(null) }
-    var base by remember { mutableStateOf(store.base) }
 
     // The grant is made in system settings, so the answer changes while this app
     // is in the background and there is no callback for it. Re-asking cheaply is
@@ -136,8 +134,9 @@ fun Settings(store: Store, bell: Bell, forgotten: () -> Unit) {
             Text("Як це відчувається", style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Пʼять сигналів. Їх варто відчути зараз, бо вночі " +
-                    "розрізняти доведеться не дивлячись.",
+                "Чотири сигнали, які варто відчути зараз — бо вночі " +
+                    "розрізняти доведеться не дивлячись. Пʼятий не відчувається " +
+                    "взагалі, і в цьому вся його робота.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -174,7 +173,10 @@ fun Settings(store: Store, bell: Bell, forgotten: () -> Unit) {
                 },
             )
             Bells(
-                "Тихо", "—", "не будить",
+                "Тихо", "—", "не будить, не вібрує",
+                // Still worth pressing: it puts the line in the shade, which is
+                // where this class is meant to be found rather than felt.
+                verb = "Показати",
                 onRing = {
                     bell.ring(context, bell.quiet, "Тихо",
                         "Дорозвідка по балістиці.")
@@ -237,21 +239,15 @@ fun Settings(store: Store, bell: Bell, forgotten: () -> Unit) {
             }
         }
 
-        // --- the plumbing ---------------------------------------------------
-        Spacer(Modifier.height(16.dp))
-        Card {
-            Text("Сервер", style = MaterialTheme.typography.bodyLarge)
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = base,
-                onValueChange = { base = it },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            TextButton(onClick = { store.base = base }) { Text("Запамʼятати") }
-        }
-
+        // No server field here, and its absence is deliberate rather than tidy.
+        // The token is issued by one server and means nothing on another, so
+        // changing the address after registering could only ever break the app
+        // -- silently, into a 401 that looks like the service being down.
+        //
+        // It is asked once at first run, before a token exists, which is the
+        // only moment the question is coherent. "Забути цей пристрій" leads back
+        // there, so the way to change it is to stop being registered first,
+        // which is exactly what changing it means.
         Spacer(Modifier.height(16.dp))
         TextButton(onClick = {
             scope.launch {
@@ -285,6 +281,12 @@ private fun Bells(
     name: String,
     rhythm: String,
     meaning: String,
+    // What the button honestly offers. His objection, and it was about the copy
+    // rather than the code: "а на «Тихо» навіщо вібро? На те воно й тихо."
+    // The channel has never vibrated -- `enableVibration(false)` -- but a button
+    // saying "Відчути" beside it promised a sensation that cannot arrive, and a
+    // quiet bell is defined by not being felt.
+    verb: String = "Відчути",
     onRing: () -> Unit,
 ) {
     Row(
@@ -304,7 +306,7 @@ private fun Bells(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        OutlinedButton(onClick = onRing) { Text("Відчути") }
+        OutlinedButton(onClick = onRing) { Text(verb) }
     }
 }
 
