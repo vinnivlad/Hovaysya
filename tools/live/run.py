@@ -52,7 +52,7 @@ from ..labeler.build import kyiv_dt
 from ..policy.announce import Announcer
 from ..policy.config import CONFIG_PATH, changed_from_default, load as load_config
 from ..policy.episodes import OFFICIAL_CHANNELS, Tracker, observe, read
-from ..policy.recipients import decide_all, from_dir
+from ..policy.recipients import TELEGRAM_NAME, decide_all, from_dir
 from ..policy.rules import decide
 from .notify import Notifier
 from .version import startup_note
@@ -227,10 +227,26 @@ def _say(session: Session, who, channel: str, message_id: int, ts: int,
     if warm:
         return
 
-    # To the phone, if a bot is configured. A failure here must never take the
-    # watch down: a missing notification is a bad night, a crashed watcher is no
-    # night at all.
-    if utterance is not None and session.notifier is not None:
+    # To the phone, if a bot is configured -- and only for the recipient the bot
+    # *is*. There is one notifier and it points at one chat, so sending it for
+    # every recipient sends every bell as many times as there are people.
+    #
+    # Which is what happened, live, the evening `from_dir` started always
+    # including `telegram_channel`: A already had a registered token from testing
+    # the API, so it went from one recipient to two and he got two of everything.
+    # He noticed on the one that is unmistakable: "тільки що прийшло 2 відбої о
+    # 19:41."
+    #
+    # The name is the gate because the name is the fact: `telegram_channel` is a
+    # delivery channel that always exists, and everyone who registers a phone is
+    # delivered to by push instead. Anything cleverer -- first recipient, or
+    # whoever holds the shipped config -- would be a rule that quietly stops
+    # being true.
+    #
+    # A failure here must never take the watch down: a missing notification is a
+    # bad night, a crashed watcher is no night at all.
+    if (utterance is not None and session.notifier is not None
+            and who.name == TELEGRAM_NAME):
         from .notify import format_message
 
         session.notifier.send(format_message(utterance, obs, decision),

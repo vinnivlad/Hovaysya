@@ -601,3 +601,84 @@ def test_the_siren_and_the_all_clear_carry_the_channels_own_circles():
     assert said[2].startswith("🔔 🟢 ")
     # ...and nothing else wears one.
     assert not said[1].startswith(("🔴", "🟢")) and "🔴" not in said[1].splitlines()[0]
+# --- one chat, one message --------------------------------------------------
+
+
+class _Chat:
+    """A notifier that only remembers. `Notifier` talks to Telegram."""
+
+    enabled = True
+    failures = 0
+
+    def __init__(self):
+        self.messages = []
+
+    @property
+    def sent(self):
+        return len(self.messages)
+
+    def send(self, text, audible=False):
+        self.messages.append((text, audible))
+        return True
+
+
+def test_two_recipients_do_not_double_every_bell():
+    """Live, the evening this could first happen. He heard it on the one that is
+    unmistakable: "тільки що прийшло 2 відбої о 19:41."
+
+    `_say` runs once per recipient, and there is one notifier pointing at one
+    chat -- so sending from it for every recipient sends every bell as many times
+    as there are people. Harmless while there was exactly one recipient, and
+    `from_dir` always including `telegram_channel` is what ended that: server A
+    already had a registered token from testing the API, so it went from one
+    recipient to two and he got two of everything.
+
+    The name is the gate, because the name is the fact. `telegram_channel` is a
+    delivery channel that always exists; anyone who registers a phone is reached
+    by push instead. Anything cleverer -- the first recipient, or whoever holds
+    the shipped config -- is a rule that would quietly stop being true.
+    """
+    from tools.live.run import Session, handle
+    from tools.policy.config import DEFAULTS, replace
+    from tools.policy.recipients import TELEGRAM_NAME, Recipient
+
+    chat = _Chat()
+    mine = Recipient(name=TELEGRAM_NAME, config=replace(DEFAULTS, home="Жуляни"))
+    theirs = Recipient(name="оля", config=replace(DEFAULTS, home="Виноградар"))
+    for who in (mine, theirs):
+        who.tracker.official_source = True
+    session = Session(recipients=[mine, theirs], tracker=mine.tracker,
+                      announcer=mine.announcer, notifier=chat)
+
+    now = 1_780_000_000
+    handle(session, "alarm_kyiv", 1, now, "🚨 м. Київ Повітряна тривога",
+           False, now)
+    handle(session, "alarm_kyiv", 2, now + 600,
+           "🟢 м. Київ Відбій повітряної тривоги", False, now + 600)
+
+    # Two recipients, so four log rows -- and two messages, not four.
+    assert len({row["who"] for row in session.log}) == 2, session.log
+    assert chat.sent == 2, chat.messages
+    assert "Тривога" in chat.messages[0][0]
+    assert "Відбій" in chat.messages[1][0]
+
+
+def test_the_warm_pass_still_sends_nothing():
+    """A catch-up must go through the trackers and reach no phone: on a restart
+    mid-alert the backlog is hours old and every bell in it has already rung."""
+    from tools.live.run import Session, handle
+    from tools.policy.config import DEFAULTS, replace
+    from tools.policy.recipients import TELEGRAM_NAME, Recipient
+
+    chat = _Chat()
+    mine = Recipient(name=TELEGRAM_NAME, config=replace(DEFAULTS, home="Жуляни"))
+    mine.tracker.official_source = True
+    session = Session(recipients=[mine], tracker=mine.tracker,
+                      announcer=mine.announcer, notifier=chat)
+
+    now = 1_780_000_000
+    handle(session, "alarm_kyiv", 1, now, "🚨 м. Київ Повітряна тривога",
+           False, now, warm=True)
+    assert chat.sent == 0, chat.messages
+    # ...but the tracker knows an alert is running.
+    assert mine.tracker.episode is not None
