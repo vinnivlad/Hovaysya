@@ -270,17 +270,53 @@ def _low(text: str) -> str:
 # немає" and from "❗️Реактивний шахед вже над Києвом, а тривоги немає" -- both
 # real, and the second one over the city. Only service words may stand between
 # the class and the denial.
+#
+# The stem is "балісти" and not "балістик": the к becomes ц in the locative, so
+# "балістиці" does not contain "балістик" and neither does "балістичних".
+# Everything else in this file has always used the shorter one -- see the
+# `_THREAT` table -- and these patterns inherited the longer one, so the fix
+# above shipped with a hole in it: "по балістиці чисто" and "без фіксації
+# балістичних ракет" both went straight past it, and so would have
+# "Загрози балістиці немає".
+_DENIED_CLASS = (r"(?:балісти\w*|крилат\w*|реактивн\w*|шахед\w*|бпла|"
+                 r"міг-31\w*|кинж\w*|кинд\w*|циркон\w*|іскандер\w*|ракет\w*)")
+# The generic noun an adjectival class takes with it. Without this, cutting
+# "без фіксації балістичних" out of "без фіксації балістичних ракет" leaves the
+# bare " ракет", which the cruise pattern then reads as a cruise missile -- the
+# denial turning into a different threat instead of into none.
+_DENIED_NOUN = r"(?:\s+(?:ракет\w*|дрон\w*|бпла))?"
+# The service words that may stand in the gap, and nothing else.
+_DENIED_GAP = (r"(?:\s+(?:в\s+повітрі|у\s+повітрі|над\s+містом|в\s+наш\s+бік|"
+               r"наразі|поки|станом\s+на\s+зараз|для\s+нас|для\s+столиці|"
+               r"для\s+києва|більше|тут|локаційно|зараз))*")
+# What counts as saying the class is not there. The last two are the monitoring
+# channels' own recheck words -- "📡По балістиці чисто", "Кинджал поки не
+# фіксуються" -- and they mean exactly what a denial means, so they belong in the
+# same place rather than in a second mechanism.
+# ...and not when the same breath says the thing is airborne anyway. "У Києві
+# пекло, більшість шахедів не фіксуються та летять над будинками" means the radar
+# has lost them, not that they are gone, and cutting the class there read a
+# message about shahedy over the rooftops as being about cruise missiles. One
+# message in 27374 -- the construction is rare, three matches in 635 lines with a
+# clearance word, and the other two name a place rather than a class ("Над
+# Києвом локаційно чисто") so they were never touched. Narrow on purpose:
+# anything broader is the sentence-level reading this pattern exists to avoid.
+# The word boundary is load-bearing: without it `\w*` simply matches less --
+# "фіксують" instead of "фіксуються" -- and the lookahead then sees "ся та
+# летять", which starts with no conjunction, so the guard is stepped around by
+# ordinary backtracking.
+_DENIED_TAIL = (r"(?:нема\w*|не\s+має|відсутн\w*|чисто|не\s+фіксу\w*)\b"
+                r"(?!\s*(?:та|і|й|,)\s*(?:лет|йдут|рухаю|курс))")
+
 _DENIED = re.compile(
-    r"(?:загроз\w*\s+)?(?:балістик\w*|крилат\w*|реактивн\w*|шахед\w*|"
-    r"міг-31\w*|кинж\w*|кинд\w*|ракет\w*)"
-    r"(?:\s+(?:в\s+повітрі|у\s+повітрі|над\s+містом|в\s+наш\s+бік|наразі|поки|"
-    r"станом\s+на\s+зараз|для\s+нас|для\s+столиці|для\s+києва|більше|тут))*"
-    r"\s*(?:нема\w*|не\s+має|відсутн\w*)",
+    r"(?:по\s+)?(?:загроз\w*\s+)?" + _DENIED_CLASS + _DENIED_NOUN + _DENIED_GAP
+    + r"\s*" + _DENIED_TAIL,
     re.IGNORECASE)
-# ...and the other word order: "наразі немає загрози балістики".
+# ...and the other word order: "наразі немає загрози балістики", "без фіксації
+# балістичних ракет".
 _DENIED_FIRST = re.compile(
-    r"(?:нема\w*|не\s+має|відсутн\w*)\s+(?:загроз\w*\s+)?"
-    r"(?:балістик\w*|крилат\w*|реактивн\w*|шахед\w*|міг-31\w*|кинж\w*|кинд\w*)",
+    r"(?:нема\w*|не\s+має|відсутн\w*|без\s+фіксац\w*)\s+(?:загроз\w*\s+)?"
+    + _DENIED_CLASS + _DENIED_NOUN,
     re.IGNORECASE)
 
 
@@ -297,15 +333,31 @@ def without_denials(text: str) -> str:
     return text
 
 
-def threat_hint(text: str) -> str:
-    """Best guess at what is flying. `none` when nothing suggests a threat."""
-    text = without_denials(text)
+def stated_class(text: str) -> str:
+    """The class a message *names*, whether or not it names it to deny it.
+
+    A different question from `threat_hint`, and the difference is the whole
+    reason both exist. "📡По балістиці чисто" is not a ballistic threat -- that
+    is what the denial cut is for -- but it is unmistakably *about* ballistic,
+    and a screen that says "Балістика: дорозвідка" has to know which class was
+    re-checked. Reading the stripped text there answered "all", which is true of
+    nothing and useless on a screen.
+
+    The same shape as the morning's boundary: the denial decides what is flying
+    and nothing else. Places, modality, certainty and now the subject of a
+    recheck all read the whole message.
+    """
     if _MIG.search(text or "") and not _LAUNCHED.search(text or ""):
         return "mig"
     for kind, rx in _THREAT:
         if rx.search(text or ""):
             return kind
     return "none"
+
+
+def threat_hint(text: str) -> str:
+    """Best guess at what is flying. `none` when nothing suggests a threat."""
+    return stated_class(without_denials(text))
 
 
 def cleared_class(text: str) -> str | None:
@@ -550,11 +602,19 @@ def reappeared(text: str) -> bool:
 
 
 _SPECIFIC_CRUISE = re.compile(
-    r"крилат|калібр|х-?101|х-?59|х-?55|бандерол|кр|крів", re.IGNORECASE)
+    r"крилат|калібр|х-?101|х-?59|х-?55|бандерол|\bкр\b|\bкрів\b", re.IGNORECASE)
 
 
 def generic_rocket(text: str) -> bool:
-    """True when the cruise class rests on a bare "ракета" and nothing else."""
+    """True when the cruise class rests on a bare "ракета" and nothing else.
+
+    "КР" is the channels' own abbreviation for a cruise missile and belongs in
+    the specific list, but the two boundaries around it had been literal
+    backspace characters, so those alternatives could never match. 247 messages
+    of the 388 that say "КР" as a word -- "Група КР курсом на Київ" -- counted as
+    a bare "ракета", which during a ballistic episode had `rules` relabel them
+    ballistic.
+    """
     return not _SPECIFIC_CRUISE.search(text or "")
 
 

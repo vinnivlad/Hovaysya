@@ -322,7 +322,18 @@ class Announcer:
         # below would render it as one -- or, with no class stated, as a bare
         # "Тривога". It says what it is.
         if obs.recheck:
-            word = CLASS_BY.get(threat) if threat else None
+            # The class that was re-checked, not the one the episode is about.
+            # "📡По балістиці чисто" during a shahed wave came out as
+            # "Дорозвідка по реактивних шахедах" -- naming what was flying
+            # instead of what had just been checked and found clear, which is
+            # the opposite of what the line is for.
+            #
+            # The episode's class is still the fallback, because a recheck that
+            # names nothing at all -- "Київщина дорозвідка до відбою" -- is
+            # about whatever the night is about.
+            named = (obs.recheck_class
+                     if obs.recheck_class not in ("none", "unknown") else None)
+            word = CLASS_BY.get(named or threat) if (named or threat) else None
             text = f"Дорозвідка по {word}." if word else "Дорозвідка."
             utterance = Utterance(ts=obs.ts, lead=decision.alarm or "none",
                                   text=text)

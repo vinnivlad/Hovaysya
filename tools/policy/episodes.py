@@ -211,6 +211,14 @@ class Episode:
     # Classes already reported as "дорозвідка" in this episode. The channels
     # repeat it, and he asked for it deduped.
     rechecked: set[str] = field(default_factory=set)
+    # ...and *when* each was last called that. The set above needs no age: "we
+    # already said дорозвідка about ballistic in this episode" is a fact about
+    # the episode. A screen does need one, because it claims to describe now.
+    # Measured over the corpus: an entry sits in `rechecked` for a median 6.9
+    # minutes, but 41% of 417 stay past ten, 14% past thirty, and the longest was
+    # three hours -- so the first screen would have shown three-hour-old
+    # reconnaissance as current. See `policy.status`.
+    recon_at: dict[str, int] = field(default_factory=dict)
     # Whether anything has yet said what this siren was about. The official
     # channel never does.
     explained: bool = False
@@ -286,6 +294,7 @@ class Observation:
     # was correctly treating it as a jet Shahed.
     effective_threat: str | None = None
     cleared_class: str | None = None
+    recheck_class: str = "none"
     is_reply: bool = False
     partial_clear: bool = False
 
@@ -380,8 +389,29 @@ def read(ts: int, text: str, is_reply: bool = False,
         official=channel in OFFICIAL_CHANNELS,
         partial_clear=hints.partial_clear(text),
         cleared_class=hints.cleared_class(text),
+        # Which class a "дорозвідка" line was about, read from the whole message:
+        # the denial cut answers "what is flying", and re-checking ballistic is
+        # not a ballistic threat but is still about ballistic.
+        recheck_class=hints.stated_class(text),
     )
     return Reading(base=base, places=places, static_scope=static)
+
+
+def recheck_key(obs) -> str:
+    """Which class a recheck line is about, as both the dedup and the screen see it.
+
+    One function, so the two cannot disagree. `rules` silences a repeated
+    "дорозвідка" by this key and `status` puts it on the screen by the same one;
+    keying them separately would mean a line deduped as one class and displayed
+    as another, and the bug would only show up on a screen at three in the
+    morning.
+
+    "all" when no class is named, which is the honest answer for a bare
+    "Київщина дорозвідка до відбою" and is also how the dedup behaved before any
+    class survived the denial cut.
+    """
+    named = obs.recheck_class
+    return named if named not in ("none", "unknown") else "all"
 
 
 def observe_for(reading: Reading, config=None) -> Observation:
@@ -660,7 +690,14 @@ class Tracker:
         # would re-arm it every few seconds and the dedup would mean nothing.
         stated = obs.effective_threat or obs.threat
         if obs.recheck and level is not None:
-            ep.rechecked.add(stated if stated not in ("none", "unknown") else "all")
+            # Keyed on what the line was about rather than on what the policy
+            # decided is flying. Those are the same thing for a live report and
+            # opposite for this one: "по балістиці чисто" decides to `none`, so
+            # the old key was "all" -- every class of recheck sharing one slot,
+            # and nothing left to put on the screen.
+            key = recheck_key(obs)
+            ep.rechecked.add(key)
+            ep.recon_at[key] = obs.ts
             # A recheck closes the wave it is about. What comes after it is a new
             # one -- seen on the ballistic night of 2026-09-01, where a recheck
             # at 02:25 was followed by Tsirkon launches a minute later and every
@@ -680,6 +717,7 @@ class Tracker:
                and stated not in ("none", "unknown"))
               or (obs.reappeared and obs.scope != "elsewhere")):
             ep.rechecked.clear()
+            ep.recon_at.clear()
 
         # Anything we actually said that named both a class and somewhere near
         # enough to matter answers "why is the siren on" -- whichever rule

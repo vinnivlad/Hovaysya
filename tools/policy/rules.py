@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 from ..nlp import hints
 from .episodes import (GEO_STEP, REFRACTORY_NEAR_S, SILENT_DEDUP_S,
-                       THREAT_LEVEL, Observation, Tracker, silent_signature)
+                       THREAT_LEVEL, Observation, recheck_key, Tracker, silent_signature)
 
 LEVELS = ("info", "alert")
 
@@ -122,7 +122,7 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             and not (stale and obs.alert_state == "alert")):
         threat = ep.threat
         inherited = True
-    # A bare "ракета" is a guess, not a class. `ракет` is the last rule in the
+    # A bare "ракета" is a guess, not a class. `\bракет` is the last rule in the
     # list, there precisely because the specific names failed -- and during a
     # ballistic wave it is that wave. Seen in the labelled night: mon1tor_ua
     # wrote "❗Балістична ракета на Київ." and kievinform_ua1 wrote "РАКЕТА НА
@@ -245,7 +245,11 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
         # threat which had already been called off was probably destroyed.
         if ep is None or not ep.alert_announced:
             return _silent("recheck: no alert running")
-        key = threat if threat not in ("none", "unknown") else "all"
+        # The same key the episode stored, from `episodes.recheck_key`: what the
+        # line was *about*, not what the policy decided is flying. For a recheck
+        # those differ by design -- "по балістиці чисто" decides to `none` -- and
+        # computing it twice is how they would come to disagree.
+        key = recheck_key(obs)
         if key in ep.rechecked:
             return _silent("already-notified: recheck")
         if not cfg.show_recheck:
