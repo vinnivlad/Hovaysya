@@ -160,6 +160,44 @@ got by reading it back from the system rather than assuming we were obeyed.
 Settings says so in as many words, because it is the only thing on any screen
 that the person has to go and do themselves.
 
+## Debug or release
+
+Debug is the fast path and needs nothing: the IDE signs it with the throwaway
+keystore in `~/.android`, and `adb install` is the whole ceremony. Two things
+differ, and only one of them is cosmetic.
+
+    підпис        debug: ~/.android/debug.keystore, password "android"
+                  release: your own, or the APK is unsigned and will not install
+    відкритий HTTP debug: permitted to 10.0.2.2 only, from `src/debug/`
+                  release: refused -- that file is not in the variant
+    debuggable    debug: yes, so anything with adb reads app-private storage
+                  release: no
+    ui-tooling    debug only
+
+**The signing key is app identity**, which makes it the one to decide early.
+Debug and release are signed differently, so one cannot replace the other:
+installing a release over a debug build requires an uninstall, and uninstalling
+wipes the secret this phone registered with. Home and radius get chosen again,
+and a stale recipient is left on the server. Deciding that on the day you start
+relying on the app is deciding it at the worst moment.
+
+So make the keystore before that day:
+
+    keytool -genkeypair -v -keystore data/hovaysya.keystore         -alias hovaysya -keyalg RSA -keysize 4096 -validity 10000
+
+Then copy `keystore.properties.example` to `keystore.properties` and fill in the
+two passwords. Both files stay out of git -- the repository is public -- and the
+keystore lives under `data/` with every other secret here, which also means
+`python -m tools.backup` copies it. **Losing it loses the ability to update the
+app on any phone that has it.** Back it up somewhere that is not this machine.
+
+Without `keystore.properties` the build still configures and debug still works;
+only `assembleRelease` produces an unsigned APK, and Gradle says so on every
+build rather than leaving it to be discovered at install time.
+
+`versionCode` is bumped by hand. Android will not install an older one over a
+newer one, so it is the number to raise before handing a build to anybody.
+
 ## Not here yet
 
 **Push.** Everything above is a screen being looked at; nothing wakes the phone.

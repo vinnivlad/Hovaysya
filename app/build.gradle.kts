@@ -7,12 +7,34 @@
 // Four endpoints returning small objects do not repay a dependency that can
 // break a build the night it is needed.
 
+import java.util.Properties
+
 plugins {
     id("com.android.application") version "8.7.3"
     id("org.jetbrains.kotlin.android") version "2.1.0"
     // Kotlin 2.x moved the Compose compiler into its own plugin.
     id("org.jetbrains.kotlin.plugin.compose") version "2.1.0"
 }
+
+// Where the release key lives, read from a file that is not in git.
+//
+// The passwords are the reason this is a file and not a constant: this
+// repository is public. `keystore.properties` sits beside `local.properties` in
+// the root, is gitignored the same way, and points at a keystore under `data/`
+// -- which is where every other secret in this project already lives and which
+// no server ever receives, because `deploy/lean.sh` carries only tracked
+// directories and `data/` is not one.
+//
+// Absent, the build still configures and `assembleDebug` still works. Only the
+// release APK comes out unsigned, which Android refuses to install -- so the
+// failure is loud rather than a silently unsigned build handed to somebody.
+val signingProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+val signable = signingProperties.getProperty("storeFile") != null
 
 android {
     namespace = "ua.hovaysya"
@@ -29,9 +51,31 @@ android {
         versionName = "0.1"
     }
 
+    if (signable) {
+        signingConfigs {
+            create("release") {
+                storeFile = rootProject.file(
+                    signingProperties.getProperty("storeFile"))
+                storePassword = signingProperties.getProperty("storePassword")
+                keyAlias = signingProperties.getProperty("keyAlias")
+                keyPassword = signingProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Null rather than the debug key, deliberately. Signing a release
+            // with the debug key would install and would tie the app's identity
+            // to a keystore that lives in everybody's home directory -- and the
+            // identity is the whole point of signing: it is what lets one build
+            // replace another instead of demanding an uninstall.
+            signingConfig = if (signable) {
+                signingConfigs.getByName("release")
+            } else {
+                null
+            }
         }
     }
 
@@ -47,6 +91,12 @@ android {
     buildFeatures {
         compose = true
     }
+}
+
+if (!signable) {
+    logger.lifecycle(
+        "  Ховайся: keystore.properties немає — release-APK буде без підпису " +
+        "і не встановиться. Для debug це не потрібно; див. app/README.md.")
 }
 
 dependencies {
