@@ -35,7 +35,9 @@ if ! command -v caddy >/dev/null 2>&1; then
 fi
 
 echo "== Caddyfile: $HOST -> $TARGET:8080"
-sed "s/hovaysya\.duckdns\.org/$HOST/; s/PRIVATE_IP/$TARGET/" \
+# Global, because the address now appears in two proxy blocks: one for the
+# endpoint that is meant to wait and one for everything else.
+sed "s/hovaysya\.duckdns\.org/$HOST/g; s/PRIVATE_IP/$TARGET/g" \
 	"$REPO/deploy/Caddyfile" > /etc/caddy/Caddyfile
 install -d -o caddy -g caddy /var/log/caddy
 caddy validate --config /etc/caddy/Caddyfile >/dev/null

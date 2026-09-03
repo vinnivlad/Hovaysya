@@ -157,3 +157,43 @@ def test_the_phone_app_never_reaches_a_server():
     root = pathlib.Path(__file__).resolve().parents[2]
     assert (root / "app" / "build.gradle.kts").exists(), (
         "the app is expected at the top level; move this test with it")
+def test_the_proxy_lets_the_waiting_endpoint_wait():
+    """The one place the proxy config and the code have to agree on a number.
+
+    `/state?wait=30` exists in order not to answer until something changes -- it
+    is what replaces a push service. Caddy's `response_header_timeout` was five
+    seconds for every path, which was right while every request answered at
+    once, and turned the long poll into a 504: the phone's permanent
+    notification read "HTTP 504" under the word Ховайся.
+
+    Raising it everywhere would have thrown away the property it was there for,
+    so the waiting endpoint gets its own proxy. This pins both halves: that the
+    split exists, and that its timeout is above what the API will actually hold.
+    """
+    import re
+
+    from tools.serve.api import MAX_WAIT_S
+
+    caddy = _text("Caddyfile")
+    assert "@waiting path /state" in caddy, "the split is gone"
+
+    # Comments first: the note above the split quotes the old value, and a
+    # guard that reads its own explanation is measuring prose.
+    directives = chr(10).join(line for line in caddy.splitlines()
+                           if not line.strip().startswith("#"))
+    timeouts = [int(m) for m in
+                re.findall(r"response_header_timeout (\d+)s", directives)]
+    assert len(timeouts) == 2, timeouts
+    assert max(timeouts) > MAX_WAIT_S, (timeouts, MAX_WAIT_S)
+    # ...and the other one still fails fast, which is what it is for.
+    assert min(timeouts) <= 5, timeouts
+
+
+def test_the_proxy_address_is_substituted_everywhere_it_appears():
+    """It appears twice now. A `sed` without `g` would have left the second
+    proxy pointing at the literal word `PRIVATE_IP`, which resolves to nothing
+    and would have failed only on the paths that use it."""
+    caddy = _text("Caddyfile")
+    assert caddy.count("PRIVATE_IP:8080") == 2, caddy.count("PRIVATE_IP:8080")
+    installer = _text("install-proxy.sh")
+    assert "s/PRIVATE_IP/$TARGET/g" in installer, "substitution is not global"

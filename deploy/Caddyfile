@@ -24,16 +24,47 @@ hovaysya.duckdns.org {
 	# bearer token, which the API itself verifies. And health is the point of
 	# this arrangement rather than a detail: if A is down there is nothing worth
 	# showing, so the app has to be able to see that.
-	reverse_proxy PRIVATE_IP:8080 {
-		header_up X-Real-IP {remote_host}
-		# A dead or slow A must look dead rather than hang the app.
-		transport http {
-			dial_timeout 3s
-			response_header_timeout 5s
+	#
+	# Two proxies, and the split is the whole point of this block.
+	#
+	# `response_header_timeout 5s` was right for as long as every request
+	# answered at once: a dead or slow A must look dead rather than hang the
+	# app. Then `/state?wait=30` arrived, whose entire job is *not* to answer
+	# until something changes -- so Caddy gave up after five seconds and the
+	# phone's permanent notification read "HTTP 504" under the word Ховайся,
+	# which is exactly how he found it.
+	#
+	# Raising the timeout for everything would have thrown away the property it
+	# was there for. So the endpoint that is meant to wait is allowed to, and
+	# nothing else is. A hung-but-listening A is still spotted in five seconds
+	# on `/health`, which is what the app's own status line reads, and Caddy's
+	# active check marks the upstream down for every path anyway. A dead one
+	# fails on `dial_timeout` in three seconds regardless.
+	@waiting path /state
+	route {
+		reverse_proxy @waiting PRIVATE_IP:8080 {
+			header_up X-Real-IP {remote_host}
+			transport http {
+				dial_timeout 3s
+				# Above the API's own `MAX_WAIT_S`, with room for the network.
+				response_header_timeout 45s
+			}
+			health_uri /health
+			health_interval 30s
+			health_timeout 5s
 		}
-		health_uri /health
-		health_interval 30s
-		health_timeout 5s
+
+		reverse_proxy PRIVATE_IP:8080 {
+			header_up X-Real-IP {remote_host}
+			# A dead or slow A must look dead rather than hang the app.
+			transport http {
+				dial_timeout 3s
+				response_header_timeout 5s
+			}
+			health_uri /health
+			health_interval 30s
+			health_timeout 5s
+		}
 	}
 
 	header {
