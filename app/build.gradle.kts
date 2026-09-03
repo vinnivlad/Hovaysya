@@ -7,6 +7,7 @@
 // Four endpoints returning small objects do not repay a dependency that can
 // break a build the night it is needed.
 
+import java.time.LocalDate
 import java.util.Properties
 
 plugins {
@@ -14,6 +15,48 @@ plugins {
     id("org.jetbrains.kotlin.android") version "2.1.0"
     // Kotlin 2.x moved the Compose compiler into its own plugin.
     id("org.jetbrains.kotlin.plugin.compose") version "2.1.0"
+}
+
+// The version, from the year and the number of commits in it. His scheme, and
+// his reason for wanting one: "міняй версію застосунку на кожну готову правку. Я
+// сам буду забувати."
+//
+//     versionCode  20260222      year * 10000 + commits this year
+//     versionName  2026.222
+//
+// Monotonic across a year boundary, which a bare commit count is not: 2026 with
+// its five-thousandth commit is 20265000 and the first of 2027 is 20270001.
+// Ten thousand commits in one year is the ceiling and it is not close.
+//
+// Counted rather than typed because a `versionCode` that somebody has to
+// remember to raise is one that stays wrong. Android refuses to install an older
+// code over a newer one, so a forgotten bump means a phone silently keeping the
+// build it has -- which is the same failure as not shipping.
+//
+// Commits that touch nothing in `app/` still move it. That is deliberate: the
+// number is a stamp, not a changelog, and it only has to be different and
+// larger.
+fun commitsThisYear(): Int? = runCatching {
+    val process = ProcessBuilder(
+        "git", "rev-list", "--count", "HEAD",
+        "--since=${LocalDate.now().year}-01-01")
+        .directory(rootProject.projectDir)
+        .redirectErrorStream(true)
+        .start()
+    val text = process.inputStream.bufferedReader().use { it.readText() }
+    process.waitFor()
+    text.trim().toIntOrNull()
+}.getOrNull()
+
+val buildYear = LocalDate.now().year
+val buildCount = commitsThisYear()
+if (buildCount == null) {
+    // Without git the number would be lower than the last real one, so the APK
+    // simply will not install over anything -- a loud failure rather than a
+    // build that quietly claims to be older than it is.
+    logger.lifecycle(
+        "  Ховайся: git не відповів — версія буде $buildYear.0, і така збірка " +
+        "не встановиться поверх наявної. Це навмисно.")
 }
 
 // Where the release key lives, read from a file that is not in git.
@@ -51,8 +94,8 @@ android {
         // not swallow. Below that there is nothing worth shipping.
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = buildYear * 10_000 + (buildCount ?: 0)
+        versionName = "$buildYear.${buildCount ?: 0}"
     }
 
     if (signable) {
@@ -94,6 +137,10 @@ android {
 
     buildFeatures {
         compose = true
+        // So the app can show which build a phone is running, which is the other
+        // half of having a version at all: a number nobody can read from the
+        // device answers no question.
+        buildConfig = true
     }
 }
 

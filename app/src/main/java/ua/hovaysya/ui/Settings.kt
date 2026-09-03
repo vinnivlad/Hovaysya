@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ua.hovaysya.Bell
+import ua.hovaysya.BuildConfig
 import ua.hovaysya.Gazetteer
 import ua.hovaysya.Screen
 import ua.hovaysya.Store
@@ -110,7 +111,7 @@ fun Settings(
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            "Ти тут як «${store.name ?: "?"}»",
+            "Ти тут як «${store.name ?: "?"}» · версія ${BuildConfig.VERSION_NAME}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

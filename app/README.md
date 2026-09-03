@@ -195,8 +195,26 @@ Without `keystore.properties` the build still configures and debug still works;
 only `assembleRelease` produces an unsigned APK, and Gradle says so on every
 build rather than leaving it to be discovered at install time.
 
-`versionCode` is bumped by hand. Android will not install an older one over a
-newer one, so it is the number to raise before handing a build to anybody.
+`versionCode` counts itself, from the year and the number of commits in it --
+his scheme, and his reason for wanting one: "я сам буду забувати".
+
+    versionCode  20260222      year * 10000 + commits this year
+    versionName  2026.222
+
+Monotonic across a year boundary, which a bare commit count is not: 2026 with its
+five-thousandth commit is 20265000 and the first of 2027 is 20270001. Counted
+rather than typed, because a number somebody has to remember to raise is one that
+stays wrong -- and Android refuses to install an older code over a newer one, so
+a forgotten bump means a phone silently keeping the build it has, which is the
+same outcome as not shipping.
+
+Settings shows `versionName`, which is the other half of having a version: a
+number nobody can read from the device answers no question. It is the commit,
+so `git log` finds exactly what a phone is running.
+
+Without git the number would be lower than the last real one, so such a build
+simply will not install over anything, and Gradle says so. That is deliberate --
+a loud failure rather than a build quietly claiming to be older than it is.
 
 ## Not here yet
 
