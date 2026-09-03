@@ -153,7 +153,7 @@ class AlertService : Service() {
             else -> screen.said.lastOrNull()?.text ?: "тихо"
         }
 
-        return Notification.Builder(this, bell.quiet)
+        return Notification.Builder(this, bell.status)
             .setSmallIcon(R.drawable.ic_bell)
             .setContentTitle(title(screen))
             .setContentText(body)

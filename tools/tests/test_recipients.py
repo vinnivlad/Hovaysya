@@ -182,6 +182,19 @@ def test_somebody_who_registers_mid_raid_is_taken_on_next_poll(tmp_path):
     # Warmed, so the screen tells the truth from the first moment rather than
     # saying "без загроз" into a running raid.
     assert snapshot(olya, now=int(now))["state"] == ALERT, notes
+
+    # ...and the warm-up left its lines in the log, which is the half I had got
+    # wrong twice. He found it both times -- "на мого користувача ховайся не
+    # підтягнув повідомлень" -- because `warm_one` discarded its rows while the
+    # watcher's own start-up warm keeps its own and marks them `warm`. With the
+    # two paths disagreeing, every deploy restart left `telegram_channel` with
+    # ninety minutes of lines and anybody who registered through the app with
+    # none. `/decisions` is served from this log and `said` is filtered out of
+    # it, so empty here means an empty screen and an empty feed.
+    hers = [row for row in session.log if row.get("who") == olya.name]
+    assert hers, notes
+    assert all(row.get("warm") for row in hers), "replayed, not announced"
+    assert any(row.get("said") for row in hers), hers[:3]
     # And her tracker knows the siren is being watched. Set on the first
     # recipient's tracker alone, everyone after the first would read a chat
     # channel's "ТРИВОГА" as the siren itself.

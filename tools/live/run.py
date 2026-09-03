@@ -384,7 +384,7 @@ def recipients_signature(directory: Path) -> tuple:
         return ()
 
 
-def warm_one(who, conn, now: float) -> int:
+def warm_one(who, conn, now: float) -> tuple[int, list]:
     """Replay the recent past into one person's tracker, telling them nothing.
 
     Without this a phone that registers during a raid gets a screen saying there
@@ -395,9 +395,19 @@ def warm_one(who, conn, now: float) -> int:
     The same window and the same code path as the watcher's own start-up warm --
     a Session of one, `warm=True` throughout -- so the decisions and the
     announcer's memory advance exactly as they would have, and nothing is sent
-    about weather that has already passed. The log rows are discarded on purpose:
-    they were never said to this person, and `/decisions` claiming otherwise
-    would be a lie on the feed screen.
+    about weather that has already passed.
+
+    **The log rows are kept**, and discarding them was a mistake of mine that he
+    found twice: "на мого користувача ховайся не підтягнув повідомлень". I
+    reasoned that they were never said to this person, so showing them would be a
+    lie -- but the watcher's own start-up warm keeps its rows and marks them
+    `warm`, which is exactly the distinction that reasoning needed. The two paths
+    disagreeing is what produced the asymmetry: after every deploy restart
+    `telegram_channel` had ninety minutes of lines and anybody who had registered
+    through the app had none, and deploys are frequent.
+
+    They go into the caller's log rather than the throwaway one, because that is
+    the log `/decisions` is served from and `said` is filtered out of.
     """
     solo = Session(recipients=[who], tracker=who.tracker,
                    announcer=who.announcer, notifier=None)
@@ -410,7 +420,7 @@ def warm_one(who, conn, now: float) -> int:
         handle(solo, row["channel"], row["message_id"], row["ts"],
                row["text_norm"], row["reply_to"] is not None, now, warm=True)
         seen += 1
-    return seen
+    return seen, solo.log
 
 
 def refresh_recipients(session: Session, conn, directory: Path,
@@ -447,7 +457,9 @@ def refresh_recipients(session: Session, conn, directory: Path,
     for name, who in fresh.items():
         if name not in have:
             who.tracker.official_source = session.tracker.official_source
-            notes.append(f"+{name} ({warm_one(who, conn, now)} прогріто)")
+            seen, warmed = warm_one(who, conn, now)
+            session.log.extend(warmed)
+            notes.append(f"+{name} ({seen} прогріто)")
 
     # Order stays the index's, so a night's log reads the same way twice.
     session.recipients = [have.get(name) or fresh[name] for name in fresh]

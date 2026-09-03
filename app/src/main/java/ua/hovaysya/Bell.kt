@@ -80,6 +80,22 @@ class Bell(private val store: Store) {
     /** Worth knowing, not worth waking. */
     val quiet: String get() = "quiet.v$generation"
 
+    /**
+     * The service's own presence, and nothing else.
+     *
+     * Its own channel rather than `quiet`, for two reasons. It is not a message
+     * about a threat -- it is the line that says this app is running at all --
+     * and it needs `setShowBadge(false)`, which `quiet` must not have: a silent
+     * status line about a real threat should still mark the icon.
+     *
+     * Without that the launcher wore a permanent unread dot, because Android
+     * badges any active notification and this one never goes away. His words:
+     * "на застосунку постійно висить червоний кружочок непрочитаного
+     * повідомлення." A badge that is always on says nothing, which makes every
+     * real one say nothing either.
+     */
+    val status: String get() = "status.v$generation"
+
     fun create(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
             ?: return
@@ -138,6 +154,14 @@ class Bell(private val store: Store) {
                 enableVibration(false)
                 setSound(null, null)
             },
+            NotificationChannel(
+                status, "Стан сервісу", NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Постійний рядок: чи є тривога і чи це працює."
+                enableVibration(false)
+                setSound(null, null)
+                setShowBadge(false)
+            },
         )
         manager.createNotificationChannels(channels)
     }
@@ -156,7 +180,7 @@ class Bell(private val store: Store) {
      */
     fun remake(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        listOf(shelter, siren, near, clear, quiet)
+        listOf(shelter, siren, near, clear, quiet, status)
             .forEach { manager?.deleteNotificationChannel(it) }
         store.channelGeneration = generation + 1
         create(context)
