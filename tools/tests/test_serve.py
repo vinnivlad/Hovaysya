@@ -827,3 +827,79 @@ def test_asking_for_said_lines_still_pages_forward(tmp_path):
     older = decisions(d, "Володимир", "2026-09-03T00:00:00+00:00.a/0", 3,
                       days=10 ** 6, said_only=True)["decisions"]
     assert [r["said"] for r in older] == ["line 1", "line 2", "line 3"], older
+def test_the_feed_carries_exactly_what_the_chat_carries(tmp_path):
+    """What he asked screen two to be: "рахуй те саме, що показує Ховайся ТГ
+    канал... неважливо тиша там чи ні."
+
+    The equality is structural rather than a coincidence worth maintaining by
+    hand. `_say` sends to the chat when there is an utterance, and writes that
+    same utterance into the log as `said` -- so a silent decision reaches neither.
+    `?said=1` therefore returns the chat's contents for whoever asks, computed
+    against their own ring instead of his.
+
+    Pinned because the two could drift apart in either direction: a notifier that
+    learned to send something unsaid, or a log that stopped recording something
+    sent.
+    """
+    import time
+
+    from tools.live.run import Session, handle, write_log
+    from tools.policy.config import load as load_config
+    from tools.policy.recipients import TELEGRAM_NAME, Recipient
+
+    class Chat:
+        enabled = True
+        failures = 0
+
+        def __init__(self):
+            self.messages = []
+
+        @property
+        def sent(self):
+            return len(self.messages)
+
+        def send(self, text, audible=False):
+            self.messages.append(text)
+            return True
+
+    cfg = load_config(warn=lambda _m: None)
+    chat = Chat()
+    who = Recipient(name=TELEGRAM_NAME, config=cfg)
+    who.tracker.official_source = True
+    session = Session(recipients=[who], tracker=who.tracker,
+                      announcer=who.announcer, notifier=chat)
+
+    now = int(time.time())
+    # A raid with plenty of silence in it: the oblast, the city at large, and
+    # somewhere far away, none of which is his business.
+    script = [
+        ("🚨 м. Київ\nПовітряна тривога", "alarm_kyiv"),
+        ("⚠️Реактивний шахед на Сумщині.", "mon1tor_ua"),
+        ("⚠️Реактивний шахед на Жуляни.", "mon1tor_ua"),
+        ("⚠️БпЛА на Київщині, курс західний.", "mon1tor_ua"),
+        ("⚠️2 реактивні шахеди на Вишневе.", "mon1tor_ua"),
+        ("💥Вибух у Дніпрі.", "mon1tor_ua"),
+        ("🟢 м. Київ\nВідбій повітряної тривоги", "alarm_kyiv"),
+    ]
+    for offset, (text, channel) in enumerate(script):
+        handle(session, channel, offset, now - 600 + offset * 60, text,
+               False, now)
+
+    live = tmp_path / "live"
+    live.mkdir()
+    write_log(session, live / "20260903T120000.jsonl")
+
+    served = decisions(live, TELEGRAM_NAME, None, 60, days=10 ** 6,
+                       said_only=True)["decisions"]
+
+    # The chat got a message for every utterance; the feed serves every `said`.
+    assert chat.sent > 0, "the script must produce something"
+    assert len(served) == chat.sent, (len(served), chat.sent)
+    # ...and the same sentences, in the same order.
+    for row, message in zip(served, chat.messages):
+        assert row["said"] in message, (row["said"], message[:80])
+
+    # The silence is in the log and not in either of them.
+    everything = decisions(live, TELEGRAM_NAME, None, 60,
+                           days=10 ** 6)["decisions"]
+    assert len(everything) > len(served), "the script must include silence"
