@@ -424,8 +424,8 @@ def recipients_signature(directory: Path) -> tuple:
         return ()
 
 
-def seed_from_official(recipients, conn, now: float) -> int | None:
-    """The declaring channel's last word, when nothing else is left to read.
+def confirm_with_official(recipients, conn, now: float) -> int | None:
+    """The declaring channel's last word, and it goes last.
 
     Third and last, and it earns its place on the two cases the others cannot
     cover, both of which he named. A watcher that has already spent hours
@@ -443,6 +443,23 @@ def seed_from_official(recipients, conn, now: float) -> int | None:
     rejected -- "тягнути історію щоб знайти старт тривоги це все одно не
     варіант" is an argument against inferring, not against reading a
     declaration.
+
+    Last, and that ordering is the correction. It used to run first, before the
+    replay and the saved episode, and the startup log showed exactly what that
+    cost: the declaration seated the raid at 10:58 correctly, and then `carry`
+    overwrote it with an episode opened at 11:41 -- written by the process that
+    had *already* gone blind, so an episode with no official siren in it. Which
+    `status.snapshot` reports as `watching`, and the app draws as "БЕЗ ТРИВОГ".
+    The right answer arrived and was then replaced by a worse one.
+
+    A saved episode is more *detailed* than a declaration -- threat class,
+    reconnaissance, what has been said -- and I let that stand in for being more
+    authoritative. It is not. Detail written by a run that was wrong about the
+    sky is still wrong about the sky.
+
+    So this corrects instead of replacing: it keeps whatever detail is there and
+    fixes the two facts the channel owns, which are that the siren is official
+    and when it began.
 
     Silent. A siren from three hours ago is not news.
     """
@@ -467,16 +484,27 @@ def seed_from_official(recipients, conn, now: float) -> int | None:
         if state != "alert":
             continue
         for who in recipients:
-            who.tracker.episode = Episode(
-                opened_at=row["ts"],
-                # Alive now, because the declaration is unanswered now. Stamping
-                # this with the declaration's own time would have the tracker
-                # close the episode as idle on the first message it sees.
-                last_live=int(now),
-                alert_announced=True,
-                alert_scope_known=True,
-                official_alert=True,
-            )
+            episode = who.tracker.episode
+            if episode is None:
+                who.tracker.episode = Episode(
+                    opened_at=row["ts"],
+                    # Alive now, because the declaration is unanswered now.
+                    # Stamping this with the declaration's own time would have
+                    # the tracker close the episode as idle on the first message
+                    # it sees.
+                    last_live=int(now),
+                    alert_announced=True,
+                    alert_scope_known=True,
+                    official_alert=True,
+                )
+            else:
+                # Kept, not replaced. The two facts below are the channel's;
+                # everything else in the episode belongs to whoever built it.
+                episode.official_alert = True
+                episode.alert_announced = True
+                # The earlier opening, because a raid that began at 10:58 did
+                # not begin at 11:41 just because that is when we noticed.
+                episode.opened_at = min(episode.opened_at, row["ts"])
             who.tracker.official_seen = row["ts"]
         return row["ts"]
     return None
@@ -636,7 +664,7 @@ def warm_one(who, conn, now: float) -> tuple[int, list]:
     # channel's last unanswered word is the answer regardless of when the raid
     # began, and costs one query per registration instead of hours of replay.
     if who.tracker.episode is None:
-        seed_from_official([who], conn, now)
+        confirm_with_official([who], conn, now)
     return seen, solo.log
 
 
@@ -867,12 +895,8 @@ def main(argv: list[str] | None = None) -> int:
     # Before any of that: if the last thing the previous run decided was that a
     # raid was on, it still is. One row, read rather than derived.
     declared = seed_from_log(session, LOG_DIR, log_path, time.time())
-    source = "за логом"
-    if not declared:
-        declared = seed_from_official(session.recipients, conn, time.time())
-        source = "за офіційним каналом"
     if declared:
-        print(f"  {source} тривога триває з {kyiv_dt(declared):%H:%M} — "
+        print(f"  за логом тривога триває з {kyiv_dt(declared):%H:%M} — "
               "нічого не озвучую, вона вже йде")
     warmed = spoken = 0
     for row in conn.execute(
@@ -913,6 +937,15 @@ def main(argv: list[str] | None = None) -> int:
         since = f"{kyiv_dt(ep.opened_at):%H:%M}" if ep is not None else "?"
         print(f"  відновлено епізод з {since} — "
               f"{len(restored)} отримувач(і): {', '.join(restored)}")
+
+    # And last of all, the declaring channel -- after the replay and after the
+    # saved episode, because it is the only source here that cannot be out of
+    # date about whether a siren is running.
+    confirmed = confirm_with_official(session.recipients, conn, time.time())
+    if confirmed:
+        state = state_word(session.tracker)
+        print(f"  офіційна тривога з {kyiv_dt(confirmed):%H:%M} — "
+              f"стан: {state}")
 
     # Catch up on whatever arrived while the machine was off, silently. The
     # tracker needs it — an alert may already be running — but printing six

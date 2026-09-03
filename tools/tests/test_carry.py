@@ -398,7 +398,7 @@ def test_a_restored_raid_survives_the_next_message(tmp_path):
 def test_an_unanswered_declaration_is_the_last_resort():
     """When the log's newest rows say the sky is clear because the watcher spent
     hours believing it, the truth is only in the declaring channel."""
-    from tools.live.run import seed_from_official
+    from tools.live.run import confirm_with_official
 
     now = 1_780_000_000
     conn = _official([
@@ -407,7 +407,7 @@ def test_an_unanswered_declaration_is_the_last_resort():
     ])
     session, who = _one_person_session()
 
-    assert seed_from_official(session.recipients, conn, now) == now - 3 * 3600
+    assert confirm_with_official(session.recipients, conn, now) == now - 3 * 3600
     assert who.tracker.episode is not None
     assert who.tracker.episode.official_alert is True
     # Alive now, because the declaration is unanswered now.
@@ -415,7 +415,7 @@ def test_an_unanswered_declaration_is_the_last_resort():
 
 
 def test_an_answered_declaration_opens_nothing():
-    from tools.live.run import seed_from_official
+    from tools.live.run import confirm_with_official
 
     now = 1_780_000_000
     conn = _official([
@@ -424,13 +424,13 @@ def test_an_answered_declaration_opens_nothing():
     ])
     session, who = _one_person_session()
 
-    assert seed_from_official(session.recipients, conn, now) is None
+    assert confirm_with_official(session.recipients, conn, now) is None
     assert who.tracker.episode is None
 
 
 def test_a_partial_all_clear_is_not_an_answer():
     """It lifts one class and leaves the raid running."""
-    from tools.live.run import seed_from_official
+    from tools.live.run import confirm_with_official
 
     now = 1_780_000_000
     conn = _official([
@@ -440,7 +440,7 @@ def test_a_partial_all_clear_is_not_an_answer():
     ])
     session, who = _one_person_session()
 
-    assert seed_from_official(session.recipients, conn, now) == now - 3 * 3600
+    assert confirm_with_official(session.recipients, conn, now) == now - 3 * 3600
     assert who.tracker.episode is not None
 
 
@@ -467,3 +467,76 @@ def test_somebody_who_registers_during_a_raid_is_told_there_is_one():
 
     assert newcomer.tracker.episode is not None
     assert newcomer.tracker.episode.official_alert is True
+
+
+def test_the_declaration_corrects_a_worse_episode_instead_of_losing_to_it():
+    """The ordering fault the startup log exposed.
+
+    The declaration seated the raid at 10:58, and then the saved episode --
+    written by the process that had already gone blind, so carrying no official
+    siren -- replaced it with one opened at 11:41. `status.snapshot` calls that
+    `watching`, and the app draws `watching` as "БЕЗ ТРИВОГ": the right answer
+    arrived and was overwritten by a worse one.
+
+    Detail is not authority. A saved episode knows more about the threat class
+    than a declaration ever will, and none of that makes it right about whether
+    a siren is running.
+    """
+    from tools.live.run import confirm_with_official
+    from tools.policy.episodes import Episode
+
+    now = 1_780_000_000
+    conn = _official([
+        ("alarm_kyiv", 2, now - 3 * 3600, "🚨 м. Київ Повітряна тривога"),
+    ])
+    session, who = _one_person_session()
+    # What a blind run saves: an episode it opened later, off chat traffic.
+    who.tracker.episode = Episode(
+        opened_at=now - 2 * 3600, last_live=now - 60, threat="shahed-jet",
+        official_alert=False)
+
+    assert confirm_with_official(session.recipients, conn, now) == now - 3 * 3600
+
+    episode = who.tracker.episode
+    assert episode.official_alert is True, "the siren is the channel's to declare"
+    assert episode.opened_at == now - 3 * 3600, "the raid began when it began"
+    assert episode.threat == "shahed-jet", "detail kept, not thrown away"
+
+
+def test_a_correct_episode_is_not_disturbed():
+    from tools.live.run import confirm_with_official
+    from tools.policy.episodes import Episode
+
+    now = 1_780_000_000
+    conn = _official([
+        ("alarm_kyiv", 2, now - 3 * 3600, "🚨 м. Київ Повітряна тривога"),
+    ])
+    session, who = _one_person_session()
+    who.tracker.episode = Episode(
+        opened_at=now - 3 * 3600, last_live=now - 60, threat="ballistic",
+        threat_peak=3, official_alert=True)
+
+    confirm_with_official(session.recipients, conn, now)
+
+    assert who.tracker.episode.threat_peak == 3
+    assert who.tracker.episode.opened_at == now - 3 * 3600
+
+
+def test_the_state_reported_after_confirming_is_the_alert():
+    """End to end, because every piece of this has been right on its own while
+    the answer the phone got was wrong."""
+    from tools.live.run import confirm_with_official
+    from tools.policy.episodes import Episode
+    from tools.policy.status import snapshot
+
+    now = 1_780_000_000
+    conn = _official([
+        ("alarm_kyiv", 2, now - 3 * 3600, "🚨 м. Київ Повітряна тривога"),
+    ])
+    session, who = _one_person_session()
+    who.tracker.episode = Episode(
+        opened_at=now - 2 * 3600, last_live=now - 60, official_alert=False)
+
+    confirm_with_official(session.recipients, conn, now)
+
+    assert snapshot(who, said=[], now=now)["state"] == "alert"
