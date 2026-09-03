@@ -292,10 +292,19 @@ def _say(session: Session, who, channel: str, message_id: int, ts: int,
         session.notifier.send(format_message(utterance, obs, decision),
                               audible=decision.audible)
     mark = "!!" if decision.audible else ("..." if decision.notify else "  ")
+    # Whose decision this is, because there is one line per recipient and
+    # without the name they read as the same line four times. His point, and it
+    # inverts what I was about to do: I had it down as noise to collapse, and
+    # "якщо це журнал, то треба писати id користувача ще" is the better answer --
+    # four people deciding differently about one message is exactly what a
+    # watcher's log is for. The JSON log has carried `who` since the day a
+    # second person registered; only the human-readable line did not.
+    #
     # flush on every line: this runs for hours in a terminal, and a buffered
     # alert is not an alert.
-    print(f"{kyiv_dt(ts):%H:%M:%S} {fmt_lag(lag)} {mark:<3} {channel[:9]:<10} "
-          f"{text.replace(chr(10), ' / ')[:84]}", flush=True)
+    print(f"{kyiv_dt(ts):%H:%M:%S} {fmt_lag(lag)} {mark:<3} "
+          f"{who.name[:9]:<10} {channel[:9]:<10} "
+          f"{text.replace(chr(10), ' / ')[:74]}", flush=True)
     if utterance:
         print(f"{'':<21}   -> «{utterance.text}»   [{utterance.lead}]", flush=True)
 
