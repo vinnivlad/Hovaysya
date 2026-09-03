@@ -46,7 +46,9 @@ private val Outline = Color(0xFF2E3136)
 private val Text = Color(0xFFECEAE6)
 private val Muted = Color(0xFF8B8D93)
 
-// The three states, each recognisable before its word is read.
+// The three states, each recognisable before its word is read. The same values
+// live in `res/values/colors.xml`, because the ongoing notification is drawn with
+// a Canvas rather than by Compose and has to reach them from outside Kotlin.
 private val Calm = Color(0xFF5F8479)      // nothing is flying
 private val Watch = Color(0xFFD4952F)     // something is up, not here
 private val Danger = Color(0xFFE8503A)    // it concerns me

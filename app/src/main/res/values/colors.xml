@@ -11,6 +11,18 @@
     -->
     <color name="ground">#FF0E0F11</color>
 
+    <!--
+      The three states, and the same values as `ui/Theme.kt`. Here as well
+      because the notification is not Compose: `AlertService` draws its mark with
+      a Canvas and reads these, while the screens read the Kotlin. Two places for
+      one colour again, for the same reason `ground` is, and like `ground` the
+      duplication is stated rather than discovered.
+    -->
+    <color name="calm">#FF5F8479</color>
+    <color name="watch">#FFD4952F</color>
+    <color name="danger">#FFE8503A</color>
+    <color name="muted">#FF8B8D93</color>
+
     <!-- The launcher icon keeps one identity: an app is found by its icon. -->
     <color name="icon_ground">#FF2E3A38</color>
 </resources>

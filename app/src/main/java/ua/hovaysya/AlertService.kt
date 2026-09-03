@@ -6,6 +6,10 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.IBinder
 import kotlinx.coroutines.CoroutineScope
@@ -153,6 +157,7 @@ class AlertService : Service() {
             else -> screen.said.lastOrNull()?.text ?: "тихо"
         }
 
+        val accent = getColor(colourOf(screen, problem))
         return Notification.Builder(this, bell.status)
             .setSmallIcon(R.drawable.ic_bell)
             .setContentTitle(title(screen))
@@ -161,8 +166,53 @@ class AlertService : Service() {
             .setOngoing(true)
             .setShowWhen(false)
             .setOnlyAlertOnce(true)
+            // Both, and deliberately. `setColorized` paints the whole
+            // notification and is honoured for foreground services, which this
+            // is -- but some vendor shells ignore it. The large icon is a
+            // coloured disc that no shell can decline to draw, so the answer to
+            // "тривога чи ні" survives either way.
+            .setColor(accent)
+            .setColorized(true)
+            .setLargeIcon(mark(accent))
             .build()
     }
+
+    /** Red for an alert, green for none, muted for not knowing. */
+    private fun colourOf(screen: Screen?, problem: String?): Int = when {
+        problem != null -> R.color.muted
+        screen == null || !screen.known -> R.color.muted
+        screen.state == Screen.ALERT -> R.color.danger
+        else -> R.color.calm
+    }
+
+    /**
+     * A filled disc in that colour with the bell knocked out of it.
+     *
+     * Drawn rather than shipped as three tinted drawables, because the shape is
+     * one file and the colours are already defined once. Cached because this is
+     * rebuilt on every update and a bitmap per thirty seconds for a year is a
+     * silly amount of garbage for three possible pictures.
+     */
+    private fun mark(colour: Int): Icon = marks.getOrPut(colour) {
+        val size = 192
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawCircle(
+            size / 2f, size / 2f, size / 2f,
+            Paint().apply {
+                isAntiAlias = true
+                color = colour
+            })
+        getDrawable(R.drawable.ic_bell)?.apply {
+            setTint(getColor(R.color.ground))
+            val inset = size / 4
+            setBounds(inset, inset, size - inset, size - inset)
+            draw(canvas)
+        }
+        Icon.createWithBitmap(bitmap)
+    }
+
+    private val marks = mutableMapOf<Int, Icon>()
 
     companion object {
         private const val NOTIFICATION_ID = 1
