@@ -179,7 +179,23 @@ FALLING_TERMS = ("падає", "падають", "падаєт", "падают")
 # NOT aftermath. "вибух" and "влучання" sit 1.8-2.2 min from live danger, and
 # 88% of "вибух" messages arrive within ten minutes of one — an explosion report
 # usually means the wave is still in progress.
-IMPACT_TERMS = ("вибух", "влучан", "детонац", "приліт")
+IMPACT_TERMS = ("вибух", "влучан", "детонац", "приліт",
+                # The verb, which the noun stem above never covered. His
+                # report: "Голосіївський район Києва. Палає багатоповерхівка
+                # ... Ворог влучив реактивним БпЛА у житловий будинок" came out
+                # as "Загроза: реактивний шахед. Голосіїв." -- a building
+                # already on fire announced as something on its way, and
+                # Голосіїв is in his ring, so it rang.
+                #
+                # Exact forms rather than a stem. `влучи` would also swallow
+                # "влучить" and "влучити", which are a prediction and an
+                # intention -- the opposite tense and the opposite meaning.
+                # Measured in the corpus: влучили 12, влучив 9, влучила 8, and
+                # 28 messages carrying one of them that nothing here could see.
+                # "влучило" is in the list with no occurrences of its own: it is
+                # the same word in the neuter, and its absence is a sample size
+                # rather than a fact about the language.
+                "влучив", "влучила", "влучило", "влучили")
 
 SUMMARY_TERMS = (
     "за добу", "за ніч", "за минулу ніч", "протягом ночі", "протягом доби",

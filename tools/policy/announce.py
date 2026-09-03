@@ -141,7 +141,12 @@ def _landed_word(obs) -> str | None:
     if not getattr(obs, "impact", False) or getattr(obs, "falling", False):
         return None
     low = (obs.text or "").lower()
-    if "влучан" in low or "приліт" in low:
+    # The stem, so the verb counts as well as the noun -- "Ворог влучив
+    # реактивним БпЛА у житловий будинок" was being called "Вибух", which is a
+    # different event from the one the channel reported. Broad on purpose and
+    # safe here: this only chooses a noun for something already established as
+    # an impact, so it cannot make a non-impact into one.
+    if "влуч" in low or "приліт" in low:
         return "Влучання"
     return "Вибух"
 
