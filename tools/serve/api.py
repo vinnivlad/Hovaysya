@@ -5,6 +5,7 @@ is that nothing has to be installed:
 
     GET  /messages?since=<cursor>     the merged raw feed of every channel
     GET  /messages?back=30m           ...or just the last half hour, newest end
+    GET  /decisions?said=1            ...only the lines it actually said
     GET  /decisions?since=<cursor>    what Ховайся decided, for this recipient
                                       -- and for nobody else: the sentence names
                                       their ring and the reason says "my area"
@@ -252,7 +253,8 @@ def health(conn: sqlite3.Connection | None, log_dir: Path,
 
 
 def decisions(log_dir: Path, who: str | None, since: str | None, limit: int,
-              days: int = LOG_DAYS, now: float | None = None) -> dict:
+              days: int = LOG_DAYS, now: float | None = None,
+              said_only: bool = False) -> dict:
     """What Ховайся decided **for this recipient**, from the newest logs only.
 
     The filter is the whole point, and for a while it was missing -- his call,
@@ -271,6 +273,18 @@ def decisions(log_dir: Path, who: str | None, since: str | None, limit: int,
 
     A line with no owner belongs to nobody and reaches nobody. Those are the ones
     written before the owner was recorded, and `LOG_DAYS` clears them on its own.
+
+    `said_only` is the difference between "what did this decide" and "what did it
+    say", and putting it here rather than in the app is the whole of a fault he
+    reported twice. The feed asked for the last sixty *rows* and filtered them
+    itself -- and only one row in seven carries an utterance, with silent runs up
+    to seventy-two long in the corpus. So the newest sixty rows were regularly
+    all silent and the screen came out empty, while the first screen showed his
+    lines perfectly, because `write_state` filters before it takes the last
+    three rather than after.
+
+    Filtered before the limit, which is the point. Filtering after a limit is
+    not a filter, it is a lottery.
     """
     if who is None:
         return {"decisions": [], "next": since or ""}
@@ -298,6 +312,8 @@ def decisions(log_dir: Path, who: str | None, since: str | None, limit: int,
             # catch-up pass writes those lines again.
             if (not at or key in seen or (since and key <= since)
                     or row.get("who") != who):
+                continue
+            if said_only and not row.get("said"):
                 continue
             seen.add(key)
             out.append({"cursor": key, "at": at, "anchor": anchor,
@@ -504,7 +520,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, messages(self.server.db, since, limit,
                                      _parse_back((query.get("back") or [None])[0])))
         elif url.path == "/decisions":
-            self._send(200, decisions(self.server.log_dir, who, since, limit))
+            # `?said=1` for the feed, which asks what Ховайся said rather than
+            # what it decided. The reason travels either way -- arguing with a
+            # decision is how every rule here got fixed -- but a screen titled
+            # "Ховайся" showing `too-far: oblast, not the city` is showing the
+            # machine's reasoning as though it were a message.
+            said_only = (query.get("said") or ["0"])[0] not in ("0", "", "false")
+            self._send(200, decisions(self.server.log_dir, who, since, limit,
+                                      said_only=said_only))
         elif url.path == "/state":
             wait = (query.get("wait") or ["0"])[0]
             try:

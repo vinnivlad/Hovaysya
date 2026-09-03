@@ -767,3 +767,63 @@ def test_asking_without_a_version_answers_at_once(tmp_path):
     assert answer["state"] == "quiet"
     assert answer["v"]
     assert time.monotonic() - started < 2
+def test_the_feed_survives_a_quiet_stretch_longer_than_its_window(tmp_path):
+    """The fault he reported twice, and the numbers say why it was not obvious.
+
+    Only one row in seven carries an utterance, and the corpus has silent runs
+    of up to seventy-two. The feed asked for the last sixty *rows* and filtered
+    them in the app -- so any quiet stretch longer than the window emptied the
+    screen, while the first screen kept showing his lines because `write_state`
+    filters before taking the last three rather than after.
+
+    Filtering after a limit is not a filter. It is a lottery on how talkative
+    the channels have been.
+    """
+    d = tmp_path / "live"
+    d.mkdir()
+    rows = []
+    # One thing said, then a hundred silent decisions after it.
+    rows.append({"at": "2026-09-03T00:00:00+00:00", "anchor": "a/0",
+                 "who": "Володимир", "level": "alert", "alarm": "alert",
+                 "said": "Тривога."})
+    for i in range(1, 101):
+        rows.append({"at": f"2026-09-03T{i // 60:02d}:{i % 60:02d}:00+00:00",
+                     "anchor": f"a/{i}", "who": "Володимир",
+                     "reason": "too-far: oblast, not the city"})
+    (d / "1.jsonl").write_text(
+        "".join(json.dumps(r, ensure_ascii=False) + chr(10) for r in rows),
+        encoding="utf-8")
+
+    # What the app used to do: the newest sixty rows, filtered afterwards.
+    raw = decisions(d, "Володимир", None, 60, days=10 ** 6)["decisions"]
+    assert [r for r in raw if r["said"]] == [], "the old shape, for the record"
+
+    # What it asks for now.
+    page = decisions(d, "Володимир", None, 60, days=10 ** 6,
+                     said_only=True)["decisions"]
+    assert [r["said"] for r in page] == ["Тривога."], page
+
+
+def test_asking_for_said_lines_still_pages_forward(tmp_path):
+    """A cursor has to skip the silent rows in between rather than replay them,
+    or the phone walks the same quiet stretch on every request."""
+    d = tmp_path / "live"
+    d.mkdir()
+    rows = []
+    for i in range(6):
+        rows.append({"at": f"2026-09-03T0{i}:00:00+00:00", "anchor": f"a/{i}",
+                     "who": "Володимир", "level": "alert", "alarm": "alert",
+                     "said": f"line {i}"})
+        rows.append({"at": f"2026-09-03T0{i}:30:00+00:00", "anchor": f"b/{i}",
+                     "who": "Володимир", "reason": "silent"})
+    (d / "1.jsonl").write_text(
+        "".join(json.dumps(r, ensure_ascii=False) + chr(10) for r in rows),
+        encoding="utf-8")
+
+    first = decisions(d, "Володимир", None, 2, days=10 ** 6,
+                      said_only=True)["decisions"]
+    assert [r["said"] for r in first] == ["line 4", "line 5"], first
+
+    older = decisions(d, "Володимир", "2026-09-03T00:00:00+00:00.a/0", 3,
+                      days=10 ** 6, said_only=True)["decisions"]
+    assert [r["said"] for r in older] == ["line 1", "line 2", "line 3"], older

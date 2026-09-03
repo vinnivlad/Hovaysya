@@ -244,8 +244,17 @@ class Api(private val base: String, private val token: String?) {
             }
         }
 
+    /**
+     * What Ховайся said, newest last.
+     *
+     * `said=1` is asked of the server rather than filtered here, and that was a
+     * real fault rather than tidiness: only one row in seven carries an
+     * utterance and silent runs reach seventy-two, so asking for the last sixty
+     * rows and filtering them locally produced an empty screen whenever the
+     * quiet stretch was longer than the window.
+     */
     suspend fun verdicts(limit: Int = 60): List<Verdict> =
-        get("/decisions?limit=$limit") { o ->
+        get("/decisions?said=1&limit=$limit") { o ->
             o.list("decisions") { row ->
                 Verdict(
                     cursor = row.optString("cursor"),

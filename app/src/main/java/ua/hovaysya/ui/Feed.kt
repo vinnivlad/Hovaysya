@@ -56,12 +56,9 @@ fun HovaysyaFeed(store: Store) {
     LaunchedEffect(Unit) {
         while (true) {
             runCatching { store.api().verdicts() }
-                // Only what was actually said. `/decisions` carries every
-                // verdict including the silent ones, because the reason is what
-                // makes a decision arguable -- but a screen called "Ховайся"
-                // showing `too-far: oblast, not the city` is showing the
-                // machine's reasoning as though it were a message. He saw one
-                // with no text at all and said so.
+                // The server filters now, and it has to: filtering after a
+                // limit is not a filter. The check stays as a belt, since a
+                // row with nothing said has nothing to draw.
                 .onSuccess { rows = it.filter { row -> row.said != null }
                              problem = null }
                 .onFailure { problem = it.message ?: "немає зв'язку" }
