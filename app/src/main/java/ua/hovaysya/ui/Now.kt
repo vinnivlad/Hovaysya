@@ -160,12 +160,27 @@ fun Now(store: Store, onSettings: () -> Unit) {
             // and for the same reason it is only shown during one. What is being
             // re-checked is a detail of a raid, not news on its own.
             screen?.recon?.takeIf { alerting && it.isNotEmpty() }?.let { recon ->
+                // `all` is the class the policy uses when a message re-checks
+                // the sky without naming what it is re-checking, and it has no
+                // Ukrainian word -- `CLASS_WORD.get(c, c)` on the server hands
+                // an unmapped class straight through, so the screen read
+                // "All — дорозвідка". Filtered on the class rather than on the
+                // word: what leaked here is the class name, and matching the
+                // display string would break the moment somebody translated it.
+                val named = recon.filter { it.cls != "all" }
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    recon.joinToString(", ") {
+                    if (named.isEmpty()) "Дорозвідка"
+                    else named.joinToString(", ") {
                         it.word.replaceFirstChar { c -> c.uppercase() }
                     } + " — дорозвідка",
-                    style = MaterialTheme.typography.bodyLarge,
+                    // The same size as the threat directly above it, his call.
+                    // They are two halves of one answer -- what is in the air,
+                    // and what is being looked at again -- and the smaller type
+                    // read as a footnote to the first rather than a peer of it.
+                    // The colour stays muted, which is what keeps the order
+                    // clear now that the size no longer does.
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
