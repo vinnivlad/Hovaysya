@@ -49,6 +49,7 @@ from ..export import store
 from ..export.config import CHANNELS, DB_PATH
 from ..export.tme import Client, FetchError
 from ..labeler.build import kyiv_dt
+from ..policy import carry
 from ..policy.announce import Announcer
 from ..policy.config import CONFIG_PATH, changed_from_default, load as load_config
 from ..policy.episodes import OFFICIAL_CHANNELS, Tracker, observe, read
@@ -61,6 +62,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 LOG_DIR = REPO_ROOT / "data" / "live"
 # One JSON file per person, rewritten every poll: what the first screen shows.
 STATE_DIR = LOG_DIR / "state"
+# The tracker's own memory across restarts. Beside the state files but never
+# served: `/state` is a contract with a phone, this is the insides.
+CARRY_DIR = LOG_DIR / "carry"
 # Written by the API when somebody registers or changes their settings, read here
 # between polls. The watcher never writes it.
 RECIPIENTS_DIR = REPO_ROOT / "data" / "recipients"
@@ -102,11 +106,21 @@ HEARTBEAT_S = 900.0
 SLEEP_GAP_S = 120.0
 
 # How much recent history to replay through the tracker at startup. Polling
-# catches up on what arrived while the process was down, but a restart during an
-# alert has nothing to catch up on and would begin blind: no episode, so the
-# first place name re-announces a wave already announced, and the loop polls at
-# the quiet interval through an attack. So the warm-up reads the store instead of
-# relying on the poll, and an hour and a half comfortably spans an episode.
+# starts from the last message this run has seen, so the window is only about
+# rebuilding state, not about missing messages.
+#
+# Ninety minutes, and no longer sized to cover a raid -- the episode itself is
+# saved and restored now (`policy.carry`), so this window's remaining job is the
+# announcer's memory: not saying again, on the first cycle, what was said just
+# before the restart. `already_said` covers most of that from the log; this
+# covers the rest.
+#
+# It was sized to cover a raid once, and it could not be. Across 1453 official
+# episodes in the corpus the median runs 33 minutes but p90 is 174 and p95 is
+# 275, so **20% of raids outlive ninety minutes** and one restart in five
+# reported calm sky over a city under attack. Widening it would have moved that
+# number without fixing anything, which is his objection and the right one:
+# "тягнути історію щоб знайти старт тривоги це все одно не варіант".
 WARM_WINDOW_S = 90 * 60
 
 # ...but a message that arrived seconds ago is not backlog, it is now. An
@@ -480,9 +494,15 @@ def write_state(session: Session, directory: Path, now: float) -> None:
     the alternative is remembering what changed, which is the kind of bookkeeping
     that goes wrong quietly. `/state` reads whichever file the token names.
     """
+    from ..policy import carry
     from ..policy.status import SAID_ON_SCREEN, write
 
     for who in session.recipients:
+        # The episode, saved on the same cadence as the screen it feeds. Cheap
+        # -- one small file per person per cycle -- and it is the difference
+        # between a restart that keeps knowing there is a raid and one that
+        # asks the last ninety minutes of the database to guess.
+        carry.save(CARRY_DIR, who, who.tracker, int(now))
         # `alarm` travels with the line, because the app cannot colour it
         # without knowing what kind of thing it was. Without it an all-clear --
         # which is `level="alert"` with `alarm="clear"`, since announcing it is
@@ -657,6 +677,28 @@ def main(argv: list[str] | None = None) -> int:
         note = f", з них {spoken} свіжих — озвучено" if spoken else ""
         print(f"  прогрів: {warmed} повідомлень за останні "
               f"{WARM_WINDOW_S // 60} хв{note} — стан: {state}")
+
+    # Then put back what the previous run knew, over the top of whatever the
+    # replay concluded.
+    #
+    # Order matters and this is the useful order. The replay's job is the
+    # announcer's memory, so it has to run; the episode's job is to be true, and
+    # the previous process knew it exactly -- it had seen every message, not
+    # just the last ninety minutes. So the replay teaches what was already said
+    # and then the saved episode overwrites what was guessed about the raid.
+    #
+    # Anything that happened while the process was down is still ahead of us:
+    # the catch-up poll below feeds it in, against a restored episode rather
+    # than an empty one.
+    restored = []
+    for who in people:
+        if carry.load(CARRY_DIR, who, who.tracker, int(time.time())):
+            restored.append(who.name)
+    if restored:
+        ep = people[0].tracker.episode
+        since = f"{kyiv_dt(ep.opened_at):%H:%M}" if ep is not None else "?"
+        print(f"  відновлено епізод з {since} — "
+              f"{len(restored)} отримувач(і): {', '.join(restored)}")
 
     # Catch up on whatever arrived while the machine was off, silently. The
     # tracker needs it — an alert may already be running — but printing six

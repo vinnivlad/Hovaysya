@@ -15,9 +15,15 @@
 # means one timer, and neither installer can undo the other's arrangement.
 #
 # Restarting unconditionally would drop the episode state every ten minutes,
-# and the watcher rebuilds it from the last 90 minutes of the database on every
-# start — cheap, but not free, and it prints a warm-up line each time. Silence
-# when nothing changed is what makes the log readable in the morning.
+# and the watcher rebuilds it from the database on every start — cheap, but not
+# free, and it prints a warm-up line each time. Silence when nothing changed is
+# what makes the log readable in the morning.
+#
+# "Nothing changed" used to mean "HEAD did not move", and that was too coarse.
+# An Android-only commit moves HEAD, so shipping a sound for the phone restarted
+# the watcher on the server and cost a live episode. Nothing under `app/` is even
+# checked out here. So the question is not whether the repository moved, it is
+# whether anything these units read moved.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -50,6 +56,16 @@ fi
 
 echo "${units[*]:-нічого перезапускати}: ${before:0:7} -> ${after:0:7}"
 git log --oneline "$before..$after" | sed 's/^/  /'
+
+# Paths no running unit reads: the Android app, prose, and the label files the
+# eval uses. Everything else counts, including anything new -- an unknown path
+# restarts, because being one deploy late is a smaller fault than running old
+# code without knowing it.
+if ! git diff --name-only "$before..$after" \
+        | grep -qvE '^(app/|docs/|labels/|README\.md$|\.gitignore$)'; then
+    echo "  — служб не торкається, не перезапускаю"
+    exit 0
+fi
 
 # The timer runs this as the checkout's owner, and an ordinary user may not
 # restart a system unit: systemd answers "Interactive authentication required",
