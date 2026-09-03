@@ -2349,3 +2349,264 @@ def test_two_official_sources_declaring_together_ring_once_each():
         if decision.notify and decision.level != "info":
             bells.append((offset, decision.alarm))
     assert bells == [(0, "alert"), (600, "clear")], bells
+# --- what stays at the foot of the first screen -----------------------------
+
+
+def _with_lines(script, at_offset):
+    """Run a script and take the screen, feeding it the log rows as the watcher
+    does -- which is what makes `said` a real answer rather than a fixture."""
+    from datetime import datetime, timezone
+
+    from tools.policy.announce import Announcer
+    from tools.policy.config import load as load_config
+    from tools.policy.episodes import Tracker, read
+    from tools.policy.recipients import Recipient
+    from tools.policy.status import snapshot
+
+    cfg = load_config(warn=lambda _m: None)
+    who = Recipient(name="я", config=cfg, tracker=Tracker(config=cfg),
+                    announcer=Announcer(config=cfg))
+    who.tracker.official_source = True
+    said = []
+    for offset, text, channel in script:
+        # Only up to the moment being examined. Feeding the whole script and
+        # then asking what the screen looked like earlier is incoherent: the
+        # tracker would already be past it.
+        if offset > at_offset:
+            break
+        obs, decision = who.decide(read(T0 + offset, text, False, channel))
+        utterance = who.announcer.announce(obs, decision)
+        if utterance:
+            said.append({
+                "at": datetime.fromtimestamp(T0 + offset,
+                                             tz=timezone.utc).isoformat(),
+                "level": decision.level, "alarm": decision.alarm,
+                "text": utterance.text,
+            })
+    return snapshot(who, said=said, now=T0 + at_offset), who
+
+
+SIREN_POST = ("🚨 м. Київ\nПовітряна тривога", "alarm_kyiv")
+CLEAR_POST = ("🟢 м. Київ\nВідбій повітряної тривоги", "alarm_kyiv")
+
+
+def test_the_foot_of_the_screen_holds_this_raid_and_not_the_last_one():
+    """His complaint, and it was about the screen lying by omission: "зараз
+    тривоги немає а там висить три повідомлення про дрони і відбій."
+
+    His own fix was a five-minute timer. This is the other answer, and it asks a
+    better question: a line does not go stale by the clock, it stops being about
+    the thing on the screen. So the lines belong to the episode.
+    """
+    screen, _ = _with_lines([
+        (0, SIREN_POST[0], SIREN_POST[1]),
+        (60, "⚠️Реактивний шахед на Жуляни.", "mon1tor_ua"),
+        (4800, CLEAR_POST[0], CLEAR_POST[1]),
+    ], at_offset=60)
+    assert any("Жуляни" in line["text"] for line in screen["said"]), screen["said"]
+
+
+def test_the_closing_line_survives_the_next_episode_opening():
+    """The flaw in scoping to the episode alone, found by replaying a real
+    morning: an episode reopens within seconds of an all-clear, because the
+    channels do not stop talking. Ten seconds after the 09:32 all-clear on
+    2026-09-03 the foot of the screen was empty.
+
+    So a recent all-clear stays, and it brings the one number worth still
+    knowing -- how long the alert was on, measured from the siren rather than
+    from the episode, because an episode opens on any live threat.
+    """
+    screen, _ = _with_lines([
+        (0, SIREN_POST[0], SIREN_POST[1]),
+        (60, "⚠️Реактивний шахед на Жуляни.", "mon1tor_ua"),
+        (4800, CLEAR_POST[0], CLEAR_POST[1]),
+        # ...and the traffic that reopens an episode immediately.
+        (4840, "⚠️Реактивний шахед на Чернігівщині.", "mon1tor_ua"),
+    ], at_offset=4860)
+
+    assert [line["alarm"] for line in screen["said"]] == ["clear"], screen["said"]
+    assert screen["ended"] is not None
+    assert screen["ended"]["lasted_s"] == 4800, screen["ended"]
+
+
+def test_a_fresh_alert_clears_the_last_raids_epitaph():
+    """"Відбій тривоги" under a headline reading "ТРИВОГА" tells somebody it is
+    over while it is not. Once a siren is declared again, the previous raid is
+    history and history has its own screen."""
+    screen, _ = _with_lines([
+        (0, SIREN_POST[0], SIREN_POST[1]),
+        (4800, CLEAR_POST[0], CLEAR_POST[1]),
+        (5400, SIREN_POST[0], SIREN_POST[1]),
+    ], at_offset=5460)
+
+    assert screen["state"] == "alert"
+    assert screen["ended"] is None
+    assert all(line["alarm"] != "clear" for line in screen["said"]), screen["said"]
+
+
+def test_an_hour_later_the_foot_of_the_screen_is_bare():
+    """Which is the honest answer once nothing has happened for an hour."""
+    from tools.policy.status import ENDED_SHOWN_S
+
+    screen, _ = _with_lines([
+        (0, SIREN_POST[0], SIREN_POST[1]),
+        (4800, CLEAR_POST[0], CLEAR_POST[1]),
+    ], at_offset=4800 + ENDED_SHOWN_S + 60)
+
+    assert screen["said"] == [], screen["said"]
+    assert screen["ended"] is None
+
+
+def test_watching_without_a_siren_reports_no_duration():
+    """An episode opens on any live threat -- a drone three regions away opens
+    one -- and there is nothing to report about an hour of watching that ended
+    without an alert ever being declared."""
+    screen, _ = _with_lines([
+        (0, "⚠️Реактивний шахед на Сумщині.", "mon1tor_ua"),
+        (600, "📡По балістиці чисто.", "mon1tor_ua"),
+    ], at_offset=660)
+
+    assert screen["ended"] is None
+def test_a_partial_all_clear_lifts_one_class_and_ends_nothing():
+    """His question, and it found a flattening of mine: "часткові відбої
+    правильно обробляються? Наприклад відбій по балістиці? Там ще threat може
+    бути."
+
+    Yes -- and one place had stopped telling the two apart. `status._is_clear`
+    counted `clear-partial` as a full all-clear, which would have kept "Відбій
+    по балістиці" at the foot of the screen as the line that ended a raid that
+    was still running. The app had the same flattening: green for both, where
+    green means over.
+
+    Everything else along the chain already knew the difference, and this pins
+    it: the episode stays open, the lifted class leaves `top` while the one
+    still flying holds it, and no duration is reported for a raid that has not
+    ended.
+    """
+    screen, who = _with_lines([
+        (0, SIREN_POST[0], SIREN_POST[1]),
+        (60, "❗️Пуск балістики по Києву", "mon1tor_ua"),
+        (120, "⚠️Реактивний шахед на Жуляни.", "mon1tor_ua"),
+        (300, "⚪️ Відбій загрози балістики.", "mon1tor_ua"),
+    ], at_offset=360)
+
+    # The alert is still on and the episode was not closed.
+    assert screen["state"] == "alert"
+    assert who.tracker.episode is not None
+    assert screen["ended"] is None, screen["ended"]
+
+    # Ballistic was lifted; what is still up holds the headline.
+    assert "ballistic" in [c["class"] for c in screen["cleared"]], screen["cleared"]
+    assert screen["top"] is not None
+    assert screen["top"]["class"] != "ballistic", screen["top"]
+
+    # And the line that said so is marked as partial, never as the end.
+    partial = [line for line in screen["said"] if line["alarm"] == "clear-partial"]
+    assert partial, screen["said"]
+    assert all(line["alarm"] != "clear" for line in screen["said"])
+
+
+def test_a_partial_all_clear_does_not_arm_the_all_clear_dedup():
+    """Because a real all-clear has to follow it and be heard. Sharing the
+    marker would have swallowed the one announcement that ends the night."""
+    _, who = _with_lines([
+        (0, SIREN_POST[0], SIREN_POST[1]),
+        (60, "❗️Пуск балістики по Києву", "mon1tor_ua"),
+        (300, "⚪️ Відбій загрози балістики.", "mon1tor_ua"),
+    ], at_offset=360)
+    assert who.tracker.said_clear_at is None
+
+    screen, who = _with_lines([
+        (0, SIREN_POST[0], SIREN_POST[1]),
+        (60, "❗️Пуск балістики по Києву", "mon1tor_ua"),
+        (300, "⚪️ Відбій загрози балістики.", "mon1tor_ua"),
+        (600, CLEAR_POST[0], CLEAR_POST[1]),
+    ], at_offset=660)
+    assert who.tracker.said_clear_at is not None
+    assert screen["ended"] is not None, screen["ended"]
+# --- one official source for alerts and all-clears --------------------------
+
+
+def test_chatter_about_an_all_clear_does_not_end_the_alert():
+    """The fault he found by noticing a "дорозвідка" that did not arrive.
+
+    On 2026-09-03 at 08:46:13 `mon1tor_ua` wrote "⚪️У Києві можуть дати відбій
+    на 10 хвилин" -- a guess about a future all-clear. `rules` silenced it
+    correctly, and `Tracker.record` closed the episode anyway, while the siren
+    declared at 08:12 ran until 09:32. For forty-six minutes the watcher
+    believed nothing was running: every recheck was dropped as "recheck: no
+    alert running", and `threat_peak`, `launched` and `ring_seen` had been
+    thrown away mid-raid so a second rise could ring for the same wave.
+
+    Across the corpus a chat channel closed an episode the rules refused to
+    close 174 times. For 149 of those the official all-clear followed within two
+    minutes and nothing was lost; 25 were genuinely premature, and the worst
+    left the watcher blind for 261 minutes. The closers include a joke -- "Ех,
+    був би я біля кнопки — давно б уже дав відбій 😄" -- and a complaint that no
+    all-clear had been given.
+
+    His rule, stated as a rule about the whole system: "не дивися на ті балачки
+    з інших каналів про відбій. У нас одне офіційне джерело тривог і відбоїв."
+    """
+    from tools.policy.announce import Announcer
+    from tools.policy.config import load as load_config
+    from tools.policy.episodes import Tracker, read
+    from tools.policy.recipients import Recipient
+    from tools.policy.rules import CHAT_ALL_CLEAR
+
+    cfg = load_config(warn=lambda _m: None)
+    who = Recipient(name="я", config=cfg, tracker=Tracker(config=cfg),
+                    announcer=Announcer(config=cfg))
+    who.tracker.official_source = True
+
+    who.decide(read(T0, SIREN_POST[0], False, SIREN_POST[1]))
+    who.decide(read(T0 + 60, "⚠️Реактивний шахед на Жуляни.", False,
+                    "mon1tor_ua"))
+    opened = who.tracker.episode.opened_at
+    said_before = dict(who.announcer.spoken) if hasattr(
+        who.announcer, "spoken") else None
+
+    for chatter in ("⚪️У Києві можуть дати відбій на 10 хвилин.",
+                    "Ой, у Києві і не давали відбій🫠",
+                    "Ех, був би я біля кнопки — давно б уже дав відбій 😄"):
+        obs, decision = who.decide(read(T0 + 120, chatter, False, "mon1tor_ua"))
+        assert decision.reason == CHAT_ALL_CLEAR, (chatter, decision.reason)
+        assert who.tracker.episode is not None, chatter
+        assert who.tracker.episode.opened_at == opened, chatter
+        assert who.tracker.episode.alert_announced, chatter
+
+    # ...and the announcer did not forget what it had said either, which was the
+    # same fault one layer up: a repeat would have followed.
+    if said_before is not None:
+        assert who.announcer.spoken == said_before
+
+    # The official one still ends it.
+    who.decide(read(T0 + 600, CLEAR_POST[0], False, CLEAR_POST[1]))
+    assert who.tracker.episode is None
+
+
+def test_without_an_official_source_the_chat_channels_still_close():
+    """Which is what the labelled nights are: the official channel is absent
+    from those streams, the chat channels declare and close as they always did,
+    and the eval that scores them has to keep meaning what it meant."""
+    from tools.policy.config import load as load_config
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    cfg = load_config(warn=lambda _m: None)
+    tracker = Tracker(config=cfg)
+    tracker.official_source = False
+
+    for offset, text in ((0, "🛑 ТРИВОГА в Києві"),
+                         (60, "⚠️Реактивний шахед на Жуляни.")):
+        obs = observe(T0 + offset, text, False, "kievinform_ua1")
+        d = decide(obs, tracker)
+        tracker.record(obs, d.level if d.notify else None,
+                       d.alarm if d.notify else None, d.reason)
+    assert tracker.episode is not None
+
+    obs = observe(T0 + 600, "🟢 ВІДБІЙ ТРИВОГИ", False, "kievinform_ua1")
+    d = decide(obs, tracker)
+    tracker.record(obs, d.level if d.notify else None,
+                   d.alarm if d.notify else None, d.reason)
+    assert tracker.episode is None, "a chat all-clear must still close one here"

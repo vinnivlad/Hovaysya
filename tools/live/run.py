@@ -471,7 +471,12 @@ def write_state(session: Session, directory: Path, now: float) -> None:
     from ..policy.status import SAID_ON_SCREEN, write
 
     for who in session.recipients:
-        said = [{"at": row["at"], "level": row["level"], "text": row["said"]}
+        # `alarm` travels with the line, because the app cannot colour it
+        # without knowing what kind of thing it was. Without it an all-clear --
+        # which is `level="alert"` with `alarm="clear"`, since announcing it is
+        # an audible event -- was drawn with the same red mark as a raid.
+        said = [{"at": row["at"], "level": row["level"],
+                 "alarm": row.get("alarm"), "text": row["said"]}
                 for row in session.log
                 if row.get("said") and row.get("who") == who.name]
         write(directory, who, said=said[-SAID_ON_SCREEN:], now=int(now))

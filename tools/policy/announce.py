@@ -34,7 +34,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .episodes import Observation
-from .rules import Decision
+from .rules import CHAT_ALL_CLEAR, Decision
 
 # What to call each class out loud. Not the internal name: he hears these at
 # three in the morning and has to act on them without thinking.
@@ -288,7 +288,14 @@ class Announcer:
         # only when one was announced left the memory of a finished attack
         # alive: a siren an hour later opened with "Тривога. Балістика. Жуляни."
         # on a class from before the previous all-clear.
-        if obs.alert_state == "clear" and not obs.partial_clear:
+        # ...but only an all-clear the decision accepted as one. The same fault
+        # as in `Tracker.record`, one layer up: a chat channel saying "Ех, був би
+        # я біля кнопки — давно б уже дав відбій 😄" wiped the memory of
+        # everything said during a raid that was still running, so the next line
+        # repeated what had already been announced. The decision had refused to
+        # treat it as the end; this did not agree with it.
+        if (obs.alert_state == "clear" and not obs.partial_clear
+                and decision.reason != CHAT_ALL_CLEAR):
             self.reset()
         self.note(obs)
         if not decision.notify:

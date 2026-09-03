@@ -21,6 +21,13 @@ from .episodes import (GEO_STEP, REFRACTORY_NEAR_S, SILENT_DEDUP_S,
 
 LEVELS = ("info", "alert")
 
+# A chat channel reporting an all-clear while the authoritative source is in the
+# stream. Named because `announce` has to recognise it too: his instruction, and
+# it is a rule about the whole system rather than about one branch -- "не дивися
+# на ті балачки з інших каналів про відбій. У нас одне офіційне джерело тривог і
+# відбоїв."
+CHAT_ALL_CLEAR = "refinement: the official channel closes the alert"
+
 # The siren that matters is the city's. Oblast districts get their own alerts
 # constantly and the user labelled every one of them silent.
 #
@@ -187,7 +194,7 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
         # Whether or not this episode saw an official declaration: while the
         # authoritative source is in the stream, a chat all-clear is a report
         # about somebody's district and not the end of his alert.
-        return _silent("refinement: the official channel closes the alert")
+        return _silent(CHAT_ALL_CLEAR)
     if obs.alert_state == "clear" and obs.scope in CITY_OR_NEARER:
         return _notify("alert", "clear", "all-clear")
     if obs.alert_state == "clear":

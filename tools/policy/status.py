@@ -33,6 +33,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 from .announce import CLASS_WORD
@@ -48,6 +49,20 @@ QUIET, WATCHING, ALERT = "quiet", "watching", "alert"
 # How many of the last Ховайся lines the first screen carries. His number:
 # "останні 1-3 повідомлення від ховайся внизу".
 SAID_ON_SCREEN = 3
+
+# How long the closing line of a finished raid stays on the screen.
+#
+# His complaint was real -- "зараз тривоги немає а там висить три повідомлення
+# про дрони і відбій" -- and his own fix was a five-minute timer. This is the
+# other answer to it, and it is a better question: a line does not go stale by
+# the clock, it stops being about the thing on the screen. So the lines belong to
+# the episode, and when the episode ends they go with it.
+#
+# All but one. "Відбій тривоги" is the last thing a raid says and the most useful
+# thing to still be there afterwards, so it stays for an hour along with how long
+# the alert ran -- which is the line people actually read in the official app.
+# After that it is history, and history has its own screen.
+ENDED_SHOWN_S = 60 * 60
 
 # How recently a class must have been called "дорозвідка" to still be on the
 # screen as such. `Episode.rechecked` deliberately has no age -- it answers "have
@@ -66,6 +81,51 @@ def _named(classes) -> list[dict]:
     return [{"class": c, "word": CLASS_WORD.get(c, c)} for c in live]
 
 
+def _when(row) -> int | None:
+    """The epoch of a log row's ISO stamp, which the watcher writes in UTC."""
+    try:
+        return int(datetime.fromisoformat(row.get("at") or "").timestamp())
+    except ValueError:
+        return None
+
+
+def _is_clear(row) -> bool:
+    """A *full* all-clear, which is the only line that ends a raid.
+
+    His question, and it caught a flattening of mine: "часткові відбої правильно
+    обробляються? Наприклад відбій по балістиці? Там ще threat може бути."
+    A partial all-clear lifts one class and leaves the alert running, so it is
+    not the line that ended anything and must not be the one kept behind after
+    the rest have gone.
+    """
+    return row.get("alarm") == "clear"
+
+
+def _lines(said, since: int | None, at: int, alerting: bool) -> list[dict]:
+    """The lines that are about what is on the screen right now, oldest last.
+
+    Two sources, and the second one is why the first is not enough. An episode's
+    own lines are what it has said about this raid -- but an episode reopens
+    within seconds of an all-clear, because the channels do not stop talking, so
+    scoping to the episode alone made the closing line vanish the moment it
+    mattered most. Measured on 2026-09-03: ten seconds after the 09:32 all-clear
+    the foot of the screen was empty.
+
+    So a recent all-clear stays too -- unless a fresh alert has been declared.
+    Then it is history, and history must not sit under a headline reading
+    "ТРИВОГА" telling somebody it is over.
+    """
+    kept = []
+    if since is not None:
+        kept += [r for r in said if (_when(r) or since) >= since]
+    if not alerting:
+        closing = [r for r in said
+                   if _is_clear(r) and at - (_when(r) or 0) <= ENDED_SHOWN_S]
+        kept += [r for r in closing[-1:] if r not in kept]
+    kept.sort(key=lambda r: _when(r) or 0)
+    return kept[-SAID_ON_SCREEN:]
+
+
 def snapshot(recipient, said=(), now: int | None = None) -> dict:
     """One person's current state, from their own tracker.
 
@@ -75,13 +135,16 @@ def snapshot(recipient, said=(), now: int | None = None) -> dict:
     """
     ep = recipient.tracker.episode
     at = int(now if now is not None else 0)
+    alerting = ep is not None and ep.official_alert
+    lines = _lines(said, ep.opened_at if ep is not None else None, at, alerting)
+    ended = None if alerting else _ended(recipient.tracker, at)
 
     if ep is None:
         # No episode is exactly "без загроз", and it is also how a full all-clear
         # is recognised -- there is nothing left to describe.
         return {"at": at, "state": QUIET, "since": None, "top": None,
                 "threat": None, "recon": [], "cleared": [], "launched": [],
-                "peak": 0, "said": list(said)[-SAID_ON_SCREEN:]}
+                "peak": 0, "said": lines, "ended": ended}
 
     cleared = set(ep.cleared)
     # Reconnaissance is not the threat -- it is the thing his example puts on the
@@ -107,8 +170,36 @@ def snapshot(recipient, said=(), now: int | None = None) -> dict:
         # The rung reached since the siren. A partial all-clear moves it down by
         # one, which is the only thing that lowers it -- his exception.
         "peak": ep.threat_peak,
-        "said": list(said)[-SAID_ON_SCREEN:],
+        "said": lines,
+        # Cleared once a fresh alert is declared: during a raid the question is
+        # not how long the last one lasted. An episode being open is not enough
+        # -- one opens on any live threat, and most of them are somebody else's.
+        "ended": ended,
     }
+
+
+def _ended(tracker, at: int) -> dict | None:
+    """The raid that just finished: when it was called off, and how long it ran.
+
+    Measured from the siren rather than from the episode, and the two are not the
+    same: an episode opens on any live threat, so a drone three regions away can
+    open one an hour before anything is declared. The number worth reading is the
+    one the official app shows, which is how long the alert was on.
+
+    None when the last episode never had a siren -- there is nothing to report
+    about an hour of watching that ended quietly.
+    """
+    closed = getattr(tracker, "closed", None)
+    if not closed:
+        return None
+    last = closed[-1]
+    sirens = [s.ts for s in getattr(last, "sent", ()) if s.alarm == "alert"]
+    if not sirens:
+        return None
+    finished = tracker.said_clear_at or last.last_live or 0
+    if not finished or at - finished > ENDED_SHOWN_S:
+        return None
+    return {"at": finished, "lasted_s": max(0, finished - min(sirens))}
 
 
 def write(directory: Path, recipient, said=(), now: int | None = None) -> Path:

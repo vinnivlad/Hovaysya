@@ -673,7 +673,27 @@ class Tracker:
             self.said_clear_at = None
         # A partial all-clear lifts one threat class, not the alert. Closing the
         # episode here would forget everything the night had established.
-        if obs.alert_state == "clear" and not obs.partial_clear:
+        # Only the source that declares may close. `rules` has refused to
+        # *announce* a chat all-clear for as long as the official channel has
+        # been in the stream -- "a chat all-clear is a report about somebody's
+        # district and not the end of his alert" -- and this did not agree with
+        # it, so the state kept ending alerts the decision had just declined to
+        # end. The same shape as every other fault in this file: state taking
+        # what the decision threw out.
+        #
+        # What it cost, on 2026-09-03. At 08:46:13 `mon1tor_ua` wrote "⚪️У Києві
+        # можуть дати відбій на 10 хвилин" -- a guess about a future all-clear.
+        # The rule silenced it correctly and this closed the episode anyway,
+        # while the siren declared at 08:12 ran until 09:32. For those
+        # forty-six minutes the watcher believed nothing was running: every
+        # "дорозвідка" was dropped as "recheck: no alert running", which is how
+        # he noticed, and `threat_peak`, `launched` and `ring_seen` had all been
+        # thrown away mid-raid so a second rise could ring for the same wave.
+        #
+        # When no official source is in the stream the chat channels still close
+        # what they still declare -- which is what the labelled nights are.
+        if (obs.alert_state == "clear" and not obs.partial_clear
+                and (obs.official or not self.official_is_live(obs.ts))):
             # No marker on the way out. It used to set `cleared = True` here --
             # a bool into what a second declaration below had already made a
             # `set[str]`, so `ep.cleared.add()` would have raised on the next
