@@ -70,6 +70,13 @@ data class Screen(
     val said: List<Line>,
     val ended: Ended?,
     val note: String?,
+    /**
+     * What the server calls this answer. Handed back on the next request so it
+     * can be held open until the answer differs, which is what replaces a push
+     * service. It ignores when the state was written: `at` changes on every
+     * poll whether or not anything happened.
+     */
+    val version: String?,
 ) {
     val known: Boolean get() = state != null
 
@@ -147,6 +154,11 @@ class ApiError(message: String, val code: Int = 0) : IOException(message)
 
 class Api(private val base: String, private val token: String?) {
 
+    private companion object {
+        const val CONNECT_TIMEOUT_MS = 8_000
+        const val READ_TIMEOUT_MS = 8_000
+    }
+
     suspend fun health(): Health = get("/health") { o ->
         Health(
             ok = o.optBoolean("ok"),
@@ -156,28 +168,47 @@ class Api(private val base: String, private val token: String?) {
         )
     }
 
-    suspend fun screen(): Screen = get("/state") { o ->
-        Screen(
-            state = o.stringOrNull("state"),
-            at = o.longOrNull("at"),
-            top = o.namedOrNull("top"),
-            threat = o.namedOrNull("threat"),
-            recon = o.namedList("recon"),
-            cleared = o.namedList("cleared"),
-            peak = o.optInt("peak", 0),
-            said = o.list("said") { row ->
-                Line(
-                    at = row.optString("at"),
-                    level = row.stringOrNull("level"),
-                    alarm = row.stringOrNull("alarm"),
-                    text = row.optString("text"),
-                )
-            },
-            ended = o.optJSONObject("ended")?.let {
-                Ended(at = it.optLong("at"), lastedS = it.optLong("lasted_s"))
-            },
-            note = o.stringOrNull("note"),
-        )
+    /**
+     * The current state, or -- with [wait] -- the next one.
+     *
+     * `wait` holds the request open until the answer differs from [version] or
+     * the seconds run out. A timeout is a normal answer rather than a failure:
+     * it returns the current state, which is also how the phone learns the
+     * service is still there.
+     */
+    suspend fun screen(wait: Int = 0, version: String? = null): Screen {
+        val query = when {
+            wait <= 0 -> ""
+            version == null -> "?wait=$wait"
+            else -> "?wait=$wait&v=$version"
+        }
+        // The read timeout has to outlast the wait or every long poll fails on
+        // the clock instead of returning -- and that failure looks exactly like
+        // the server being down. Ten seconds of slack for the proxy in front.
+        return get("/state$query", readTimeoutMs = (wait + 10) * 1_000) { o ->
+            Screen(
+                state = o.stringOrNull("state"),
+                at = o.longOrNull("at"),
+                top = o.namedOrNull("top"),
+                threat = o.namedOrNull("threat"),
+                recon = o.namedList("recon"),
+                cleared = o.namedList("cleared"),
+                peak = o.optInt("peak", 0),
+                said = o.list("said") { row ->
+                    Line(
+                        at = row.optString("at"),
+                        level = row.stringOrNull("level"),
+                        alarm = row.stringOrNull("alarm"),
+                        text = row.optString("text"),
+                    )
+                },
+                ended = o.optJSONObject("ended")?.let {
+                    Ended(at = it.optLong("at"), lastedS = it.optLong("lasted_s"))
+                },
+                note = o.stringOrNull("note"),
+                version = o.stringOrNull("v"),
+            )
+        }
     }
 
     /** The gazetteer, with the tier order the policy ranks names in. */
@@ -273,21 +304,25 @@ class Api(private val base: String, private val token: String?) {
 
     // --- the plumbing -------------------------------------------------------
 
-    private suspend fun <T> get(path: String, read: (JSONObject) -> T): T =
-        send("GET", path, null, read)
+    private suspend fun <T> get(
+        path: String,
+        readTimeoutMs: Int = READ_TIMEOUT_MS,
+        read: (JSONObject) -> T,
+    ): T = send("GET", path, null, readTimeoutMs, read)
 
     private suspend fun <T> send(
         method: String,
         path: String,
         body: JSONObject?,
+        readTimeoutMs: Int = READ_TIMEOUT_MS,
         read: (JSONObject) -> T,
     ): T = withContext(Dispatchers.IO) {
         val connection = URL(base.trimEnd('/') + path).openConnection()
                 as HttpURLConnection
         try {
             connection.requestMethod = method
-            connection.connectTimeout = 8_000
-            connection.readTimeout = 8_000
+            connection.connectTimeout = CONNECT_TIMEOUT_MS
+            connection.readTimeout = readTimeoutMs
             connection.setRequestProperty("Accept", "application/json")
             token?.let {
                 connection.setRequestProperty("Authorization", "Bearer $it")

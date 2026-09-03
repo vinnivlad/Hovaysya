@@ -15,6 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import ua.hovaysya.AlertService
 import ua.hovaysya.Bell
 import ua.hovaysya.Store
 
@@ -33,8 +35,13 @@ import ua.hovaysya.Store
 fun App(store: Store, bell: Bell) {
     var registered by remember { mutableStateOf(store.registered) }
 
+    val context = LocalContext.current
     if (!registered) {
-        Setup(store) { registered = true }
+        Setup(store) {
+            registered = true
+            // The first thing a registered phone needs is something watching.
+            AlertService.start(context)
+        }
         return
     }
 
@@ -50,6 +57,9 @@ fun App(store: Store, bell: Bell) {
         Settings(store, bell, onBack = { settings = false }) {
             settings = false
             registered = false
+            // Nothing left to watch for, and a notification that could not be
+            // dismissed would be the last thing this app did.
+            AlertService.stop(context)
         }
         return
     }

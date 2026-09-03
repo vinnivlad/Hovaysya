@@ -658,3 +658,112 @@ def test_a_cold_screen_gets_the_newest_decisions_and_paging_gets_the_oldest(tmp_
     # Ascending either way, so the app can append.
     for served in (fresh, page):
         assert served == sorted(served, key=lambda r: r["cursor"])
+# --- what stands in for a push ----------------------------------------------
+
+
+def _state_dir(tmp_path, payload):
+    directory = tmp_path / "state"
+    directory.mkdir(exist_ok=True)
+    (directory / "оля.json").write_text(
+        json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    return directory
+
+
+def test_the_version_ignores_when_the_state_was_written():
+    """Which is the whole reason a long poll can wait at all.
+
+    The watcher rewrites the state file after every poll whether or not anything
+    happened, so `at` changes about six times a minute. A version that included
+    it would make every held request return within ten seconds, the phone would
+    be back to polling, and the battery this exists to save would be spent on
+    learning that nothing had changed.
+    """
+    from tools.serve.api import _version
+
+    quiet = {"at": 1, "state": "quiet", "said": []}
+    later = {"at": 999, "state": "quiet", "said": []}
+    assert _version(quiet) == _version(later)
+
+    alert = {"at": 1, "state": "alert", "said": []}
+    assert _version(quiet) != _version(alert)
+
+
+def test_a_held_request_returns_the_moment_the_answer_changes(tmp_path):
+    """This is what replaces Firebase, so it is worth pinning what it promises.
+
+    He asked whether a push provider was really compulsory, and it is not: it is
+    compulsory only to use Google's channel. A request held open against the
+    watcher delivers the same thing with nothing in between -- no account, no
+    `google-services.json`, no service key on the server.
+    """
+    import threading
+    import time
+
+    from tools.serve.api import _version, state_after
+
+    directory = _state_dir(tmp_path, {"at": 1, "state": "quiet", "said": []})
+    have = _version({"state": "quiet", "said": []})
+
+    def change():
+        time.sleep(0.5)
+        _state_dir(tmp_path, {"at": 2, "state": "alert", "said": []})
+
+    threading.Thread(target=change, daemon=True).start()
+    started = time.monotonic()
+    answer = state_after(directory, "оля", have, wait=20)
+    took = time.monotonic() - started
+
+    assert answer["state"] == "alert"
+    assert answer["v"] != have
+    assert took < 5, f"waited {took:.1f}s for a change half a second away"
+
+
+def test_a_timeout_is_an_answer_and_not_a_failure(tmp_path):
+    """It comes back with the state and its version, which is how the phone asks
+    again -- and how it learns the service is still there. A held request that
+    simply died would be indistinguishable from a server that had."""
+    import time
+
+    from tools.serve.api import _version, state_after
+
+    directory = _state_dir(tmp_path, {"at": 1, "state": "quiet", "said": []})
+    have = _version({"state": "quiet", "said": []})
+
+    started = time.monotonic()
+    answer = state_after(directory, "оля", have, wait=2)
+    took = time.monotonic() - started
+
+    assert answer["v"] == have
+    assert answer["state"] == "quiet"
+    assert 1.5 <= took < 6, f"{took:.1f}s"
+
+
+def test_the_wait_is_bounded(tmp_path):
+    """A phone asking for an hour would hold a thread for an hour, and every
+    proxy in the way would drop it long before that."""
+    import time
+
+    from tools.serve.api import MAX_WAIT_S, _version, state_after
+
+    directory = _state_dir(tmp_path, {"at": 1, "state": "quiet", "said": []})
+    have = _version({"state": "quiet", "said": []})
+    fake = iter([0.0] + [MAX_WAIT_S + 1] * 10)
+
+    answer = state_after(directory, "оля", have, wait=10 ** 6,
+                         now=lambda: next(fake))
+    assert answer["v"] == have
+
+
+def test_asking_without_a_version_answers_at_once(tmp_path):
+    """A cold screen has nothing to compare against and should not be made to
+    wait for a change that may be hours away."""
+    import time
+
+    from tools.serve.api import state_after
+
+    directory = _state_dir(tmp_path, {"at": 1, "state": "quiet", "said": []})
+    started = time.monotonic()
+    answer = state_after(directory, "оля", None, wait=20)
+    assert answer["state"] == "quiet"
+    assert answer["v"]
+    assert time.monotonic() - started < 2

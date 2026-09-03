@@ -33,6 +33,14 @@ class MainActivity : ComponentActivity() {
             askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
+        // Watching starts here rather than in `App`, because a service may be
+        // started from an activity that is in the foreground and this is the
+        // only moment that is certainly true. `BootReceiver` covers the other
+        // way in.
+        if (store.registered) {
+            AlertService.start(this)
+        }
+
         setContent {
             HovaysyaTheme {
                 App(store, bell)

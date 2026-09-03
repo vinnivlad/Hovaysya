@@ -10,6 +10,8 @@ is that nothing has to be installed:
                                       their ring and the reason says "my area"
     GET  /state                       what the first screen shows: the worst
                                       thing in the air, what is only scouted
+    GET  /state?wait=30&v=<version>   ...and held until that answer changes,
+                                      which is what stands in for a push
     GET  /places                      every name the policy knows, for the
                                       first screen's home picker
     GET  /config                      their settings
@@ -39,6 +41,7 @@ a feed that jumps backwards.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sqlite3
 import threading
@@ -351,6 +354,53 @@ def places() -> dict:
     return {"places": out, "tiers": list(TIERS)}
 
 
+# How long a phone may be left holding the line, and the ceiling on what it can
+# ask for. Thirty seconds is short enough to survive any proxy in the way and
+# long enough that a quiet night costs two requests a minute instead of sixty.
+MAX_WAIT_S = 30
+
+# How often the file is re-read while somebody is waiting. The watcher rewrites
+# it once a poll, so a second's granularity adds nothing to the delay that
+# matters and keeps a held request from spinning.
+WAIT_TICK_S = 1.0
+
+
+def _version(payload: dict) -> str:
+    """A digest of the state, ignoring when it was written.
+
+    `at` changes on every poll whether or not anything happened, so a version
+    that included it would make every long poll return within ten seconds and
+    the waiting would buy nothing. What is left changes only when the answer
+    does.
+    """
+    body = {k: v for k, v in payload.items() if k != "at"}
+    text = json.dumps(body, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def state_after(state_dir: Path, who: str, version: str | None,
+                wait: float, now=time.monotonic) -> dict:
+    """The state, held until it differs from `version` or the wait runs out.
+
+    This is what replaces a push service, and the reason it can: the phone keeps
+    one request open and the answer arrives the moment the watcher writes a
+    different one. No Google account, no `google-services.json`, and nothing
+    between this machine and the phone at three in the morning -- which is the
+    whole property the rest of this project is built for.
+
+    A timeout is not a failure. It returns the current state with its version so
+    the phone can ask again, which is how it also notices that the service is
+    still there.
+    """
+    deadline = now() + max(0.0, min(wait, MAX_WAIT_S))
+    while True:
+        payload = state(state_dir, who)
+        payload["v"] = _version(payload)
+        if payload["v"] != version or now() >= deadline:
+            return payload
+        time.sleep(WAIT_TICK_S)
+
+
 def state(state_dir: Path, who: str) -> dict:
     """One person's current state, as the watcher last wrote it.
 
@@ -456,7 +506,19 @@ class Handler(BaseHTTPRequestHandler):
         elif url.path == "/decisions":
             self._send(200, decisions(self.server.log_dir, who, since, limit))
         elif url.path == "/state":
-            self._send(200, state(self.server.log_dir / "state", who))
+            wait = (query.get("wait") or ["0"])[0]
+            try:
+                seconds = float(wait)
+            except ValueError:
+                seconds = 0.0
+            directory = self.server.log_dir / "state"
+            if seconds > 0:
+                self._send(200, state_after(
+                    directory, who, (query.get("v") or [None])[0], seconds))
+            else:
+                payload = state(directory, who)
+                payload["v"] = _version(payload)
+                self._send(200, payload)
         elif url.path == "/places":
             self._send(200, places())
         elif url.path == "/config":

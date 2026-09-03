@@ -39,6 +39,18 @@ class Store(context: Context) {
     val registered: Boolean get() = !secret.isNullOrEmpty()
 
     /**
+     * The stamp of the newest line this phone has already rung for.
+     *
+     * Persisted, and that is the point: the state file still holds the lines of
+     * a finished raid, so a service restarting after a reboot would ring for an
+     * alert that ended two hours ago. Waking somebody at three for something
+     * that is over is how an app stops being believed.
+     */
+    var lastSaid: String?
+        get() = prefs.getString(KEY_LAST_SAID, null)
+        set(value) = prefs.edit().putString(KEY_LAST_SAID, value).apply()
+
+    /**
      * Which set of notification channels this phone is on. A channel cannot be
      * changed once created, so the only way to give the shelter bell the right
      * to bypass night mode -- after the person grants it -- is a new id. See
@@ -52,7 +64,11 @@ class Store(context: Context) {
 
     /** Forget this device's registration, without touching the server. */
     fun forget() {
-        prefs.edit().remove(KEY_SECRET).remove(KEY_NAME).apply()
+        prefs.edit().remove(KEY_SECRET).remove(KEY_NAME)
+            // The ring memory goes too. Kept, the next registration on this
+            // phone would inherit a stamp from somebody else's night and stay
+            // silent until the clock caught up with it.
+            .remove(KEY_LAST_SAID).apply()
     }
 
     companion object {
@@ -65,5 +81,6 @@ class Store(context: Context) {
         private const val KEY_SECRET = "secret"
         private const val KEY_NAME = "name"
         private const val KEY_CHANNELS = "channels"
+        private const val KEY_LAST_SAID = "lastSaid"
     }
 }

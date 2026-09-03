@@ -19,6 +19,24 @@
     <!-- For the shelter-now case, once there is a push to trigger it. -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
+    <!--
+      The service that stands in for a push. It keeps one request open against
+      the watcher and rings when the answer changes, which is why this app needs
+      no Firebase, no Google account and no third party in the path of the one
+      message that matters.
+
+      `specialUse` and not `dataSync`, which is not a preference: since Android
+      15 a `dataSync` service is capped at six hours in any twenty-four, and a
+      thing that watches for air raids cannot be off for eighteen of them. Play
+      asks for a justification for `specialUse`; this app is not in Play, which
+      is the one place where having no store makes something simpler.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- So it is watching again after a reboot without anybody opening the app. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
@@ -38,5 +56,25 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".AlertService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Continuous air-raid alerting for one household. The
+                    service holds a long-poll open to the owner's own server and
+                    raises the alarm the moment it changes; there is no push
+                    provider, so nothing else can wake the device in time." />
+        </service>
+
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

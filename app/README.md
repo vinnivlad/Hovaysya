@@ -200,13 +200,29 @@ newer one, so it is the number to raise before handing a build to anybody.
 
 ## Not here yet
 
-**Push.** Everything above is a screen being looked at; nothing wakes the phone.
-That needs FCM, which needs a Google account and a Firebase project -- no Play
-Developer account, no payment method -- and a `google-services.json` that must
-not be committed. Until then `Bell` can be exercised from Settings, one row
-per bell with its rhythm drawn beside it -- which is the only way to check the
-alphabet at all: patterns are distinguishable only if somebody has felt every
-one of them.
+**Nothing, on the push side.** There is no Firebase here and there is not going
+to be. He asked whether it was really compulsory, and it is not: it is compulsory
+only to use *Google's* channel. `AlertService` keeps one request open against
+`/state?wait=30` and rings the moment the answer changes -- no account, no
+`google-services.json`, no service key on the server, and nothing between that
+machine and this phone on the one night it matters.
+
+Android's price is a notification that cannot be dismissed, and that turned out
+to be the thing he already wanted: a status line saying what is happening rather
+than a feed of what happened. The cost is the feature.
+
+Two constraints in there worth knowing. The service type is `specialUse` and not
+`dataSync`, because since Android 15 a `dataSync` service is capped at six hours
+in any twenty-four and a thing that watches for air raids cannot be off for
+eighteen of them; Play asks for a justification for `specialUse`, and not being
+in Play is the one place where having no store makes something simpler. And the
+stamp of the last line rung for is persisted, because the state file still holds
+a finished raid's lines -- a service restarting after a reboot would otherwise
+ring for an alert that ended two hours ago.
+
+`Bell` can still be exercised from Settings, one row per bell with its rhythm
+beside it, which is the only way to check the alphabet at all: patterns are
+distinguishable only if somebody has felt every one of them.
 
 **A moving home.** "Можливо навіть автоматично, при переміщенні містом" needs
 location permission and a rule for when a move is real rather than a walk to the
