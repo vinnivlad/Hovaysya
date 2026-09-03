@@ -249,6 +249,12 @@ fun Now(store: Store, onSettings: () -> Unit) {
  * `poll_age_s` is the number that means something -- the watcher rewrites its
  * log after every poll whether or not anything arrived. The age of the last
  * *message* is not health: ten-minute silences happened 307 times in two weeks.
+ *
+ * The words are about the watching and not about a watcher, which is his
+ * correction: "«спостерігач живий» треба змінити. Фраза двозначна в цих
+ * реаліях." It is, and so was its opposite -- "спостерігач мовчить 12 хв" reads
+ * worse than the state it describes. An app for air raids cannot afford a line
+ * that could be read as being about a person, however well the code means it.
  */
 @Composable
 private fun Status(health: Health?, problem: String?) {
@@ -257,8 +263,8 @@ private fun Status(health: Health?, problem: String?) {
         health == null -> "…"
         !health.ok -> "сервіс не відповідає як слід"
         health.pollAgeS == null -> "сервіс на звʼязку"
-        health.pollAgeS > 300 -> "спостерігач мовчить ${health.pollAgeS / 60} хв"
-        else -> "спостерігач живий"
+        health.pollAgeS > 300 -> "спостереження стоїть ${health.pollAgeS / 60} хв"
+        else -> "спостереження працює"
     }
     val bad = problem != null || health?.ok == false ||
         (health?.pollAgeS ?: 0L) > 300

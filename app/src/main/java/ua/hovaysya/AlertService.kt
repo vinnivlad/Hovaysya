@@ -204,7 +204,8 @@ class AlertService : Service() {
         val body = when {
             problem != null -> problem
             screen == null -> "стежу"
-            !screen.known -> "спостерігач ще не писав"
+            // Same family, same reason: not "спостерігач ще не писав".
+            !screen.known -> "ще немає даних"
             screen.state == Screen.ALERT ->
                 screen.top?.word?.replaceFirstChar { it.uppercase() } ?: "тривога"
             else -> screen.said.lastOrNull()?.text ?: "тихо"
