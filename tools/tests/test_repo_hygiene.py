@@ -39,6 +39,8 @@ def test_no_control_characters_hide_in_the_source():
                     f"{path.relative_to(REPO_ROOT)}:{number} "
                     f"{sorted(hex(ord(c)) for c in bad)}")
     assert not offenders, offenders
+
+
 def test_no_xml_comment_contains_a_double_hyphen():
     """`--` is illegal inside an XML comment, and it broke his build.
 
@@ -231,6 +233,45 @@ def test_nothing_tracked_carries_an_address_or_a_key():
             if keyish.search(line):
                 offenders.append(f"{name}:{number} key material or path")
     assert not offenders, offenders
+
+
+def test_the_receiver_handles_every_broadcast_its_filter_asks_for():
+    """A manifest that subscribes and a receiver that ignores are one bug.
+
+    `BootReceiver` returns early on any action it does not recognise, which is
+    right -- a broadcast receiver is a public entry point. But the list it
+    recognises and the list the manifest subscribes to are written in two
+    different files, and for a while they disagreed: the filter asked only for
+    `BOOT_COMPLETED`, so every app update left the service down and the phone
+    unwatched until somebody opened the app. The absence looked exactly like a
+    working app, which is the whole reason it survived.
+
+    Same shape as the drawn-rhythm guard below it. Two places state one fact;
+    something has to make them agree.
+    """
+    from xml.etree import ElementTree
+
+    manifest = (REPO_ROOT / "app/src/main/AndroidManifest.xml").read_text(
+        encoding="utf-8")
+    receiver = (REPO_ROOT / "app/src/main/java/ua/hovaysya/BootReceiver.kt").read_text(
+        encoding="utf-8")
+
+    tree = ElementTree.fromstring(manifest)
+    android = "{http://schemas.android.com/apk/res/android}"
+    subscribed = set()
+    for node in tree.iter("receiver"):
+        if not node.get(f"{android}name", "").endswith("BootReceiver"):
+            continue
+        for action in node.iter("action"):
+            subscribed.add(action.get(f"{android}name", "").rsplit(".", 1)[-1])
+    assert subscribed, "the manifest no longer subscribes BootReceiver to anything"
+
+    for action in sorted(subscribed):
+        assert f"ACTION_{action}" in receiver, (
+            f"the manifest subscribes to {action} but BootReceiver drops it, "
+            "so that broadcast arrives and nothing happens")
+
+
 def test_the_drawn_rhythm_matches_the_pattern_it_names():
     """The screen is the only place the alphabet is written down, so a screen
     that draws it wrong teaches it wrong -- and is believed, which is worse than

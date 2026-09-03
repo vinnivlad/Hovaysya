@@ -74,6 +74,10 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- After an update, too. Installing over a running app kills
+                     the process and nothing restarts the service, so the phone
+                     stopped watching every time we shipped a build. -->
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
     </application>
