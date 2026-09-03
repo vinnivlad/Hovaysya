@@ -96,6 +96,10 @@ class Store(context: Context) {
             // phone would inherit a stamp from somebody else's night and stay
             // silent until the clock caught up with it.
             .remove(KEY_LAST_SAID).apply()
+        // And whatever is on the screens. Here rather than in the screen that
+        // offers the button, so registering again on this phone cannot inherit
+        // the previous person's raid -- decided from a home that is not theirs.
+        Held.clear()
     }
 
     companion object {

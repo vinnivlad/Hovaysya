@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import ua.hovaysya.Held
 import ua.hovaysya.Post
 import ua.hovaysya.clock
 import ua.hovaysya.saidPlainly
@@ -52,8 +53,10 @@ import ua.hovaysya.Verdict
 /** What Ховайся said, and the reason it gives itself. */
 @Composable
 fun HovaysyaFeed(store: Store) {
-    var rows by remember { mutableStateOf<List<Verdict>>(emptyList()) }
-    var problem by remember { mutableStateOf<String?>(null) }
+    // Kept above the tabs -- see `Held`. An empty feed and a forgotten one look
+    // identical on screen, and one of them is a lie.
+    val rows = Held.said
+    val problem = Held.saidProblem
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -61,9 +64,9 @@ fun HovaysyaFeed(store: Store) {
                 // The server filters now, and it has to: filtering after a
                 // limit is not a filter. The check stays as a belt, since a
                 // row with nothing said has nothing to draw.
-                .onSuccess { rows = it.filter { row -> row.said != null }
-                             problem = null }
-                .onFailure { problem = saidPlainly(it) }
+                .onSuccess { Held.said = it.filter { row -> row.said != null }
+                             Held.saidProblem = null }
+                .onFailure { Held.saidProblem = saidPlainly(it) }
             delay(15_000)
         }
     }
@@ -157,16 +160,16 @@ private fun isPartial(alarm: String?): Boolean = alarm == "clear-partial"
 /** Every channel, merged into one stream. */
 @Composable
 fun ChannelFeed(store: Store) {
-    var rows by remember { mutableStateOf<List<Post>>(emptyList()) }
-    var problem by remember { mutableStateOf<String?>(null) }
+    val rows = Held.posts
+    val problem = Held.postsProblem
 
     LaunchedEffect(Unit) {
         while (true) {
             // Thirty minutes, which is his number: "коли я відкриваю скрін, я
             // хочу бачити останні повідомлення за 30хв".
             runCatching { store.api().posts(minutes = 30) }
-                .onSuccess { rows = it; problem = null }
-                .onFailure { problem = saidPlainly(it) }
+                .onSuccess { Held.posts = it; Held.postsProblem = null }
+                .onFailure { Held.postsProblem = saidPlainly(it) }
             delay(20_000)
         }
     }

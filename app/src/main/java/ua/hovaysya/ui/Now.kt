@@ -18,10 +18,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import ua.hovaysya.Health
+import ua.hovaysya.Held
 import ua.hovaysya.clock
 import ua.hovaysya.saidPlainly
 import ua.hovaysya.spell
@@ -49,9 +46,13 @@ import ua.hovaysya.Store
  */
 @Composable
 fun Now(store: Store, onSettings: () -> Unit) {
-    var screen by remember { mutableStateOf<Screen?>(null) }
-    var health by remember { mutableStateOf<Health?>(null) }
-    var problem by remember { mutableStateOf<String?>(null) }
+    // Read from `Held`, not remembered here: this composition dies every time
+    // he touches another tab, and the state must not die with it. Reading the
+    // fields during composition subscribes to them, so the answer that arrives
+    // a moment later still redraws.
+    val screen = Held.screen
+    val health = Held.health
+    val problem = Held.problem
 
     // While this screen is open, and only then. Background waking is the push
     // notification's job, and polling from the foreground is what keeps a screen
@@ -60,9 +61,9 @@ fun Now(store: Store, onSettings: () -> Unit) {
         while (true) {
             val api = store.api()
             runCatching { api.screen() }
-                .onSuccess { screen = it; problem = null }
-                .onFailure { problem = saidPlainly(it) }
-            runCatching { api.health() }.onSuccess { health = it }
+                .onSuccess { Held.screen = it; Held.problem = null }
+                .onFailure { Held.problem = saidPlainly(it) }
+            runCatching { api.health() }.onSuccess { Held.health = it }
             delay(10_000)
         }
     }
