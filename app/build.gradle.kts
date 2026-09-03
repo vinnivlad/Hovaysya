@@ -34,7 +34,11 @@ val signingProperties = Properties().apply {
         file.inputStream().use { load(it) }
     }
 }
-val signable = signingProperties.getProperty("storeFile") != null
+// Complete, not merely present. A half-filled file would make this true and
+// then fail the build on a wrong password, which says nothing about the cause --
+// where an absent one says exactly what to do.
+val signable = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+    .all { !signingProperties.getProperty(it).isNullOrBlank() }
 
 android {
     namespace = "ua.hovaysya"
