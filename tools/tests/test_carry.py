@@ -356,3 +356,114 @@ def test_each_person_gets_their_own_answer(tmp_path):
     seed_from_log(session, tmp_path, skip, now)
     assert mine.tracker.episode is not None
     assert theirs.tracker.episode is None
+
+
+def _official(rows):
+    import sqlite3
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute("CREATE TABLE messages (channel TEXT, message_id INTEGER, "
+                 "ts INTEGER, text_norm TEXT, reply_to INTEGER)")
+    conn.executemany("INSERT INTO messages VALUES (?, ?, ?, ?, NULL)", rows)
+    return conn
+
+
+def test_a_restored_raid_survives_the_next_message(tmp_path):
+    """The bug in the first version of this, which the other tests could not
+    see because none of them handled a message afterwards.
+
+    `Tracker.before` closes an episode that has been silent for 45 minutes. The
+    episode was being stamped as last alive when the *raid* began, so on a raid
+    three hours old the very next message closed it again -- restoring the state
+    and then throwing it away in the same second.
+    """
+    from tools.live.run import handle, seed_from_log
+
+    now = 1_780_000_000
+    skip = _log(tmp_path, [
+        {"ts": now - 300, "who": "telegram_channel", "level": "alert",
+         "alarm": "shahed-jet", "sky": "alert", "since": now - 3 * 3600},
+    ])
+    session, who = _one_person_session()
+    seed_from_log(session, tmp_path, skip, now)
+    assert who.tracker.episode is not None
+
+    handle(session, "monitoring_kyiv", 9, now, "Шахед на Вишневе", False, now)
+
+    assert who.tracker.episode is not None, "closed as idle right after restoring"
+    assert who.tracker.episode.opened_at == now - 3 * 3600
+
+
+def test_an_unanswered_declaration_is_the_last_resort():
+    """When the log's newest rows say the sky is clear because the watcher spent
+    hours believing it, the truth is only in the declaring channel."""
+    from tools.live.run import seed_from_official
+
+    now = 1_780_000_000
+    conn = _official([
+        ("alarm_kyiv", 1, now - 5 * 3600, "🟢 м. Київ Відбій повітряної тривоги"),
+        ("alarm_kyiv", 2, now - 3 * 3600, "🚨 м. Київ Повітряна тривога"),
+    ])
+    session, who = _one_person_session()
+
+    assert seed_from_official(session.recipients, conn, now) == now - 3 * 3600
+    assert who.tracker.episode is not None
+    assert who.tracker.episode.official_alert is True
+    # Alive now, because the declaration is unanswered now.
+    assert who.tracker.episode.last_live == now
+
+
+def test_an_answered_declaration_opens_nothing():
+    from tools.live.run import seed_from_official
+
+    now = 1_780_000_000
+    conn = _official([
+        ("alarm_kyiv", 2, now - 3 * 3600, "🚨 м. Київ Повітряна тривога"),
+        ("alarm_kyiv", 3, now - 2 * 3600, "🟢 м. Київ Відбій повітряної тривоги"),
+    ])
+    session, who = _one_person_session()
+
+    assert seed_from_official(session.recipients, conn, now) is None
+    assert who.tracker.episode is None
+
+
+def test_a_partial_all_clear_is_not_an_answer():
+    """It lifts one class and leaves the raid running."""
+    from tools.live.run import seed_from_official
+
+    now = 1_780_000_000
+    conn = _official([
+        ("alarm_kyiv", 2, now - 3 * 3600, "🚨 м. Київ Повітряна тривога"),
+        ("alarm_kyiv", 3, now - 2 * 3600,
+         "🟡 м. Київ Відбій загрози застосування балістичного озброєння"),
+    ])
+    session, who = _one_person_session()
+
+    assert seed_from_official(session.recipients, conn, now) == now - 3 * 3600
+    assert who.tracker.episode is not None
+
+
+def test_somebody_who_registers_during_a_raid_is_told_there_is_one():
+    """His case, and the same bug in a different hat: "це ж і для нового
+    користувача є така бага. У нього немає історії".
+
+    A new recipient gets ninety minutes of replay, which on a raid three hours
+    old teaches them nothing -- and the first thing their phone would show is
+    "БЕЗ ТРИВОГ" during an air raid.
+    """
+    from tools.live.run import warm_one
+    from tools.policy.config import DEFAULTS, replace
+    from tools.policy.recipients import Recipient
+
+    now = 1_780_000_000
+    conn = _official([
+        ("alarm_kyiv", 2, now - 3 * 3600, "🚨 м. Київ Повітряна тривога"),
+    ])
+    newcomer = Recipient(name="оля", config=replace(DEFAULTS, home="Виноградар"))
+    newcomer.tracker.official_source = True
+
+    warm_one(newcomer, conn, now)
+
+    assert newcomer.tracker.episode is not None
+    assert newcomer.tracker.episode.official_alert is True

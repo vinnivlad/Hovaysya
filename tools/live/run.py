@@ -424,6 +424,64 @@ def recipients_signature(directory: Path) -> tuple:
         return ()
 
 
+def seed_from_official(recipients, conn, now: float) -> int | None:
+    """The declaring channel's last word, when nothing else is left to read.
+
+    Third and last, and it earns its place on the two cases the others cannot
+    cover, both of which he named. A watcher that has already spent hours
+    believing the sky is clear has a log whose newest rows say so -- the truth
+    is further up, and taking the newest row is the right rule, so the log
+    cannot rescue it. And a watcher
+    starting for the first time, or on a new box, has no log and no saved
+    episode at all; if a raid is on, it will not find out until the next
+    declaration, which for an alert already running is hours away.
+
+    One row, and not a reconstruction. `alarm_kyiv` does not report the alert
+    state, it *is* the alert state: it is the only source that declares rather
+    than describes, and an unanswered "Повітряна тривога" is the fact that a
+    raid is open. That is what makes this different from the window of chat he
+    rejected -- "тягнути історію щоб знайти старт тривоги це все одно не
+    варіант" is an argument against inferring, not against reading a
+    declaration.
+
+    Silent. A siren from three hours ago is not news.
+    """
+    from ..nlp import hints
+
+    channels = sorted(OFFICIAL_CHANNELS)
+    holes = ",".join("?" for _ in channels)
+    rows = conn.execute(
+        f"SELECT ts, text_norm FROM messages WHERE channel IN ({holes}) "
+        f"AND ts >= ? AND text_norm <> '' ORDER BY ts DESC LIMIT 40",
+        (*channels, int(now) - SEED_BACK_S))
+
+    for row in rows:
+        text = row["text_norm"]
+        state = hints.alert_state(text)
+        # A partial all-clear lifts one class and leaves the raid running, so it
+        # is not the last word about anything -- the same distinction that cost
+        # 46 minutes of blindness when chat chatter was allowed to close an
+        # episode.
+        if state == "clear" and not hints.partial_clear(text):
+            return None
+        if state != "alert":
+            continue
+        for who in recipients:
+            who.tracker.episode = Episode(
+                opened_at=row["ts"],
+                # Alive now, because the declaration is unanswered now. Stamping
+                # this with the declaration's own time would have the tracker
+                # close the episode as idle on the first message it sees.
+                last_live=int(now),
+                alert_announced=True,
+                alert_scope_known=True,
+                official_alert=True,
+            )
+            who.tracker.official_seen = row["ts"]
+        return row["ts"]
+    return None
+
+
 def _raid_since(row: dict) -> int | None:
     """When the raid this row was decided during began, if there was one.
 
@@ -513,7 +571,13 @@ def seed_from_log(session: Session, log_dir: Path, skip: Path,
             continue
         who.tracker.episode = Episode(
             opened_at=when,
-            last_live=when,
+            # The last row's time, not the raid's opening, and the difference is
+            # the whole thing working. `Tracker.before` closes an episode that
+            # has been silent for `idle_close_s` -- 45 minutes -- so an episode
+            # stamped as last alive when the raid began is closed by the very
+            # next message on a raid three hours old, which is exactly the case
+            # this exists for.
+            last_live=_stamp(row),
             # Announced, because it was: this row is the log of having said it.
             # Without this the next message in the raid announces the siren
             # again, hours late.
@@ -561,6 +625,18 @@ def warm_one(who, conn, now: float) -> tuple[int, list]:
         handle(solo, row["channel"], row["message_id"], row["ts"],
                row["text_norm"], row["reply_to"] is not None, now, warm=True)
         seen += 1
+    # And if ninety minutes of replay left them thinking the sky is clear, ask
+    # the declaring channel. His point, and it is the same bug wearing a
+    # different hat: "це ж і для нового користувача є така бага. У нього немає
+    # історії, як у того, що тільки оновлює застосунок."
+    #
+    # He suggested a bigger replay window for this case. One row of declaration
+    # does the same job strictly better: a window has to be guessed and 20% of
+    # raids outlive ninety minutes, so any window is a bet -- while the official
+    # channel's last unanswered word is the answer regardless of when the raid
+    # began, and costs one query per registration instead of hours of replay.
+    if who.tracker.episode is None:
+        seed_from_official([who], conn, now)
     return seen, solo.log
 
 
@@ -791,8 +867,12 @@ def main(argv: list[str] | None = None) -> int:
     # Before any of that: if the last thing the previous run decided was that a
     # raid was on, it still is. One row, read rather than derived.
     declared = seed_from_log(session, LOG_DIR, log_path, time.time())
+    source = "за логом"
+    if not declared:
+        declared = seed_from_official(session.recipients, conn, time.time())
+        source = "за офіційним каналом"
     if declared:
-        print(f"  за логом тривога триває з {kyiv_dt(declared):%H:%M} — "
+        print(f"  {source} тривога триває з {kyiv_dt(declared):%H:%M} — "
               "нічого не озвучую, вона вже йде")
     warmed = spoken = 0
     for row in conn.execute(
