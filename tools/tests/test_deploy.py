@@ -29,13 +29,24 @@ def _text(name: str) -> str:
 
 def test_the_scripts_are_executable_in_git():
     """Authored on Windows, where the mode bit is not tracked. Cloned onto the
-    server they came out 100644 and sudo said `command not found`."""
+    server they came out 100644 and sudo said `command not found`.
+
+    Every script, found rather than listed. This checked two names --
+    `install.sh` and `update.sh` -- so the four added after it were never
+    covered, and `update-proxy.sh` went in as 100644 for the third instance
+    of the same fault. A test that has to be edited when a file is added is
+    a test that will not be.
+    """
     out = subprocess.run(["git", "ls-files", "-s", "deploy/"],
                          capture_output=True, text=True,
                          cwd=DEPLOY.parent).stdout
     modes = {line.split("\t")[1]: line.split()[0] for line in out.splitlines()}
-    for script in ("deploy/install.sh", "deploy/update.sh"):
-        assert modes.get(script) == "100755", f"{script} is {modes.get(script)}"
+    scripts = {name: mode for name, mode in modes.items()
+               if name.endswith(".sh")}
+    assert len(scripts) >= 6, f"expected the deploy scripts, found {scripts}"
+    wrong = {name: mode for name, mode in scripts.items()
+             if mode != "100755"}
+    assert not wrong, wrong
 
 
 def test_the_update_cannot_be_stopped_by_a_privilege_it_does_not_have():

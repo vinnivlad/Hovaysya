@@ -34,6 +34,11 @@ if [ "${#units[@]}" -eq 0 ]; then
 fi
 
 before=$(git rev-parse HEAD)
+# Never a prompt. A timer has no terminal, so a git that decides to ask for a
+# password does not fail -- it waits, holding the repository lock, until somebody
+# notices days later. B spent a day in exactly that state for a different
+# reason, and this is one line against the same shape of silence.
+export GIT_TERMINAL_PROMPT=0
 git fetch --quiet origin main
 git checkout --quiet main
 git merge --quiet --ff-only origin/main

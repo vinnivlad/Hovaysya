@@ -42,6 +42,7 @@ sed "s/hovaysya\.duckdns\.org/$HOST/g; s/PRIVATE_IP/$TARGET/g" \
 install -d -o caddy -g caddy /var/log/caddy
 caddy validate --config /etc/caddy/Caddyfile >/dev/null
 
+echo "== таймер оновлення конфігу: hovaysya-proxy-update (кожні 10 хв)"
 echo "== порти 80 і 443"
 # Caddy needs 80 for the ACME challenge and 443 to serve. Oracle's security list
 # or an NSG has to allow them too, and that is a click in the dashboard -- iptables
@@ -90,6 +91,43 @@ UNIT
 	;;
 *) echo "  пропускаю: $HOST не з duckdns.org" ;;
 esac
+
+# The timer B never had, and its absence is why today's proxy fix sat on disk.
+#
+# A has had `hovaysya-update.timer` since the first deploy. B had nothing, so its
+# checkout moved only when somebody typed `git pull` -- and the moment that
+# started asking for a password, B silently stopped receiving anything at all.
+# The only symptom was the app still reading "HTTP 504", which points at
+# everything except the box that had stopped updating.
+#
+# Its own timer rather than `update.sh`, because a Caddyfile has to be
+# re-templated with the hostname and A's address before it means anything, and
+# `update.sh` only restarts units. The arguments are baked into the unit: they
+# are the two facts this machine knows and the repository must not.
+cat > /etc/systemd/system/hovaysya-proxy-update.service <<UNIT
+[Unit]
+Description=Pull and apply the Caddy config
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=$REPO
+ExecStart=$REPO/deploy/update-proxy.sh $HOST $TARGET
+UNIT
+cat > /etc/systemd/system/hovaysya-proxy-update.timer <<UNIT
+[Unit]
+Description=Pull and apply the Caddy config
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+
+[Install]
+WantedBy=timers.target
+UNIT
+chmod +x "$REPO/deploy/update-proxy.sh"
+systemctl daemon-reload
+systemctl enable --now hovaysya-proxy-update.timer
 
 systemctl enable caddy
 systemctl reload caddy 2>/dev/null || systemctl restart caddy
