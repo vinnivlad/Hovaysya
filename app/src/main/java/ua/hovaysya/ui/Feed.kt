@@ -68,7 +68,7 @@ fun HovaysyaFeed(store: Store) {
 
     Feed(
         title = "Ховайся",
-        subtitle = "київський час, найновіші внизу",
+        subtitle = "що казав Ховайся · найновіші внизу",
         empty = "За останні дні Ховайся нічого не казав.",
         problem = problem,
         isEmpty = rows.isEmpty(),
@@ -171,7 +171,7 @@ fun ChannelFeed(store: Store) {
 
     Feed(
         title = "Канали",
-        subtitle = "останні 30 хв за київським часом, найновіші внизу",
+        subtitle = "усі канали, останні 30 хв · найновіші внизу",
         empty = "За останні 30 хвилин тихо.",
         problem = problem,
         isEmpty = rows.isEmpty(),

@@ -77,13 +77,32 @@ fun Now(store: Store, onSettings: () -> Unit) {
             .fillMaxSize()
             .padding(24.dp),
     ) {
-        // The service on the left, the way in to settings on the right. One row,
-        // because both are things you glance at rather than read.
+        // The name, and what it is for. Nowhere inside the app said either --
+        // his observation, and the second half of it is the sharper one: the
+        // feed's tab is labelled "Ховайся" and, with the name established
+        // nowhere, that label read as a word chosen for no reason.
+        //
+        // Small and muted on purpose. The headline below is the only thing on
+        // this screen anybody needs at a glance, and a title competing with it
+        // would be a title winning an argument it should not be in.
         Row(
             Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
-            Box(Modifier.weight(1f)) { Status(health, problem) }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Ховайся",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    "Стежить за небом. Будить лише про твоє коло.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Status(health, problem)
+            }
             Box(
                 Modifier
                     .size(40.dp)
