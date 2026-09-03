@@ -61,6 +61,23 @@ class AlertService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_HUSH) {
+            // He swiped the permanent notification away, and that gesture now
+            // means "I have seen it": the siren stops and the line comes
+            // straight back. His design, and it is the right one -- the shade
+            // is where a hand already is at three in the morning, and swiping
+            // is the one gesture nobody has to find a button for.
+            //
+            // It also fixes something that read as a fault. Dismissing it used
+            // to leave the shade empty for up to thirty seconds, because the
+            // line is only redrawn when `/state` answers and that request is
+            // held open for `wait=30`. So the app's one permanently visible
+            // part could be missing for half a minute at a time, which looks
+            // exactly like a watcher that has died.
+            Siren.stop()
+            show(status(latest, latestProblem))
+            return START_STICKY
+        }
         if (worker == null) {
             worker = scope.launch { watch() }
         }
@@ -75,6 +92,12 @@ class AlertService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    // The last thing shown, so the line can be put back exactly as it was when
+    // it is dismissed. Redrawing it from nothing would replace a real state
+    // with "стежу" -- a downgrade dressed as a refresh.
+    private var latest: Screen? = null
+    private var latestProblem: String? = null
 
     /** One request open at a time, forever. */
     private suspend fun watch() {
@@ -98,13 +121,17 @@ class AlertService : Service() {
                 failures = 0
                 failingSince = null
                 version = screen.version
+                latest = screen
+                latestProblem = null
                 ringFor(screen)
                 show(status(screen, null))
             }.onFailure { problem ->
                 failures += 1
                 val began = failingSince ?: System.currentTimeMillis()
                 failingSince = began
-                show(status(null, trouble(problem, began)))
+                latest = null
+                latestProblem = trouble(problem, began)
+                show(status(null, latestProblem))
                 // Backing off, but never past a minute. A phone that has been
                 // offline for an hour still has to notice the moment it is not.
                 delay(minOf(60_000L, 2_000L * failures))
@@ -167,6 +194,12 @@ class AlertService : Service() {
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        // Fired when the line is swiped away. A different request code from
+        // `open`, or the two would be the same PendingIntent and tapping the
+        // notification would silence the siren instead of opening the app.
+        val hush = PendingIntent.getService(
+            this, 1, Intent(this, AlertService::class.java).setAction(ACTION_HUSH),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val body = when {
             problem != null -> problem
@@ -183,6 +216,7 @@ class AlertService : Service() {
             .setContentTitle(title(screen))
             .setContentText(body)
             .setContentIntent(open)
+            .setDeleteIntent(hush)
             .setOngoing(true)
             .setShowWhen(false)
             .setOnlyAlertOnce(true)
@@ -209,6 +243,9 @@ class AlertService : Service() {
     companion object {
         private const val NOTIFICATION_ID = 1
         private const val WAIT_S = 30
+
+        /** Swiping the permanent line away: stop the siren, put the line back. */
+        const val ACTION_HUSH = "ua.hovaysya.HUSH"
 
         /** Start it, from anywhere that is allowed to. */
         fun start(context: Context) {

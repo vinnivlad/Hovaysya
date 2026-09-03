@@ -31,6 +31,15 @@ object Siren {
 
     private const val RATE = 22_050
 
+    private val handler = Handler(Looper.getMainLooper())
+
+    // What is sounding, so it can be cut short. Guarded because the siren is
+    // started from the service's coroutine and stopped from a notification's
+    // delete intent on the main thread, and an `AudioTrack` released twice
+    // throws.
+    private var playing: AudioTrack? = null
+    private var release: Runnable? = null
+
     /**
      * The siren's range, and it is deliberately low: "можна тон сирени нижче?
      * Не схоже на те як в застосунку Тривога". A mechanical siren is a big slow
@@ -58,8 +67,18 @@ object Siren {
     private const val DRIVE = 2.6
     private const val PEAK = 0.95
 
-    /** The wail: 440 up to 880 and back, twice. A raid has begun. */
-    fun alert(volume: Float) = play(wail(cycles = 2, seconds = 2.0), volume)
+    /**
+     * The wail, five times up and down: ten seconds. A raid has begun.
+     *
+     * Long on purpose, and his: "хочу додати сценарій, що звук початку тривоги
+     * довший, нехай 10с". Four seconds was a notification chime -- it can end
+     * while somebody is still working out what woke them. Ten is long enough to
+     * be crossed a room for, which is the only length that matters at night.
+     *
+     * Long enough to need a way out, too, which is why `stop` exists and why
+     * dismissing the permanent notification calls it.
+     */
+    fun alert(volume: Float) = play(wail(cycles = 5, seconds = 2.0), volume)
 
     /**
      * The siren's voice, chopped to a vibration pattern. A threat, right here.
@@ -202,10 +221,37 @@ object Siren {
 
     // --- playing it ----------------------------------------------------------
 
+    /**
+     * Cut whatever is sounding, now.
+     *
+     * The way out of a ten-second siren. Safe to call when nothing is playing,
+     * because that is how it is usually called: dismissing the notification
+     * means "I have seen it" whether or not there is a noise to stop.
+     */
+    fun stop() {
+        synchronized(this) {
+            release?.let(handler::removeCallbacks)
+            release = null
+            playing?.let { track ->
+                runCatching {
+                    track.pause()
+                    track.flush()
+                    track.stop()
+                    track.release()
+                }
+            }
+            playing = null
+        }
+    }
+
     private fun play(samples: ShortArray, volume: Float) {
         if (volume <= 0f || samples.isEmpty()) {
             return
         }
+        // One siren at a time. Two overlapping wails are not twice as clear,
+        // and the second one would leave the first's track unreachable by
+        // `stop`.
+        stop()
         val track = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -228,11 +274,22 @@ object Siren {
         // AudioTrack holds a hardware buffer, and a leaked one is a phone that
         // stops being able to play the next alarm.
         val millis = (samples.size * 1000L / RATE) + 300
-        Handler(Looper.getMainLooper()).postDelayed({
-            runCatching {
-                track.stop()
-                track.release()
+        synchronized(this) {
+            playing = track
+            val done = Runnable {
+                synchronized(this) {
+                    if (playing === track) {
+                        runCatching {
+                            track.stop()
+                            track.release()
+                        }
+                        playing = null
+                        release = null
+                    }
+                }
             }
-        }, millis)
+            release = done
+            handler.postDelayed(done, millis)
+        }
     }
 }
