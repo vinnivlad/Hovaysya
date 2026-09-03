@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -70,12 +71,13 @@ fun HovaysyaFeed(store: Store) {
 
     Feed(
         title = "Ховайся",
-        subtitle = "рішення, найновіші вгорі",
+        subtitle = "найновіші внизу",
         empty = "За останні дні Ховайся нічого не казав.",
         problem = problem,
         isEmpty = rows.isEmpty(),
+        count = rows.size,
     ) {
-        items(rows.reversed(), key = { it.cursor }) { row ->
+        items(rows, key = { it.cursor }) { row ->
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -126,11 +128,15 @@ fun HovaysyaFeed(store: Store) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                // And the post it decided on, folded in below.
+                // And the post it decided on, whole. It used to be folded onto
+                // one line and cut at 180 characters -- "якщо вже показуємо
+                // повідомлення, то показуємо його повністю" -- and the fold cost
+                // as much as the cut: a channel writing two facts on two lines
+                // had them run together into one sentence about one thing.
                 row.text?.let {
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        it.lines().joinToString(" ").take(180),
+                        it,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -159,12 +165,13 @@ fun ChannelFeed(store: Store) {
 
     Feed(
         title = "Канали",
-        subtitle = "останні 30 хв, найновіші вгорі",
+        subtitle = "останні 30 хв, найновіші внизу",
         empty = "За останні 30 хвилин тихо.",
         problem = problem,
         isEmpty = rows.isEmpty(),
+        count = rows.size,
     ) {
-        items(rows.reversed(), key = { "${it.channel}/${it.id}" }) { post ->
+        items(rows, key = { "${it.channel}/${it.id}" }) { post ->
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -193,6 +200,20 @@ fun ChannelFeed(store: Store) {
     }
 }
 
+/**
+ * Oldest at the top, newest at the bottom, and the view sitting at the bottom --
+ * his: "зроби новіші повідомлення внизу, а не згори. Так в Телеграм, звичніше."
+ *
+ * Which is more than habit. A feed that grows downwards puts the newest line
+ * where the thumb already is and where the eye last was, and every message app
+ * anybody here uses has taught that for years. Reading a raid upwards means
+ * re-learning the direction of time at the moment least suited to it.
+ *
+ * The list follows new arrivals only when it is already at the bottom. Somebody
+ * scrolled up is reading something, and yanking them away from it to show a line
+ * they have not asked for is how a feed becomes unusable during exactly the hour
+ * it matters.
+ */
 @Composable
 private fun Feed(
     title: String,
@@ -200,8 +221,22 @@ private fun Feed(
     empty: String,
     problem: String?,
     isEmpty: Boolean,
+    count: Int,
     rows: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
+    val listState = rememberLazyListState()
+    var opened by remember { mutableStateOf(false) }
+    LaunchedEffect(count) {
+        if (count == 0) return@LaunchedEffect
+        val info = listState.layoutInfo
+        val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+        val wasAtBottom = lastVisible >= info.totalItemsCount - 2
+        if (!opened || wasAtBottom) {
+            listState.scrollToItem(count - 1)
+            opened = true
+        }
+    }
+
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(24.dp, 20.dp, 24.dp, 10.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge)
@@ -226,6 +261,7 @@ private fun Feed(
         } else {
             LazyColumn(
                 Modifier.fillMaxSize(),
+                state = listState,
                 verticalArrangement = Arrangement.Top,
                 content = rows,
             )

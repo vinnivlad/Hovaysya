@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -152,7 +153,22 @@ fun Now(store: Store) {
                 )
                 Spacer(Modifier.size(10.dp))
                 Column {
-                    Text(line.text, style = MaterialTheme.typography.bodyMedium)
+                    // The one place a cut belongs, and his: "обрізати має сенс
+                    // хіба на головному екрані в застосунку, де 1-3 останні
+                    // повідомлення внизу." By lines rather than by characters,
+                    // so it fits the space it actually has instead of a number
+                    // guessed against an unknown width.
+                    //
+                    // It will almost never fire. The median sentence is 19
+                    // characters and only 5 of 5895 run past 60 -- all of them
+                    // lists of oblasts, which is exactly the case where the foot
+                    // of this screen is the wrong place for twelve names.
+                    Text(
+                        line.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Text(
                         clock(line.at),
                         style = MaterialTheme.typography.labelSmall,

@@ -195,9 +195,17 @@ def format_message(utterance, obs, decision) -> str:
         tags.append("official")
     line = " · ".join(tags)
 
-    source = (obs.text or "").replace(chr(10), " / ")
-    if len(source) > 220:
-        source = source[:217] + "..."
+    # The whole post, and its own line breaks. It used to be folded onto one
+    # line and cut at 220 characters, which sounded modest and was not: the
+    # median post is 33 characters, but 1249 of 28116 run past 220, so 4.4% of
+    # everything arrived with its end missing. His rule, and it is the right one:
+    # "якщо вже показуємо повідомлення, то показуємо його повністю."
+    #
+    # The line breaks come back with it. "⚠️Реактивний шахед на Житомир. /
+    # 📡Кинджал поки не фіксуються." is two separate facts that the channel wrote
+    # as two lines, and running them together with a slash made them look like
+    # one sentence about one thing.
+    source = obs.text or ""
 
     # Both lines are labelled. Unlabelled, they read as one list, and he took
     # the rule name for the threat class — "це в тексті drone near me but not my
@@ -208,4 +216,26 @@ def format_message(utterance, obs, decision) -> str:
     parts.append("правило: " + decision.reason)
     if source and source not in utterance.text:
         parts.append("— " + source)
+        return _within_limit(parts)
+    return chr(10).join(parts)
+
+
+# Telegram refuses a message longer than this, and a refused message is a
+# notification that never arrives.
+TELEGRAM_LIMIT = 4096
+
+
+def _within_limit(parts: list[str]) -> str:
+    """Everything, unless Telegram itself will not carry it.
+
+    The only cap left, and it is the transport's rather than a guess at what is
+    worth reading. Two posts in 28116 reach it -- the longest is a 4053-character
+    Chernobyl anniversary text -- and for those the source is trimmed rather than
+    the sentence, because the sentence is the part that was decided.
+    """
+    body = chr(10).join(parts)
+    if len(body) <= TELEGRAM_LIMIT:
+        return body
+    room = TELEGRAM_LIMIT - (len(body) - len(parts[-1])) - 2
+    parts[-1] = parts[-1][:max(0, room)].rstrip() + "…"
     return chr(10).join(parts)

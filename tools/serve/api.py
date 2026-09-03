@@ -302,7 +302,16 @@ def decisions(log_dir: Path, who: str | None, since: str | None, limit: int,
                         "said": row.get("said"), "reason": row.get("reason"),
                         "text": row.get("text")})
     out.sort(key=lambda r: r["cursor"])
-    out = out[:limit]
+    # Which end of the window, and the answer depends on why you asked. With a
+    # cursor this is paging forward and the oldest unseen rows are the ones
+    # wanted. Without one it is a screen opening, and the oldest 60 lines of a
+    # three-day window is the least useful thing this could hand over -- which is
+    # what it did, invisibly, until the feed became chronological and was
+    # expected to end at now.
+    #
+    # `/messages?back=` answers a cold screen the same way, from the same
+    # reasoning: "коли я відкриваю скрін, я хочу бачити останні повідомлення".
+    out = out[:limit] if since else out[-limit:]
     return {"decisions": out, "next": out[-1]["cursor"] if out else (since or "")}
 
 

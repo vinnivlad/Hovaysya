@@ -628,3 +628,33 @@ def test_unregistering_without_settings_is_not_an_error(tmp_path):
     people.register(people.hashed("bare"), "хтось", tmp_path)
     assert people.unregister("bare", tmp_path) == "хтось"
     assert people.index(tmp_path) == {}
+def test_a_cold_screen_gets_the_newest_decisions_and_paging_gets_the_oldest(tmp_path):
+    """Two questions that look like one. Opening a feed asks "what happened
+    lately"; a cursor asks "what have I not seen yet", and they want opposite
+    ends of the same window.
+
+    It served the oldest either way, so an app opening on a three-day log met the
+    lines from three days ago. Invisible while the feed drew newest-first from
+    whatever it was given, and immediate once he asked for Telegram's order:
+    "зроби новіші повідомлення внизу, а не згори."
+    """
+    d = tmp_path / "live"
+    d.mkdir()
+    rows = [{"at": f"2026-09-0{1 + i // 10}T0{i % 10}:00:00+00:00",
+             "anchor": f"a/{i}", "who": "оля", "said": f"line {i}"}
+            for i in range(30)]
+    (d / "1.jsonl").write_text(
+        "".join(json.dumps(r, ensure_ascii=False) + chr(10) for r in rows),
+        encoding="utf-8")
+
+    fresh = decisions(d, "оля", None, 5, days=10 ** 6)["decisions"]
+    assert [r["said"] for r in fresh] == [f"line {i}" for i in range(25, 30)], fresh
+
+    # ...and from a cursor, what follows it rather than the last few. Four here
+    # and not five, because the window ends: the log has thirty lines.
+    page = decisions(d, "оля", fresh[0]["cursor"], 5, days=10 ** 6)["decisions"]
+    assert [r["said"] for r in page] == [f"line {i}" for i in range(26, 30)], page
+
+    # Ascending either way, so the app can append.
+    for served in (fresh, page):
+        assert served == sorted(served, key=lambda r: r["cursor"])
