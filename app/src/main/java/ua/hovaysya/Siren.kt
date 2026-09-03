@@ -8,6 +8,7 @@ import android.os.Looper
 import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.sin
+import kotlin.math.tanh
 
 /**
  * The sounds, generated rather than shipped.
@@ -29,6 +30,33 @@ import kotlin.math.sin
 object Siren {
 
     private const val RATE = 22_050
+
+    /**
+     * The siren's range, and it is deliberately low: "можна тон сирени нижче?
+     * Не схоже на те як в застосунку Тривога". A mechanical siren is a big slow
+     * thing and it sounds like one; 440 to 880 was a smoke detector.
+     */
+    private const val LOW = 250.0
+    private const val HIGH = 500.0
+
+    /**
+     * How hard the sine is driven into saturation, and how close to full scale
+     * it lands. Both exist because he asked for more volume than there was:
+     * "максимальну гучність треба збільшити".
+     *
+     * A pure sine is the quietest waveform there is for a given peak -- all of
+     * its energy sits at one frequency, and the peak is what runs out of
+     * headroom first. Saturating it flattens the tops, which raises the average
+     * power a long way without raising the peak at all, and the harmonics it
+     * grows land at 750, 1250, 1750 Hz -- exactly where a phone speaker is
+     * efficient and where a 250 Hz fundamental is not. So the same change that
+     * makes it lower is what keeps it from getting quieter.
+     *
+     * Which is also the honest waveform. A siren is chopped airflow, not a tuning
+     * fork; the grit is the instrument rather than distortion of it.
+     */
+    private const val DRIVE = 2.6
+    private const val PEAK = 0.95
 
     /** The wail: 440 up to 880 and back, twice. A raid has begun. */
     fun alert(volume: Float) = play(wail(cycles = 2, seconds = 2.0), volume)
@@ -84,9 +112,8 @@ object Siren {
             val within = (i % period) / period
             // Up for the first half of a cycle, down for the second.
             val sweep = if (within < 0.5) within * 2 else (1 - within) * 2
-            val frequency = 440.0 + 440.0 * sweep
-            phase += 2 * PI * frequency / RATE
-            out[i] = (sin(phase) * Short.MAX_VALUE * 0.6).toInt().toShort()
+            phase += 2 * PI * (LOW + (HIGH - LOW) * sweep) / RATE
+            out[i] = voice(phase)
         }
         return fade(out)
     }
@@ -116,11 +143,20 @@ object Siren {
         var phase = 0.0
         for (i in out.indices) {
             val through = i.toDouble() / out.size
-            phase += 2 * PI * (440.0 + 440.0 * through) / RATE
-            out[i] = (sin(phase) * Short.MAX_VALUE * 0.6).toInt().toShort()
+            phase += 2 * PI * (LOW + (HIGH - LOW) * through) / RATE
+            out[i] = voice(phase)
         }
         return fade(out)
     }
+
+    /**
+     * One sample of the siren, saturated. `tanh` is divided by its own value at
+     * the peak so the result still reaches full scale rather than being both
+     * driven and quieter.
+     */
+    private fun voice(phase: Double): Short =
+        (tanh(sin(phase) * DRIVE) / tanh(DRIVE) * Short.MAX_VALUE * PEAK)
+            .toInt().toShort()
 
     private fun pip(): ShortArray {
         val out = ShortArray((RATE * 0.35).toInt())
@@ -129,7 +165,10 @@ object Siren {
             // A struck bell rather than a held note: mostly gone in 70 ms.
             val envelope = exp(-t * 14)
             val wave = sin(2 * PI * 988.0 * t) + 0.35 * sin(2 * PI * 1976.0 * t)
-            out[i] = (wave * envelope * Short.MAX_VALUE * 0.45).toInt().toShort()
+            // 1.35 is the sum of the two partials at their worst, so dividing
+            // by it is what lets the rest of the line be the peak we want.
+            out[i] = (wave / 1.35 * envelope * Short.MAX_VALUE * PEAK)
+                .toInt().toShort()
         }
         return fade(out)
     }

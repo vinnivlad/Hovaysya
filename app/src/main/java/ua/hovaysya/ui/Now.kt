@@ -81,9 +81,11 @@ fun Now(store: Store, onSettings: () -> Unit) {
         // feed's tab is labelled "Ховайся" and, with the name established
         // nowhere, that label read as a word chosen for no reason.
         //
-        // Small and muted on purpose. The headline below is the only thing on
-        // this screen anybody needs at a glance, and a title competing with it
-        // would be a title winning an argument it should not be in.
+        // Quiet, but not as quiet as it was. The line used to add "Будить лише
+        // про твоє коло" in the smallest type there is, which is a promise
+        // nobody could read making a claim the app has to earn anyway; he asked
+        // for it gone and for the rest a little larger. The headline below is
+        // still the only thing here anybody needs at a glance.
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top,
@@ -95,8 +97,8 @@ fun Now(store: Store, onSettings: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    "Стежить за небом. Будить лише про твоє коло.",
-                    style = MaterialTheme.typography.labelSmall,
+                    "Стежить за небом.",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
