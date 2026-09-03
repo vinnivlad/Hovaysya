@@ -23,6 +23,16 @@ trade for a service whose whole job is to be running at 3 a.m.
 
     sudo apt update && sudo apt install -y git python3
     git clone https://github.com/vinnivlad/Hovaysya.git ~/hovaysya
+
+**Exactly that URL.** A `username@` in front of `github.com` obliges git to ask
+for that user's password on every fetch, even though the repository is public and
+no authentication is wanted -- and an update timer, having no terminal, does not
+fail on that but waits, holding the repository lock, until somebody notices days
+later. B spent two days in that state.
+
+Operating both machines -- what runs where, deploying, rebuilding from nothing --
+is in [docs/servers.md](../docs/servers.md). Addresses and keys are not: they are
+in `data/runbook.md`, which is not in git.
     cd ~/hovaysya && sudo ./deploy/install.sh
 
 Then place the secrets, which are gitignored and never travel through the repo:

@@ -22,9 +22,11 @@ beeping, which is exactly what a quiet night looks like.
 A healthy run says nothing at all. It runs every day, and a message every day is
 a message he learns to ignore.
 
-Usage:
-    python -m tools.pull
-    python -m tools.pull --host 130.110.250.164 --to D:/Work/Hovaysya-data
+Usage. `--host` is required and has no default -- the address belongs in
+`data/runbook.md`, which is not in git, and it was in this docstring for a week
+before a test noticed:
+
+    python -m tools.pull --host <the instance> --to D:/Work/Hovaysya-data
 """
 
 from __future__ import annotations

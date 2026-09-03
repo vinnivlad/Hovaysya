@@ -183,3 +183,51 @@ def test_every_compose_symbol_the_app_uses_is_imported():
                 offenders.append(
                     f"{path.relative_to(REPO_ROOT)}: import {full}")
     assert not offenders, offenders
+# Addresses that say nothing about anybody: loopback, the private ranges, the
+# emulator's route to its host, and the two wildcards.
+ALLOWED_ADDRESSES = ("127.", "10.", "192.168.", "0.0.0.0", "255.255.255.255",
+                     *[f"172.{n}." for n in range(16, 32)])
+
+
+def test_nothing_tracked_carries_an_address_or_a_key():
+    """The repository is public and its history is not reversible.
+
+    That is the whole reason `data/runbook.md` sits outside git -- and the reason
+    is only as good as the discipline. Splitting the runbook into `docs/servers.md`
+    moved two hundred lines of procedure into a public file by hand, and a hand
+    is exactly what puts a public IP in the one paragraph nobody re-reads.
+
+    So this reads every tracked text file. A private address is fine: `10.0.0.75`
+    is meaningless without a way in, and naming it is what makes the two-box
+    arrangement explicable. A routable one is not, and neither is a key path or a
+    fingerprint.
+    """
+    import re
+    import subprocess
+
+    tracked = subprocess.run(
+        ["git", "ls-files"], cwd=REPO_ROOT,
+        capture_output=True, text=True, check=True).stdout.split()
+
+    address = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+    keyish = re.compile(
+        r"(?:BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY"
+        r"|SHA256:[A-Za-z0-9+/]{20,}"
+        r"|[/\\]\.ssh[/\\])")
+
+    offenders = []
+    for name in tracked:
+        path = REPO_ROOT / name
+        if path.suffix.lower() in (".png", ".jpg", ".zip", ".jar", ".keystore"):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for number, line in enumerate(text.splitlines(), start=1):
+            for found in address.findall(line):
+                if not found.startswith(ALLOWED_ADDRESSES):
+                    offenders.append(f"{name}:{number} address {found}")
+            if keyish.search(line):
+                offenders.append(f"{name}:{number} key material or path")
+    assert not offenders, offenders
