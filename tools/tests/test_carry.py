@@ -176,3 +176,183 @@ def test_writing_the_screen_also_writes_the_memory(tmp_path, monkeypatch):
     assert carry.load(where, after, after.tracker, now) is True
     assert after.tracker.episode is not None
     assert after.tracker.episode.official_alert is True
+
+def _log(directory, rows):
+    """A previous run's decision log, and the path of the current one."""
+    import json
+    from datetime import datetime, timezone
+
+    directory.mkdir(parents=True, exist_ok=True)
+    with (directory / "old.jsonl").open("w", encoding="utf-8") as handle:
+        for row in rows:
+            row = dict(row)
+            row["at"] = datetime.fromtimestamp(
+                row.pop("ts"), tz=timezone.utc).isoformat()
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return directory / "new.jsonl"
+
+
+def _one_person_session():
+    from tools.live.run import Session
+    from tools.policy.config import DEFAULTS, replace
+    from tools.policy.recipients import TELEGRAM_NAME, Recipient
+
+    who = Recipient(name=TELEGRAM_NAME, config=replace(DEFAULTS, home="Жуляни"))
+    who.tracker.official_source = True
+    return Session(recipients=[who], tracker=who.tracker,
+                   announcer=who.announcer), who
+
+
+def test_the_last_decision_says_a_raid_is_on_so_it_is(tmp_path):
+    """His answer, after two more elaborate ones of mine had failed: "є останнє
+    повідомлення, там live-threat shahed-jet. Що тобі ще потрібно?"
+
+    Nothing. The log is append-only, every row carries the state, and a restart
+    that reads it knows what the previous run knew.
+    """
+    from tools.live.run import seed_from_log
+
+    now = 1_780_000_000
+    skip = _log(tmp_path, [
+        {"ts": now - 3 * 3600, "who": "telegram_channel", "level": "alert",
+         "alarm": "alert", "sky": "alert", "since": now - 3 * 3600},
+        {"ts": now - 300, "who": "telegram_channel", "level": "alert",
+         "alarm": "shahed-jet", "sky": "alert", "since": now - 3 * 3600},
+    ])
+    session, who = _one_person_session()
+
+    assert seed_from_log(session, tmp_path, skip, now) == now - 3 * 3600
+    assert who.tracker.episode is not None
+    assert who.tracker.episode.official_alert is True
+    assert who.tracker.episode.opened_at == now - 3 * 3600
+
+
+def test_reading_it_back_wakes_nobody(tmp_path):
+    """A siren from three hours ago is not news, and waking somebody to tell
+    them about it would be its own bug. The seed decides nothing and says
+    nothing -- it only remembers."""
+    from tools.live.run import seed_from_log
+
+    now = 1_780_000_000
+    skip = _log(tmp_path, [
+        {"ts": now - 300, "who": "telegram_channel", "level": "alert",
+         "alarm": "shahed-jet", "sky": "alert", "since": now - 3 * 3600},
+    ])
+    session, _ = _one_person_session()
+
+    seed_from_log(session, tmp_path, skip, now)
+    assert session.log == []
+
+
+def test_a_clear_sky_stays_clear(tmp_path):
+    from tools.live.run import seed_from_log
+
+    now = 1_780_000_000
+    skip = _log(tmp_path, [
+        {"ts": now - 300, "who": "telegram_channel", "level": "quiet",
+         "alarm": None, "sky": "quiet", "since": None},
+    ])
+    session, who = _one_person_session()
+
+    assert seed_from_log(session, tmp_path, skip, now) is None
+    assert who.tracker.episode is None
+
+
+def test_watching_is_not_a_raid(tmp_path):
+    """The 2.1% the measurement found: missiles over the city before the siren.
+    `level` says "alert" there because it is worth waking somebody; the sky is
+    `watching`, and the screen must not upgrade it to a declared raid."""
+    from tools.live.run import seed_from_log
+
+    now = 1_780_000_000
+    skip = _log(tmp_path, [
+        {"ts": now - 300, "who": "telegram_channel", "level": "alert",
+         "alarm": "cruise", "sky": "watching", "since": now - 600},
+    ])
+    session, who = _one_person_session()
+
+    assert seed_from_log(session, tmp_path, skip, now) is None
+    assert who.tracker.episode is None
+
+
+def test_a_log_from_before_the_field_existed_still_rescues_the_raid(tmp_path):
+    """The fallback, and the reason it is worth having: the log that has to
+    rescue the raid that prompted all of this was written by the version that
+    did not know to record the sky."""
+    from tools.live.run import seed_from_log
+
+    now = 1_780_000_000
+    skip = _log(tmp_path, [
+        {"ts": now - 300, "who": "telegram_channel", "level": "alert",
+         "alarm": "shahed-jet"},
+    ])
+    session, who = _one_person_session()
+
+    assert seed_from_log(session, tmp_path, skip, now) == now - 300
+    assert who.tracker.episode is not None
+
+
+def test_an_old_log_ending_in_an_all_clear_opens_nothing(tmp_path):
+    """An all-clear is `level="alert"` with `alarm="clear"`, because saying it
+    out loud is an audible event. Reading the level without the alarm would
+    reopen a raid on the message that ended it."""
+    from tools.live.run import seed_from_log
+
+    now = 1_780_000_000
+    skip = _log(tmp_path, [
+        {"ts": now - 300, "who": "telegram_channel", "level": "alert",
+         "alarm": "clear"},
+    ])
+    session, who = _one_person_session()
+
+    assert seed_from_log(session, tmp_path, skip, now) is None
+    assert who.tracker.episode is None
+
+
+def test_a_log_from_yesterday_is_not_believed(tmp_path):
+    from tools.live.run import SEED_BACK_S, seed_from_log
+
+    now = 1_780_000_000
+    skip = _log(tmp_path, [
+        {"ts": now - SEED_BACK_S - 600, "who": "telegram_channel",
+         "level": "alert", "alarm": "alert", "sky": "alert",
+         "since": now - SEED_BACK_S - 600},
+    ])
+    session, who = _one_person_session()
+
+    assert seed_from_log(session, tmp_path, skip, now) is None
+    assert who.tracker.episode is None
+
+
+def test_no_previous_log_is_not_an_error(tmp_path):
+    from tools.live.run import seed_from_log
+
+    session, who = _one_person_session()
+    assert seed_from_log(session, tmp_path, tmp_path / "new.jsonl",
+                         1_780_000_000) is None
+    assert who.tracker.episode is None
+
+
+def test_each_person_gets_their_own_answer(tmp_path):
+    """A raid over one recipient's ring is not one over another's, and the log
+    already records the decision per person -- which is why it is read per
+    person rather than by taking the last row."""
+    from tools.live.run import Session, seed_from_log
+    from tools.policy.config import DEFAULTS, replace
+    from tools.policy.recipients import TELEGRAM_NAME, Recipient
+
+    now = 1_780_000_000
+    skip = _log(tmp_path, [
+        {"ts": now - 300, "who": TELEGRAM_NAME, "level": "alert",
+         "alarm": "shahed-jet", "sky": "alert", "since": now - 3 * 3600},
+        {"ts": now - 300, "who": "оля", "level": "quiet", "alarm": None,
+         "sky": "quiet", "since": None},
+    ])
+    mine = Recipient(name=TELEGRAM_NAME, config=replace(DEFAULTS, home="Жуляни"))
+    theirs = Recipient(name="оля", config=replace(DEFAULTS, home="Виноградар"))
+    session = Session(recipients=[mine, theirs], tracker=mine.tracker,
+                      announcer=mine.announcer)
+
+    seed_from_log(session, tmp_path, skip, now)
+    assert mine.tracker.episode is not None
+    assert theirs.tracker.episode is None

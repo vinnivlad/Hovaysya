@@ -52,7 +52,8 @@ from ..labeler.build import kyiv_dt
 from ..policy import carry
 from ..policy.announce import Announcer
 from ..policy.config import CONFIG_PATH, changed_from_default, load as load_config
-from ..policy.episodes import OFFICIAL_CHANNELS, Tracker, observe, read
+from ..policy.episodes import (OFFICIAL_CHANNELS, Episode, Tracker, observe,
+                               read)
 from ..policy.recipients import TELEGRAM_NAME, decide_all, from_dir
 from ..policy.rules import decide
 from .notify import Notifier
@@ -122,6 +123,13 @@ SLEEP_GAP_S = 120.0
 # number without fixing anything, which is his objection and the right one:
 # "тягнути історію щоб знайти старт тривоги це все одно не варіант".
 WARM_WINDOW_S = 90 * 60
+
+# How old the last logged decision may be and still be believed.
+#
+# Twelve hours is a bound, not an estimate: if nothing has been decided for
+# longer than that the process was not merely restarted, and holding a screen
+# red on that basis is worse than saying nothing.
+SEED_BACK_S = 12 * 3600
 
 # ...but a message that arrived seconds ago is not backlog, it is now. An
 # all-clear was published at 15:36:57 and the watcher restarted at 15:37:01,
@@ -210,6 +218,16 @@ def handle(session: Session, channel: str, message_id: int, ts: int, text: str,
              utterance, now, warm)
 
 
+def _sky(episode) -> dict:
+    """Where the alert state goes in a log row, in `/state`'s own vocabulary."""
+    from ..policy.status import ALERT, QUIET, WATCHING
+
+    if episode is None:
+        return {"sky": QUIET, "since": None}
+    return {"sky": ALERT if episode.official_alert else WATCHING,
+            "since": episode.opened_at}
+
+
 def _say(session: Session, who, channel: str, message_id: int, ts: int,
          text: str, obs, decision, utterance, now: float, warm: bool) -> None:
     """Everything one recipient's decision produces: numbers, log, phone, line."""
@@ -236,6 +254,14 @@ def _say(session: Session, who, channel: str, message_id: int, ts: int,
         # registered, so everyone was served the watcher's own decisions.
         "who": who.name,
         "warm": warm or None,
+        # The state of the sky as of this message, in the same three words
+        # `/state` uses. Written because he doubted the alternative and was
+        # right to: reading it back out of `level` works 97.9% of the time --
+        # measured, 1906 of 1947 corpus rows -- and the 2.1% are missiles over
+        # the city before the siren, where the level says "alert" and the sky is
+        # only "watching". A fact this process already knows should not be
+        # recovered at 98% from a field that means something else.
+        **_sky(who.tracker.episode),
     })
 
     if warm:
@@ -396,6 +422,107 @@ def recipients_signature(directory: Path) -> tuple:
             for e in os.scandir(directory) if e.name.endswith(".json")))
     except OSError:
         return ()
+
+
+def _raid_since(row: dict) -> int | None:
+    """When the raid this row was decided during began, if there was one.
+
+    Two readings, and which one applies says how old the log is. `sky` is
+    written now and means exactly this; before it existed the only evidence was
+    the decision's own level, which is a statement about how loud to be and only
+    coincides with the alert state -- 97.9% of the time, measured. The fallback
+    is here because the log that has to rescue the raid that prompted all this
+    was written by the version that did not know to record it.
+
+    An all-clear is `level="alert"` with `alarm="clear"`, since saying it out
+    loud is an audible event. Reading the level without the alarm would reopen a
+    raid on the very message that ended it -- the same inversion that once had
+    the app ringing a siren to announce an all-clear.
+    """
+    from ..policy.status import ALERT
+
+    if "sky" in row:
+        if row["sky"] != ALERT:
+            return None
+        since = row.get("since")
+        return int(since) if since else _stamp(row)
+    if row.get("level") != "alert":
+        return None
+    if (row.get("alarm") or "").startswith("clear"):
+        return None
+    return _stamp(row)
+
+
+def _stamp(row: dict) -> int:
+    return int(datetime.fromisoformat(row["at"]).timestamp())
+
+
+def seed_from_log(session: Session, log_dir: Path, skip: Path,
+                  now: float) -> int | None:
+    """Believe the last thing we decided until something says otherwise.
+
+    His answer, after I had built two more elaborate ones and both were wrong:
+    "є останнє повідомлення, там live-threat shahed-jet. Що тобі ще потрібно?"
+    Nothing. Every decision is logged with the level it produced, the log is
+    append-only, and a row saying `alert` is the statement that a raid was on.
+    There is no reconstruction to do.
+
+    It has to be the log and not the state file, which is the part I had not
+    thought through. Both are written every cycle, but `status.write` *replaces*
+    its file -- so the moment a restarted watcher believes the sky is clear, the
+    only copy of the truth is overwritten. The log is the one thing that cannot
+    be overwritten by being wrong, and that is exactly why it is the place to
+    look.
+
+    Both of my earlier attempts failed for the same reason, which is worth
+    keeping written down: they treated the state as something to derive -- once
+    from ninety minutes of every channel, once from the official channel's own
+    declarations. The second even worked, right up until the tracker closed the
+    episode it had just opened for being three hours idle, because replaying two
+    official messages leaves no sign of life between them. Derivation kept
+    needing more machinery to hold up. Reading does not.
+
+    Silent, and it stays silent: nothing here announces, because a siren from
+    three hours ago is not news.
+    """
+    logs = sorted((path for path in log_dir.glob("*.jsonl") if path != skip),
+                  key=lambda path: path.stat().st_mtime, reverse=True)
+    if not logs:
+        return None
+
+    # The newest decision per person. Per person because they can differ: a raid
+    # over one recipient's ring is not one over another's.
+    last: dict[str, dict] = {}
+    try:
+        for line in logs[0].read_text(encoding="utf-8").splitlines():
+            row = json.loads(line)
+            if row.get("level") or row.get("sky"):
+                last[row.get("who") or ""] = row
+    except (OSError, ValueError):
+        return None
+
+    opened = None
+    for who in session.recipients:
+        row = last.get(who.name)
+        if row is None:
+            continue
+        when = _raid_since(row)
+        if when is None:
+            continue
+        if now - when > SEED_BACK_S:
+            continue
+        who.tracker.episode = Episode(
+            opened_at=when,
+            last_live=when,
+            # Announced, because it was: this row is the log of having said it.
+            # Without this the next message in the raid announces the siren
+            # again, hours late.
+            alert_announced=True,
+            alert_scope_known=True,
+            official_alert=True,
+        )
+        opened = when if opened is None else min(opened, when)
+    return opened
 
 
 def warm_one(who, conn, now: float) -> tuple[int, list]:
@@ -660,6 +787,13 @@ def main(argv: list[str] | None = None) -> int:
     warm_from = int(time.time()) - WARM_WINDOW_S
     fresh_from = time.time() - FRESH_ON_RESTART_S
     said = already_said(LOG_DIR, log_path)
+
+    # Before any of that: if the last thing the previous run decided was that a
+    # raid was on, it still is. One row, read rather than derived.
+    declared = seed_from_log(session, LOG_DIR, log_path, time.time())
+    if declared:
+        print(f"  за логом тривога триває з {kyiv_dt(declared):%H:%M} — "
+              "нічого не озвучую, вона вже йде")
     warmed = spoken = 0
     for row in conn.execute(
             "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
