@@ -71,7 +71,7 @@ fun HovaysyaFeed(store: Store) {
 
     Feed(
         title = "Ховайся",
-        subtitle = "найновіші внизу",
+        subtitle = "київський час, найновіші внизу",
         empty = "За останні дні Ховайся нічого не казав.",
         problem = problem,
         isEmpty = rows.isEmpty(),
@@ -91,10 +91,13 @@ fun HovaysyaFeed(store: Store) {
                         Modifier
                             .width(3.dp)
                             .height(16.dp)
-                            .background(
-                                if (row.level == "alert") colourFor(Screen.ALERT)
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            .background(markFor(
+                                loud = row.level == "alert"
+                                    && !isClear(row.alarm)
+                                    && !isPartial(row.alarm),
+                                clear = isClear(row.alarm),
+                                partial = isPartial(row.alarm),
+                            ))
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
@@ -118,16 +121,12 @@ fun HovaysyaFeed(store: Store) {
                     fontWeight = if (row.level == "alert") FontWeight.SemiBold
                                  else null,
                 )
-                // The reason, because a decision nobody can question is not one
-                // that can be corrected -- which is how every rule here got fixed.
-                row.reason?.let {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                // The rule name is not shown -- his call, and he is right that it
+                // is not for this screen: "в застосунку в чаті ховайся не виводь
+                // назву правила". `too-far: oblast, not the city` is written for
+                // whoever is arguing with the policy, and it still travels in
+                // `/decisions` for exactly that. A feed is read by somebody
+                // asking what happened.
                 // And the post it decided on, whole. It used to be folded onto
                 // one line and cut at 180 characters -- "якщо вже показуємо
                 // повідомлення, то показуємо його повністю" -- and the fold cost
@@ -145,6 +144,16 @@ fun HovaysyaFeed(store: Store) {
         }
     }
 }
+
+// The field, never the sentence. A word in a sentence is a guess about a
+// wording that can change; `alarm` is the contract -- his call, and the earlier
+// version of this file had exactly the cleverness he ruled out.
+//
+// Full apart from partial, too: "Відбій по балістиці" lifts one class while the
+// alert continues, so it earns the amber mark and not the green one.
+private fun isClear(alarm: String?): Boolean = alarm == "clear"
+
+private fun isPartial(alarm: String?): Boolean = alarm == "clear-partial"
 
 /** Every channel, merged into one stream. */
 @Composable
@@ -165,7 +174,7 @@ fun ChannelFeed(store: Store) {
 
     Feed(
         title = "Канали",
-        subtitle = "останні 30 хв, найновіші внизу",
+        subtitle = "останні 30 хв за київським часом, найновіші внизу",
         empty = "За останні 30 хвилин тихо.",
         problem = problem,
         isEmpty = rows.isEmpty(),

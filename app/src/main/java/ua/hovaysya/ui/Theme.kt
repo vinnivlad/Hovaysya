@@ -114,3 +114,37 @@ fun colourFor(state: String?): Color = when (state) {
     Screen.QUIET -> Calm
     else -> Muted
 }
+
+/**
+ * The headline's colour, which is a coarser question than the state.
+ *
+ * His: "на головному екрані Стежу значить немає тривоги? Так і пиши БЕЗ ТРИВОГ
+ * зеленим." The top line answers one thing -- is there an alert -- and that has
+ * two answers, so `watching` is green like `quiet` and the amber lives on the
+ * threat line underneath instead. Nothing is lost: what is being tracked is
+ * still named, in the colour that says it is being tracked.
+ */
+@Composable
+fun headlineColour(state: String?): Color = when (state) {
+    Screen.ALERT -> Danger
+    Screen.WATCHING, Screen.QUIET -> Calm
+    else -> Muted
+}
+
+/**
+ * Green for the end of a raid, amber for one class of it, red for a raid,
+ * muted for a status line.
+ *
+ * The amber is the one worth arguing about, and he raised it: a partial
+ * all-clear -- "Відбій по балістиці" -- is good news that does not end
+ * anything. Green would say it was over while a drone was still up; red would
+ * say the lifting was itself a danger. It is the middle, and this is the only
+ * mark in the set that means "less than before".
+ */
+@Composable
+fun markFor(loud: Boolean, clear: Boolean, partial: Boolean = false): Color = when {
+    clear -> Calm
+    partial -> Watch
+    loud -> Danger
+    else -> Muted
+}

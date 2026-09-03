@@ -68,7 +68,7 @@ fun Now(store: Store) {
     }
 
     val state = screen?.state
-    val accent = colourFor(state)
+    val accent = headlineColour(state)
 
     Column(
         Modifier
@@ -90,12 +90,15 @@ fun Now(store: Store) {
             // The maximum threat still in the air. Under the headline rather
             // than in it, because "ТРИВОГА" and "балістика" are two facts and
             // one can change without the other.
+            // The threat keeps the state's own colour, so "БЕЗ ТРИВОГ" above a
+            // тracked drone still reads as something being watched rather than
+            // as nothing happening.
             screen?.top?.let { top ->
                 Spacer(Modifier.height(6.dp))
                 Text(
                     top.word.replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = colourFor(state),
                 )
             }
 
@@ -146,10 +149,9 @@ fun Now(store: Store) {
                     Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(
-                            if (line.level == "alert") colourFor(Screen.ALERT)
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        .background(markFor(loud = line.isLoud,
+                                             clear = line.isClear,
+                                             partial = line.isPartial))
                 )
                 Spacer(Modifier.size(10.dp))
                 Column {
@@ -169,8 +171,14 @@ fun Now(store: Store) {
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    // How long the alert ran, beside the line that ended it.
+                    // It is the one thing worth still knowing once a raid is
+                    // over, and the reason the closing line outlives the rest.
+                    val lasted = screen?.ended
+                        ?.takeIf { line.isClear }
+                        ?.let { " · тривало " + spell(it.lastedS) }
                     Text(
-                        clock(line.at),
+                        clock(line.at) + (lasted ?: ""),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -220,33 +228,79 @@ private fun Status(health: Health?, problem: String?) {
     }
 }
 
+/**
+ * One question, two answers. "СТЕЖУ" was answering a different question than the
+ * one somebody opens this screen to ask, and he said so: "Стежу значить немає
+ * тривоги? Так і пиши БЕЗ ТРИВОГ."
+ *
+ * `watching` and `quiet` therefore read the same here, and they are not the same
+ * underneath -- the difference shows as the threat named below, which is where
+ * it belongs. What is never collapsed is not knowing: an app that reports calm
+ * because it failed to ask is worse than one that admits it.
+ */
 private fun headline(screen: Screen?, problem: String?): String = when {
     screen == null && problem != null -> "НЕ ЗНАЮ"
     screen == null -> "…"
     !screen.known -> "НЕ ЗНАЮ"
     screen.state == Screen.ALERT -> "ТРИВОГА"
-    screen.state == Screen.WATCHING -> "СТЕЖУ"
-    else -> "БЕЗ ЗАГРОЗ"
+    else -> "БЕЗ ТРИВОГ"
 }
 
 /**
- * "2026-09-02T21:14:07+00:00" -> "00:14" in Kyiv.
+ * Kyiv time, always, whatever the phone is set to.
  *
- * The watcher stamps its log in **UTC**, so cutting the characters out of the
- * string -- which is what this did first -- would put every line three hours
- * into the past. On the one screen whose job is to say what is happening now,
- * that is the worst kind of wrong: quietly plausible.
+ * Not the device zone, and this is the second thing that number taught. The
+ * watcher stamps its log in UTC, so slicing the characters out of the string --
+ * which is what this did first -- put every line three hours into the past. That
+ * was fixed by converting properly, into `systemDefault()`, and the emulator
+ * runs in UTC: the feed showed 06:28 while Kyiv said 09:28, and it read exactly
+ * like a service that had stopped three hours ago.
+ *
+ * So the zone is the domain's rather than the device's. These are Kyiv alerts,
+ * the channels write Kyiv time, the person is in Kyiv, and a phone in the wrong
+ * zone -- travelling, or an emulator out of the box -- must not be able to
+ * make this screen lie about when something happened. There is nothing here a
+ * device setting should be allowed to move.
  */
+/**
+ * And it has to be looked up defensively. "Europe/Kyiv" became the canonical
+ * name only in tzdata 2022b; on a device whose zone database predates that --
+ * and minSdk here is Android 8 -- the name is "Europe/Kiev" and `ZoneId.of`
+ * throws rather than returning anything. A crash on the screen that says whether
+ * to take cover is not a trade worth making for a spelling.
+ *
+ * The fixed offset is the last resort and is knowingly wrong for half the year,
+ * because Ukraine keeps summer time. It is there so the worst case is a clock an
+ * hour out rather than no screen at all.
+ */
+private val KYIV: ZoneId = sequenceOf("Europe/Kyiv", "Europe/Kiev")
+    .mapNotNull { runCatching { ZoneId.of(it) }.getOrNull() }
+    .firstOrNull()
+    ?: ZoneId.of("+03:00")
+private val HH_MM = DateTimeFormatter.ofPattern("HH:mm")
+
+/**
+ * A duration in the words a person would use. "1 год 20 хв", "45 хв", "40 с".
+ *
+ * Rounded to what matters: nobody reading how long a raid lasted needs the
+ * seconds, and everybody reading a forty-second one would notice their absence.
+ */
+internal fun spell(seconds: Long): String {
+    val hours = seconds / 3600
+    val minutes = (seconds % 3600) / 60
+    return when {
+        hours > 0 && minutes > 0 -> "$hours год $minutes хв"
+        hours > 0 -> "$hours год"
+        minutes > 0 -> "$minutes хв"
+        else -> "$seconds с"
+    }
+}
+
+/** An ISO stamp from the decision log, which is written in UTC. */
 internal fun clock(iso: String): String = runCatching {
-    OffsetDateTime.parse(iso)
-        .atZoneSameInstant(ZoneId.systemDefault())
-        .format(HH_MM)
+    OffsetDateTime.parse(iso).atZoneSameInstant(KYIV).format(HH_MM)
 }.getOrElse { iso }
 
 /** Epoch seconds, as `/messages` gives them. */
 internal fun clock(epochSeconds: Long): String =
-    Instant.ofEpochSecond(epochSeconds)
-        .atZone(ZoneId.systemDefault())
-        .format(HH_MM)
-
-private val HH_MM = DateTimeFormatter.ofPattern("HH:mm")
+    Instant.ofEpochSecond(epochSeconds).atZone(KYIV).format(HH_MM)

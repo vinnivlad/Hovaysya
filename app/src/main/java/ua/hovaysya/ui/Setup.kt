@@ -3,6 +3,7 @@ package ua.hovaysya.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -30,6 +35,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -68,13 +77,30 @@ private fun TakeMeIn(store: Store, next: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var problem by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val keyboard = LocalSoftwareKeyboardController.current
+    val nameFocus = remember { FocusRequester() }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
+    // The one field on the first screen anybody sees, so it asks for the
+    // keyboard rather than waiting to be tapped.
+    LaunchedEffect(Unit) {
+        nameFocus.requestFocus()
+        keyboard?.show()
+    }
+
+    // Centred while it fits, scrollable once the keyboard takes half the
+    // screen. Without the scroll the column had nowhere to go: it filled the
+    // window, so the field it was asking him to type in ended up behind the
+    // keyboard -- which, with `windowSoftInputMode` also missing from the
+    // manifest, looked like no keyboard appearing at all.
+    Box(
+        Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
     ) {
+      Column(
+        Modifier
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+      ) {
         Text("Ховайся", style = MaterialTheme.typography.displayLarge)
         Spacer(Modifier.height(8.dp))
         Text(
@@ -92,7 +118,11 @@ private fun TakeMeIn(store: Store, next: () -> Unit) {
                 Text("Це підпис у логу, не пароль. Можна будь-що.")
             },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(nameFocus),
         )
 
         if (showServer) {
@@ -144,6 +174,7 @@ private fun TakeMeIn(store: Store, next: () -> Unit) {
         ) {
             Text(if (busy) "…" else "Далі")
         }
+      }
     }
 }
 

@@ -25,8 +25,33 @@ import java.security.SecureRandom
 /** A threat class and the word the announcer uses for it. */
 data class Named(val cls: String, val word: String)
 
-/** One line Ховайся said. */
-data class Line(val at: String, val level: String?, val text: String)
+/**
+ * One line Ховайся said. `alarm` is what kind of thing it was, and it has to
+ * travel with the line: an all-clear is `level="alert"` with `alarm="clear"`,
+ * because announcing it is an audible event -- so colouring by the level alone
+ * drew the end of a raid with the same red mark as the raid.
+ */
+data class Line(
+    val at: String,
+    val level: String?,
+    val alarm: String?,
+    val text: String,
+) {
+    /**
+     * Full and partial are not the same news and must not look the same.
+     * "Відбій по балістиці" lifts one class while the alert continues -- and a
+     * threat may still be named on the same screen -- so it is neither the end
+     * of anything nor a danger in itself.
+     *
+     * Read from the field and never from the sentence. A word in a sentence is
+     * a guess about a wording that can change; `alarm` is the contract. His
+     * call: "не мудри по слову відбій. Почекаємо змін на сервері."
+     */
+    val isClear: Boolean get() = alarm == "clear"
+    val isPartial: Boolean get() = alarm == "clear-partial"
+
+    val isLoud: Boolean get() = level == "alert" && !isClear && !isPartial
+}
 
 /**
  * The first screen. `state` is null when the watcher has never written for this
@@ -43,6 +68,7 @@ data class Screen(
     val cleared: List<Named>,
     val peak: Int,
     val said: List<Line>,
+    val ended: Ended?,
     val note: String?,
 ) {
     val known: Boolean get() = state != null
@@ -53,6 +79,16 @@ data class Screen(
         const val ALERT = "alert"
     }
 }
+
+/**
+ * The raid that just finished, and only while there is none running.
+ *
+ * `lastedS` is measured from the siren rather than from the episode: an episode
+ * opens on any live threat, so a drone three regions away can open one an hour
+ * before anything is declared. This is the number the official app shows, which
+ * is how long the alert was actually on.
+ */
+data class Ended(val at: Long, val lastedS: Long)
 
 /** A name from the gazetteer. [home] is false for the ones with no point. */
 data class Place(
@@ -133,8 +169,12 @@ class Api(private val base: String, private val token: String?) {
                 Line(
                     at = row.optString("at"),
                     level = row.stringOrNull("level"),
+                    alarm = row.stringOrNull("alarm"),
                     text = row.optString("text"),
                 )
+            },
+            ended = o.optJSONObject("ended")?.let {
+                Ended(at = it.optLong("at"), lastedS = it.optLong("lasted_s"))
             },
             note = o.stringOrNull("note"),
         )
