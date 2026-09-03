@@ -34,6 +34,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 import ua.hovaysya.Health
+import ua.hovaysya.saidPlainly
 import ua.hovaysya.Screen
 import ua.hovaysya.Store
 
@@ -62,7 +63,7 @@ fun Now(store: Store, onSettings: () -> Unit) {
             val api = store.api()
             runCatching { api.screen() }
                 .onSuccess { screen = it; problem = null }
-                .onFailure { problem = it.message ?: "немає зв'язку" }
+                .onFailure { problem = saidPlainly(it) }
             runCatching { api.health() }.onSuccess { health = it }
             delay(10_000)
         }

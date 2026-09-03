@@ -6,7 +6,9 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
+import java.net.UnknownHostException
 import java.security.MessageDigest
 import java.security.SecureRandom
 
@@ -151,6 +153,36 @@ data class Health(
 )
 
 class ApiError(message: String, val code: Int = 0) : IOException(message)
+
+/**
+ * What a failure looks like to somebody who is not debugging it.
+ *
+ * `HTTP 502` was reaching the permanent notification -- his report, and it
+ * arrives every time the API restarts, because Caddy answers with an HTML error
+ * page while the upstream is down and there is no JSON in it to read a message
+ * out of. A transport status code is not news to anybody holding the phone.
+ *
+ * Three cases are worth telling apart, and the rest is one:
+ *
+ *  - no network at all, which is the phone's own problem and fixable by whoever
+ *    is holding it;
+ *  - a token the server does not recognise, which needs registering again and
+ *    will not clear itself;
+ *  - anything else, which is the service, and says so without a number.
+ *
+ * The server's own `{"error": ...}` messages are written in Ukrainian for a
+ * person and pass through -- except on 401, where "потрібен токен" is true and
+ * unhelpful to a phone that thought it had one.
+ */
+fun saidPlainly(error: Throwable): String = when {
+    error is UnknownHostException -> "немає мережі"
+    error is SocketTimeoutException -> "сервіс не відповідає"
+    error is ApiError && error.code == 401 -> "зареєструйся знову"
+    error is ApiError && error.code >= 500 -> "сервіс не відповідає"
+    error is ApiError && error.message?.isNotBlank() == true ->
+        error.message ?: "немає звʼязку"
+    else -> "немає звʼязку"
+}
 
 class Api(private val base: String, private val token: String?) {
 

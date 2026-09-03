@@ -234,6 +234,19 @@ Android's price is a notification that cannot be dismissed, and that turned out
 to be the thing he already wanted: a status line saying what is happening rather
 than a feed of what happened. The cost is the feature.
 
+A failure is shown in words rather than as a status code. `HTTP 502` was
+reaching the notification on every deploy -- Caddy answers with an HTML error
+page while the API restarts, and there is no JSON in it to read a message from --
+and a transport code is not news to anybody holding the phone. Three cases are
+worth telling apart and the rest is one: no network, which the holder can fix; a
+token the server does not know, which needs registering again and will not clear
+itself; and the service, which says so without a number.
+
+The duration comes with it after the first minute. A deploy looks like ten
+seconds of "немає звʼязку" and is over before the line is read; half an hour of
+it is a different fact, and this notification is the only place the app can state
+it.
+
 Two constraints in there worth knowing. The service type is `specialUse` and not
 `dataSync`, because since Android 15 a `dataSync` service is capped at six hours
 in any twenty-four and a thing that watches for air raids cannot be off for

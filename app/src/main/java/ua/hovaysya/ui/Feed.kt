@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import ua.hovaysya.Post
+import ua.hovaysya.saidPlainly
 import ua.hovaysya.Screen
 import ua.hovaysya.Store
 import ua.hovaysya.Verdict
@@ -61,7 +62,7 @@ fun HovaysyaFeed(store: Store) {
                 // row with nothing said has nothing to draw.
                 .onSuccess { rows = it.filter { row -> row.said != null }
                              problem = null }
-                .onFailure { problem = it.message ?: "немає зв'язку" }
+                .onFailure { problem = saidPlainly(it) }
             delay(15_000)
         }
     }
@@ -164,7 +165,7 @@ fun ChannelFeed(store: Store) {
             // хочу бачити останні повідомлення за 30хв".
             runCatching { store.api().posts(minutes = 30) }
                 .onSuccess { rows = it; problem = null }
-                .onFailure { problem = it.message ?: "немає зв'язку" }
+                .onFailure { problem = saidPlainly(it) }
             delay(20_000)
         }
     }

@@ -41,6 +41,7 @@ import ua.hovaysya.BuildConfig
 import ua.hovaysya.Gazetteer
 import ua.hovaysya.Screen
 import ua.hovaysya.Store
+import ua.hovaysya.saidPlainly
 
 /**
  * Settings, and one thing that is not a setting: whether the bell can actually
@@ -249,7 +250,7 @@ fun Settings(
                         // The watcher notices within one poll -- nothing has to
                         // be restarted for a moved home to take effect.
                         saved = "збережено, застосується протягом хвилини"
-                    }.onFailure { problem = it.message ?: "не вийшло" }
+                    }.onFailure { problem = saidPlainly(it) }
                 }
             }) { Text("Зберегти коло") }
             saved?.let {

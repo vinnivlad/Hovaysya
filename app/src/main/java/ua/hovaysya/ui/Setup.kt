@@ -46,6 +46,7 @@ import ua.hovaysya.Gazetteer
 import ua.hovaysya.Place
 import ua.hovaysya.Secret
 import ua.hovaysya.Store
+import ua.hovaysya.saidPlainly
 
 /**
  * The first run, which is the only time this app asks for anything.
@@ -167,7 +168,7 @@ private fun TakeMeIn(store: Store, next: () -> Unit) {
                         store.secret = secret
                         store.name = stored
                         next()
-                    }.onFailure { problem = it.message ?: "не вийшло" }
+                    }.onFailure { problem = saidPlainly(it) }
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -190,7 +191,7 @@ private fun ChooseHome(store: Store, done: () -> Unit) {
     LaunchedEffect(Unit) {
         runCatching { store.api().gazetteer() }
             .onSuccess { gazetteer = it }
-            .onFailure { problem = it.message ?: "не вийшло" }
+            .onFailure { problem = saidPlainly(it) }
     }
 
     val ready = gazetteer
@@ -293,7 +294,7 @@ private fun ChooseHome(store: Store, done: () -> Unit) {
                         }
                         busy = false
                         result.onSuccess { done() }
-                            .onFailure { problem = it.message ?: "не вийшло" }
+                            .onFailure { problem = saidPlainly(it) }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),

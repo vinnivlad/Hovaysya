@@ -80,6 +80,12 @@ class AlertService : Service() {
     private suspend fun watch() {
         var version: String? = null
         var failures = 0
+        // When it stopped working, not how many times it has failed. A deploy
+        // restarts the API and Caddy answers 502 for ten seconds; a real outage
+        // answers the same way for an hour. One number tells those apart and a
+        // count does not, so the notification can stop being alarming about the
+        // first without going quiet about the second.
+        var failingSince: Long? = null
         while (true) {
             if (!store.registered) {
                 // Nothing to watch for a phone that has not registered. Stop
@@ -90,12 +96,15 @@ class AlertService : Service() {
             val result = runCatching { store.api().screen(wait = WAIT_S, version = version) }
             result.onSuccess { screen ->
                 failures = 0
+                failingSince = null
                 version = screen.version
                 ringFor(screen)
                 show(status(screen, null))
             }.onFailure { problem ->
                 failures += 1
-                show(status(null, problem.message ?: "немає звʼязку"))
+                val began = failingSince ?: System.currentTimeMillis()
+                failingSince = began
+                show(status(null, trouble(problem, began)))
                 // Backing off, but never past a minute. A phone that has been
                 // offline for an hour still has to notice the moment it is not.
                 delay(minOf(60_000L, 2_000L * failures))
@@ -120,6 +129,21 @@ class AlertService : Service() {
             }
         }
         screen.said.maxByOrNull { it.at }?.let { store.lastSaid = it.at }
+    }
+
+    /**
+     * The failure, and how long it has been one.
+     *
+     * Silent about the duration for the first minute, because that is what a
+     * deploy looks like and there is nothing to act on: the API restarts, Caddy
+     * says 502, and it is over before anybody has read the line. Past that it
+     * counts, because a service that has been unreachable for half an hour is a
+     * different fact and the only place this app can state it is here.
+     */
+    private fun trouble(error: Throwable, since: Long): String {
+        val said = saidPlainly(error)
+        val minutes = (System.currentTimeMillis() - since) / 60_000
+        return if (minutes < 1) said else "$said · $minutes хв"
     }
 
     private fun show(notification: Notification) {
