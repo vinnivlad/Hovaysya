@@ -303,9 +303,62 @@ def test_the_drawn_rhythm_matches_the_pattern_it_names():
 
     assert set(pulses) >= {"SOS", "SHELTER", "NEAR", "CLEAR"}, pulses
 
-    drawn = re.findall(r'Bells\(\s*"[^"]+",\s*"([·▬ —]*)"', settings)
+    # Comments are skipped before matching. A comment placed inside one of these
+    # calls used to make its row vanish from this list, and the guard then failed
+    # on a count it could no longer see -- loud, but about the wrong thing.
+    plain = re.sub(r"//.*", "", settings)
+    drawn = re.findall(r'Bells\(\s*"[^"]+",\s*"([·▬ —]*)"', plain)
     counts = [sum(1 for c in row if c in "·▬") for row in drawn]
     # Settings lists them in the order of the alphabet, the silent one last.
     expected = [pulses["SOS"], pulses["SHELTER"], pulses["NEAR"],
                 pulses["CLEAR"], 0]
     assert counts == expected, (drawn, counts, expected)
+
+# `SHELTER` is meant to be felt as one continuous thing, so its gaps are
+# deliberately too short to separate anything.
+BLURRED = {"SHELTER"}
+
+# How long a gap has to be before a hand reads it as a gap. A vibration motor
+# does not stop when the pattern says off -- it spins down -- so a gap of the
+# same order as the spin-down is felt as one buzz briefly weakening rather than
+# as two buzzes.
+FELT_GAP_MS = 200
+
+
+def test_every_gap_in_a_pattern_is_long_enough_to_be_felt():
+    """Two of these patterns merged on his phone, and one of them merged twice.
+
+    `NEAR` is meant to be two pairs, and he reported twice that it buzzes as one
+    pair: "вібрація на «Загроза сюди» не 2 + 2, а 1 + 1". The first time I fixed
+    the array -- two pulses became four -- and left the 120 ms gaps that were
+    hiding them, so the count was right and the feel was not. `SOS` had the same
+    defect at 180/140, which means "три короткі" were never three.
+
+    A pattern whose meaning is a count is only as good as its gaps, and a gap
+    that cannot be felt is not in the pattern at all. So this is checked in
+    milliseconds rather than in pulses -- the other guard counts, this one asks
+    whether the counting is possible.
+    """
+    import re
+
+    bell = (REPO_ROOT / "app/src/main/java/ua/hovaysya/Bell.kt").read_text(
+        encoding="utf-8")
+
+    checked = []
+    for name, body in re.findall(
+            r"private val ([A-Z]+) = longArrayOf\(([^)]*)\)", bell, re.S):
+        if name in BLURRED:
+            continue
+        numbers = [int(n) for n in re.findall(r"\d+", body)]
+        # `{ wait, buzz, wait, buzz, ... }` -- the even positions are the waits,
+        # and the first of them is the delay before the pattern starts rather
+        # than a gap inside it.
+        gaps = numbers[2::2]
+        for gap in gaps:
+            assert gap >= FELT_GAP_MS, (
+                f"{name} has a {gap} ms gap, which is not a gap: the motor is "
+                f"still spinning down, so the pulses either side of it are felt "
+                f"as one")
+        checked.append(name)
+
+    assert set(checked) >= {"SOS", "NEAR", "CLEAR"}, checked

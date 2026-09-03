@@ -66,25 +66,33 @@ import android.provider.Settings
  * rather than a constant: granting the access bumps it, and [canWake] reports
  * what the channel *actually* got by reading it back from the system instead of
  * assuming we were obeyed.
+ *
+ * The same trap catches every other edit to these definitions, and for longer,
+ * because nothing reports it. An id also carries [RECIPE], a fingerprint of the
+ * patterns themselves, so changing one changes the ids and the channels are
+ * rebuilt without anybody having to know that they must be. Three of my changes
+ * to the alphabet reached nobody before that existed.
  */
 class Bell(private val store: Store) {
 
     private val generation: Int get() = store.channelGeneration
 
+    private fun id(name: String) = "$name.$RECIPE.v$generation"
+
     /** Ballistic, or something over this very roof. */
-    val shelter: String get() = "shelter.v$generation"
+    val shelter: String get() = id("shelter")
 
     /** The siren itself: a raid has begun. */
-    val siren: String get() = "siren.v$generation"
+    val siren: String get() = id("siren")
 
     /** Something is heading into my circle. */
-    val near: String get() = "near.v$generation"
+    val near: String get() = id("near")
 
     /** It is over. */
-    val clear: String get() = "clear.v$generation"
+    val clear: String get() = id("clear")
 
     /** Worth knowing, not worth waking. */
-    val quiet: String get() = "quiet.v$generation"
+    val quiet: String get() = id("quiet")
 
     /**
      * The service's own presence, and nothing else.
@@ -100,7 +108,7 @@ class Bell(private val store: Store) {
      * повідомлення." A badge that is always on says nothing, which makes every
      * real one say nothing either.
      */
-    val status: String get() = "status.v$generation"
+    val status: String get() = id("status")
 
     fun create(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -190,6 +198,18 @@ class Bell(private val store: Store) {
             },
         )
         manager.createNotificationChannels(channels)
+
+        // And throw away our own channels from an earlier recipe. Without this
+        // the system's notification settings fill up with dead copies of "В
+        // укриття" -- one per edit -- and there is no way for anybody to tell
+        // which of them is the live one.
+        //
+        // Only ours, matched on the name before the first dot. Deleting a
+        // channel somebody else made would be a fine way to break another app.
+        val wanted = channels.map { it.id }.toSet()
+        manager.notificationChannels
+            .filter { it.id.substringBefore('.') in NAMES && it.id !in wanted }
+            .forEach { manager.deleteNotificationChannel(it.id) }
     }
 
     /** Whether the shelter bell will actually be heard through night mode. */
@@ -271,12 +291,74 @@ class Bell(private val store: Store) {
         // `{ wait, buzz, wait, buzz, ... }` in milliseconds. Tuned by rhythm
         // rather than by Morse timing: what matters is that a hand can tell
         // these apart, not that a radio operator could.
+        //
+        // **Every gap is at least 200 ms**, and that is the lesson these
+        // patterns cost twice. A vibration motor does not stop when the
+        // pattern says off -- it spins down, and a gap shorter than that reads
+        // as one buzz getting momentarily weaker rather than as two buzzes.
+        //
+        // `NEAR` had 180 ms pulses split by 120, and it merged: "вібрація на
+        // «Загроза сюди» не 2 + 2, а 1 + 1". He had reported that once before
+        // and I fixed the array -- two pulses became four -- while leaving the
+        // gaps that were hiding them, so the second report was the same bug
+        // surviving its own fix. `SOS` had the same defect at 180/140, which
+        // means "три короткі" were never three.
+        //
+        // Pulses got shorter as the gaps got longer, so the rhythms still fit
+        // in the same time. A short pulse is easier to count anyway: what the
+        // hand reads is the *edges*, and there are twice as many of those in a
+        // tap than in a buzz.
+        //
+        // `SHELTER` is exempt on purpose -- it is meant to be one continuous
+        // thing -- and the guard in `test_repo_hygiene` knows that.
+
+        private val NAMES = setOf(
+            "shelter", "siren", "near", "clear", "quiet", "status")
+
+        /**
+         * A fingerprint of the alphabet, carried in every channel id.
+         *
+         * **A notification channel is immutable once it exists.** Its vibration
+         * pattern, its sound, its importance are read when it is created and
+         * never again, so editing them in this file changes nothing on a phone
+         * that already has the channel. There was a stored counter for this, but
+         * only a button in Settings ever bumped it -- so every change I made to
+         * the alphabet was inert until somebody happened to press it.
+         *
+         * That is what his two reports were. "Вібрація на «Загроза сюди» не
+         * 2 + 2, а 1 + 1" was true after I had fixed the array, because his phone
+         * still held the channel built from the *first* version of it; and
+         * "нічого не вібрувало, здається вібрувало 1 раз від пуш повідомлення"
+         * is a channel still carrying Android's default, because `setSound(null,
+         * null)` never reached it either. I changed the definitions three times
+         * and the phone was never told once.
+         *
+         * So the id now derives from the definitions. Change a pattern and the
+         * ids change with it, the channels are rebuilt on the next launch, and
+         * the stale ones are deleted. Nobody has to remember anything, which is
+         * the only kind of fix that holds -- the counter is still here, because
+         * the night-mode grant genuinely is a different reason to rebuild.
+         *
+         * `String.hashCode` is specified by the language rather than left to the
+         * runtime, so this is stable across launches and devices. It only has to
+         * *change* when the recipe changes; it does not have to be a good hash.
+         */
+        private val RECIPE: String by lazy {
+            val recipe = listOf(
+                SOS, SHELTER, NEAR, CLEAR,
+            ).joinToString("|") { it.joinToString(",") } +
+                // Not a pattern, but just as immutable, and just as inert when
+                // it changes: the channels are silent because `Siren` owns the
+                // sound now.
+                "|silent"
+            Integer.toHexString(recipe.hashCode())
+        }
 
         /** ··· ▬▬▬ ···  three short, three long, three short. */
         private val SOS = longArrayOf(
-            0, 180, 140, 180, 140, 180,
-            320, 520, 140, 520, 140, 520,
-            320, 180, 140, 180, 140, 180,
+            0, 140, 200, 140, 200, 140,
+            420, 480, 200, 480, 200, 480,
+            420, 140, 200, 140, 200, 140,
         )
 
         /** A dense stutter. Nothing structured about it, which is the point. */
@@ -295,8 +377,12 @@ class Bell(private val store: Store) {
          * pair is what every other app does for an ordinary
          * notification, and this one has to be recognisable as
          * deliberate.
+         *
+         * Then it still buzzed 1 + 1, because four pulses split by
+         * 120 ms are not four pulses to a hand. The gaps are the fix;
+         * see the note above the patterns.
          */
-        private val NEAR = longArrayOf(0, 180, 120, 180, 350, 180, 120, 180)
+        private val NEAR = longArrayOf(0, 90, 220, 90, 500, 90, 220, 90)
 
         /** One long note. The only single-pulse pattern in the set. */
         private val CLEAR = longArrayOf(0, 1200)

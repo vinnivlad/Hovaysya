@@ -181,8 +181,12 @@ fun Settings(
                         "Тривога. Реактивний шахед. Бровари.")
                 },
             )
+            // Not "або над домом", which promised something the policy does
+            // not do. The home rule fires on ballistic alone -- his own ruling,
+            // "коли летить балістика і Жуляни" -- so a drone over Жуляни
+            // arrives as "Загроза сюди", and this row taught the alphabet wrong.
             Bells(
-                "В укриття", "············", "балістика, або над домом",
+                "В укриття", "············", "балістика",
                 onRing = {
                     bell.ring(context, bell.shelter, "В укриття",
                         "Тривога. Балістика. Жуляни.")
