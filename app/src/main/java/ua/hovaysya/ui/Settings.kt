@@ -170,14 +170,14 @@ fun Settings(
             // not decoration: it is what lets somebody check they felt the one
             // they meant to press, which a row of identical buttons does not.
             Bells(
-                "Тривога", "··· --- ···", "початок, як у Тривозі",
+                "Тривога", "··· ▬▬▬ ···", "початок, як у Тривозі",
                 onRing = {
                     bell.ring(context, bell.siren, "Повітряна тривога",
                         "Тривога. Реактивний шахед. Бровари.")
                 },
             )
             Bells(
-                "В укриття", "▪▪▪▪▪▪▪▪▪▪▪▪", "балістика, або над домом",
+                "В укриття", "············", "балістика, або над домом",
                 onRing = {
                     bell.ring(context, bell.shelter, "В укриття",
                         "Тривога. Балістика. Жуляни.")
@@ -191,7 +191,7 @@ fun Settings(
                 },
             )
             Bells(
-                "Відбій", "▬▬▬▬▬", "один довгий, без ритму",
+                "Відбій", "▬", "один довгий, без ритму",
                 onRing = {
                     bell.ring(context, bell.clear, "Відбій тривоги",
                         "Відбій тривоги.")

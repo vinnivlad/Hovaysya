@@ -25,11 +25,17 @@ import android.provider.Settings
  * that everyone in this country already knows that rhythm without being taught,
  * so it is the one pattern this app must not invent for itself.
  *
- *     початок тривоги   ··· --- ···       SOS, as Тривога rings it
- *     балістика         ▪▪▪▪▪▪▪▪▪▪▪▪      a dense stutter: the roof is not enough
- *     летить сюди       ·· ··             two knocks
- *     відбій            ▬▬▬▬▬             one long note, no rhythm at all
+ *     початок тривоги   ··· ▬▬▬ ···       SOS, as Тривога rings it
+ *     балістика         ············      a dense stutter: the roof is not enough
+ *     летить сюди       ·· ··             knock-knock, knock-knock
+ *     відбій            ▬                 one long note, no rhythm at all
  *     тихо              (nothing)
+ *
+ * One glyph per pulse, `·` short and `▬` long, so what Settings draws can
+ * be compared against what the arrays actually do. It could not be, and
+ * the cost was this: the drawing said two pairs and the array buzzed one.
+ * A screen that teaches the wrong alphabet is worse than one that teaches
+ * none, because it is believed.
  *
  * Four things to tell apart half asleep, so each differs in *rhythm* rather than
  * in length: nine structured pulses, twelve rapid ones, two quick ones, and a
@@ -234,7 +240,7 @@ class Bell(private val store: Store) {
         // rather than by Morse timing: what matters is that a hand can tell
         // these apart, not that a radio operator could.
 
-        /** ··· --- ···  three short, three long, three short. */
+        /** ··· ▬▬▬ ···  three short, three long, three short. */
         private val SOS = longArrayOf(
             0, 180, 140, 180, 140, 180,
             320, 520, 140, 520, 140, 520,
@@ -247,8 +253,18 @@ class Bell(private val store: Store) {
             100, 150, 100, 150, 100, 150, 100, 150, 100, 150, 100, 150,
         )
 
-        /** Two knocks. */
-        private val NEAR = longArrayOf(0, 250, 180, 250)
+        /**
+         * Knock-knock, knock-knock. Four pulses in two pairs.
+         *
+         * It was one pair, and Settings had always drawn it as two
+         * -- his catch: "наче має бути 2 коротких + 2 коротких, а
+         * гуде 1 короткий + 1 короткий". The drawing was the better
+         * of the two and not only because it was published: a single
+         * pair is what every other app does for an ordinary
+         * notification, and this one has to be recognisable as
+         * deliberate.
+         */
+        private val NEAR = longArrayOf(0, 180, 120, 180, 350, 180, 120, 180)
 
         /** One long note. The only single-pulse pattern in the set. */
         private val CLEAR = longArrayOf(0, 1200)

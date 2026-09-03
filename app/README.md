@@ -104,11 +104,16 @@ is spent in exactly one place: the state.
 
 ## The alphabet
 
-    початок тривоги   ··· --- ···       SOS, as Тривога rings it
-    балістика         ▪▪▪▪▪▪▪▪▪▪▪▪      a dense stutter: the roof is not enough
-    летить сюди       ·· ··             two knocks
-    відбій            ▬▬▬▬▬             one long note, no rhythm at all
+    початок тривоги   ··· ▬▬▬ ···       SOS, as Тривога rings it
+    балістика         ············      a dense stutter: the roof is not enough
+    летить сюди       ·· ··             knock-knock, knock-knock
+    відбій            ▬                 one long note, no rhythm at all
     тихо              (nothing)
+
+One glyph per pulse, `·` short and `▬` long, and that convention exists so a
+test can compare what Settings draws against what the arrays do. It could not,
+and the cost was `NEAR`: drawn as two pairs since the day it was written, buzzing
+as one. He caught it by feel.
 
 The start is his: "3 коротких, 3 довгих, 3 коротких, так само як і в застосунку
 Тривога". The point is not the code -- it is that everyone here already knows

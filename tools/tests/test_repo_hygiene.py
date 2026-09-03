@@ -231,3 +231,40 @@ def test_nothing_tracked_carries_an_address_or_a_key():
             if keyish.search(line):
                 offenders.append(f"{name}:{number} key material or path")
     assert not offenders, offenders
+def test_the_drawn_rhythm_matches_the_pattern_it_names():
+    """The screen is the only place the alphabet is written down, so a screen
+    that draws it wrong teaches it wrong -- and is believed, which is worse than
+    teaching nothing.
+
+    It did. `NEAR` was `longArrayOf(0, 250, 180, 250)`, two pulses, and Settings
+    had always drawn `·· ··`, four. He noticed by feel: "наче має бути 2
+    коротких + 2 коротких, а гуде 1 короткий + 1 короткий." The drawing won,
+    because a single pair is what every other app does for an ordinary
+    notification and this one has to read as deliberate.
+
+    Comparable because the convention was made comparable: one glyph per pulse,
+    `·` short and `▬` long. A vibration pattern is `{wait, buzz, wait, buzz, ...}`
+    so the buzzes are the entries at odd positions.
+    """
+    import re
+
+    bell = (REPO_ROOT / "app/src/main/java/ua/hovaysya/Bell.kt").read_text(
+        encoding="utf-8")
+    settings = (REPO_ROOT / "app/src/main/java/ua/hovaysya/ui/Settings.kt"
+                ).read_text(encoding="utf-8")
+
+    pulses = {}
+    for name, body in re.findall(
+            r"private val ([A-Z]+) = longArrayOf\(([^)]*)\)", bell, re.S):
+        numbers = [n for n in re.findall(r"\d+", body)]
+        # Odd positions are the buzzes; the evens are the waits between them.
+        pulses[name] = len(numbers[1::2])
+
+    assert set(pulses) >= {"SOS", "SHELTER", "NEAR", "CLEAR"}, pulses
+
+    drawn = re.findall(r'Bells\(\s*"[^"]+",\s*"([·▬ —]*)"', settings)
+    counts = [sum(1 for c in row if c in "·▬") for row in drawn]
+    # Settings lists them in the order of the alphabet, the silent one last.
+    expected = [pulses["SOS"], pulses["SHELTER"], pulses["NEAR"],
+                pulses["CLEAR"], 0]
+    assert counts == expected, (drawn, counts, expected)
