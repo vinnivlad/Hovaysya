@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import ua.hovaysya.Post
+import ua.hovaysya.clock
 import ua.hovaysya.saidPlainly
 import ua.hovaysya.Screen
 import ua.hovaysya.Store

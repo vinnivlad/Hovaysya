@@ -28,13 +28,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 import ua.hovaysya.Health
+import ua.hovaysya.clock
 import ua.hovaysya.saidPlainly
+import ua.hovaysya.spell
 import ua.hovaysya.Screen
 import ua.hovaysya.Store
 
@@ -299,62 +297,3 @@ private fun headline(screen: Screen?, problem: String?): String = when {
     screen.state == Screen.ALERT -> "ТРИВОГА"
     else -> "БЕЗ ТРИВОГ"
 }
-
-/**
- * Kyiv time, always, whatever the phone is set to.
- *
- * Not the device zone, and this is the second thing that number taught. The
- * watcher stamps its log in UTC, so slicing the characters out of the string --
- * which is what this did first -- put every line three hours into the past. That
- * was fixed by converting properly, into `systemDefault()`, and the emulator
- * runs in UTC: the feed showed 06:28 while Kyiv said 09:28, and it read exactly
- * like a service that had stopped three hours ago.
- *
- * So the zone is the domain's rather than the device's. These are Kyiv alerts,
- * the channels write Kyiv time, the person is in Kyiv, and a phone in the wrong
- * zone -- travelling, or an emulator out of the box -- must not be able to
- * make this screen lie about when something happened. There is nothing here a
- * device setting should be allowed to move.
- */
-/**
- * And it has to be looked up defensively. "Europe/Kyiv" became the canonical
- * name only in tzdata 2022b; on a device whose zone database predates that --
- * and minSdk here is Android 8 -- the name is "Europe/Kiev" and `ZoneId.of`
- * throws rather than returning anything. A crash on the screen that says whether
- * to take cover is not a trade worth making for a spelling.
- *
- * The fixed offset is the last resort and is knowingly wrong for half the year,
- * because Ukraine keeps summer time. It is there so the worst case is a clock an
- * hour out rather than no screen at all.
- */
-private val KYIV: ZoneId = sequenceOf("Europe/Kyiv", "Europe/Kiev")
-    .mapNotNull { runCatching { ZoneId.of(it) }.getOrNull() }
-    .firstOrNull()
-    ?: ZoneId.of("+03:00")
-private val HH_MM = DateTimeFormatter.ofPattern("HH:mm")
-
-/**
- * A duration in the words a person would use. "1 год 20 хв", "45 хв", "40 с".
- *
- * Rounded to what matters: nobody reading how long a raid lasted needs the
- * seconds, and everybody reading a forty-second one would notice their absence.
- */
-internal fun spell(seconds: Long): String {
-    val hours = seconds / 3600
-    val minutes = (seconds % 3600) / 60
-    return when {
-        hours > 0 && minutes > 0 -> "$hours год $minutes хв"
-        hours > 0 -> "$hours год"
-        minutes > 0 -> "$minutes хв"
-        else -> "$seconds с"
-    }
-}
-
-/** An ISO stamp from the decision log, which is written in UTC. */
-internal fun clock(iso: String): String = runCatching {
-    OffsetDateTime.parse(iso).atZoneSameInstant(KYIV).format(HH_MM)
-}.getOrElse { iso }
-
-/** Epoch seconds, as `/messages` gives them. */
-internal fun clock(epochSeconds: Long): String =
-    Instant.ofEpochSecond(epochSeconds).atZone(KYIV).format(HH_MM)

@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,6 +41,7 @@ import ua.hovaysya.Bell
 import ua.hovaysya.BuildConfig
 import ua.hovaysya.Gazetteer
 import ua.hovaysya.Screen
+import ua.hovaysya.Siren
 import ua.hovaysya.Store
 import ua.hovaysya.saidPlainly
 
@@ -67,6 +69,8 @@ fun Settings(
     var gazetteer by remember { mutableStateOf<Gazetteer?>(null) }
     var home by remember { mutableStateOf<String?>(null) }
     var radius by remember { mutableStateOf(6f) }
+    var volume by remember { mutableStateOf(store.volume) }
+    var quiet by remember { mutableStateOf(store.quietHours) }
     var saved by remember { mutableStateOf<String?>(null) }
     var problem by remember { mutableStateOf<String?>(null) }
 
@@ -160,9 +164,9 @@ fun Settings(
             Text("Як це відчувається", style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Чотири сигнали, які варто відчути зараз — бо вночі " +
-                    "розрізняти доведеться не дивлячись. Пʼятий не відчувається " +
-                    "взагалі, і в цьому вся його робота.",
+                "Чотири сигнали, які варто почути й відчути зараз — бо " +
+                    "вночі розрізняти доведеться не дивлячись. Пʼятий не " +
+                    "відчувається взагалі, і в цьому вся його робота.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -208,6 +212,63 @@ fun Settings(
                         "Дорозвідка по балістиці.")
                 },
             )
+        }
+
+        // --- how loud -------------------------------------------------------
+        Spacer(Modifier.height(16.dp))
+        Card {
+            Text("Звук", style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Сирена, коли оголошують тривогу. Та сама, але коротко, тим " +
+                    "самим ритмом 2+2 — коли летить у твоє коло. Короткий " +
+                    "пілік на відбій. Вібрація працює завжди, навіть на нулі.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Гучність", style = MaterialTheme.typography.bodyMedium)
+                Slider(
+                    value = volume,
+                    onValueChange = { volume = it },
+                    // Saved on release rather than on every pixel, and the pip
+                    // plays then too: a volume you cannot hear while setting it
+                    // is a number, not a setting. It plays at the slider's own
+                    // value, not at `volumeNow()` -- previewing silence inside
+                    // the quiet window would look like a broken slider.
+                    onValueChangeFinished = {
+                        store.volume = volume
+                        Siren.clear(volume)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp),
+                )
+                Text(
+                    "${(volume * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Тихі години", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "22:00–08:00 без звуку. Вібрація лишається, і в " +
+                            "укриття все одно розбудить.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = quiet,
+                    onCheckedChange = { quiet = it; store.quietHours = it },
+                )
+            }
         }
 
         // --- where I live ---------------------------------------------------

@@ -60,6 +60,33 @@ class Store(context: Context) {
         get() = prefs.getInt(KEY_CHANNELS, 1)
         set(value) = prefs.edit().putInt(KEY_CHANNELS, value).apply()
 
+    /**
+     * How loud the alarm is, 0 to 1. Silent is a legitimate choice: the
+     * vibration alphabet works on its own, and somebody who wants only that
+     * should not have to leave the phone on mute to get it.
+     */
+    var volume: Float
+        get() = prefs.getFloat(KEY_VOLUME, 0.8f)
+        set(value) = prefs.edit().putFloat(KEY_VOLUME, value.coerceIn(0f, 1f))
+            .apply()
+
+    /**
+     * Withhold sound between 22:00 and 08:00 Kyiv time. **Off by default**, and
+     * that default is the safe one: a window that silences an air-raid alarm is
+     * a thing somebody has to choose, never a thing they discover.
+     *
+     * Vibration is not affected -- "коли звук не видається" is about sound, and
+     * the shelter channel still bypasses night mode. So the quiet window makes
+     * the phone buzz instead of wail; it does not make it ignore a raid.
+     */
+    var quietHours: Boolean
+        get() = prefs.getBoolean(KEY_QUIET_HOURS, false)
+        set(value) = prefs.edit().putBoolean(KEY_QUIET_HOURS, value).apply()
+
+    /** The volume to use right now, which the quiet window can zero. */
+    fun volumeNow(): Float =
+        if (quietHours && inQuietHours()) 0f else volume
+
     fun api(): Api = Api(base, secret)
 
     /** Forget this device's registration, without touching the server. */
@@ -82,5 +109,7 @@ class Store(context: Context) {
         private const val KEY_NAME = "name"
         private const val KEY_CHANNELS = "channels"
         private const val KEY_LAST_SAID = "lastSaid"
+        private const val KEY_VOLUME = "volume"
+        private const val KEY_QUIET_HOURS = "quietHours"
     }
 }

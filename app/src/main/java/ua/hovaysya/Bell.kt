@@ -119,6 +119,11 @@ class Bell(private val store: Store) {
                 enableVibration(true)
                 vibrationPattern = SHELTER
                 setBypassDnd(true)
+                // Silent as a channel. The sound is played by `Siren` at a
+                // volume this app controls, which a channel's own cannot be --
+                // and a channel's sound is immutable once created, so it could
+                // never have become a setting.
+                setSound(null, null)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             },
             NotificationChannel(
@@ -128,6 +133,11 @@ class Bell(private val store: Store) {
                 enableVibration(true)
                 vibrationPattern = SOS
                 setBypassDnd(true)
+                // Silent as a channel. The sound is played by `Siren` at a
+                // volume this app controls, which a channel's own cannot be --
+                // and a channel's sound is immutable once created, so it could
+                // never have become a setting.
+                setSound(null, null)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             },
             NotificationChannel(
@@ -137,6 +147,11 @@ class Bell(private val store: Store) {
                 enableVibration(true)
                 vibrationPattern = NEAR
                 setBypassDnd(true)
+                // Silent as a channel. The sound is played by `Siren` at a
+                // volume this app controls, which a channel's own cannot be --
+                // and a channel's sound is immutable once created, so it could
+                // never have become a setting.
+                setSound(null, null)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             },
             NotificationChannel(
@@ -151,6 +166,11 @@ class Bell(private val store: Store) {
                 description = "Тривога скінчилась. Один довгий сигнал."
                 enableVibration(true)
                 vibrationPattern = CLEAR
+                // Silent as a channel. The sound is played by `Siren` at a
+                // volume this app controls, which a channel's own cannot be --
+                // and a channel's sound is immutable once created, so it could
+                // never have become a setting.
+                setSound(null, null)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             },
             NotificationChannel(
@@ -217,6 +237,18 @@ class Bell(private val store: Store) {
     fun ring(context: Context, channel: String, title: String, body: String) {
         val manager = context.getSystemService(NotificationManager::class.java)
             ?: return
+        // Sound first, and only where this app actually speaks -- "звук там де
+        // його видає Ховайся". Three sounds for five channels: the wail when a
+        // raid is declared, the same siren in the near rhythm for anything
+        // arriving over him, the till's pip when it is over. The quiet window
+        // can zero the volume; it never touches the vibration.
+        val volume = store.volumeNow()
+        when (channel) {
+            siren -> Siren.alert(volume)
+            shelter, near -> Siren.rhythm(NEAR, volume)
+            clear -> Siren.clear(volume)
+            else -> Unit
+        }
         val notification = Notification.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_bell)
             .setContentTitle(title)
