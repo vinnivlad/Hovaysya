@@ -1,6 +1,7 @@
 package ua.hovaysya.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,7 +49,7 @@ import ua.hovaysya.Store
  * than one that says it does not know.
  */
 @Composable
-fun Now(store: Store) {
+fun Now(store: Store, onSettings: () -> Unit) {
     var screen by remember { mutableStateOf<Screen?>(null) }
     var health by remember { mutableStateOf<Health?>(null) }
     var problem by remember { mutableStateOf<String?>(null) }
@@ -69,13 +70,37 @@ fun Now(store: Store) {
 
     val state = screen?.state
     val accent = headlineColour(state)
+    val alerting = state == Screen.ALERT
 
     Column(
         Modifier
             .fillMaxSize()
             .padding(24.dp),
     ) {
-        Status(health, problem)
+        // The service on the left, the way in to settings on the right. One row,
+        // because both are things you glance at rather than read.
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.weight(1f)) { Status(health, problem) }
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onSettings),
+                contentAlignment = Alignment.Center,
+            ) {
+                // A glyph and not an icon resource: `material-icons` is a
+                // dependency this app does not have, and a gear is read the same
+                // in every language.
+                Text(
+                    "⚙",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
 
         Column(
             Modifier.fillMaxWidth().weight(1f),
@@ -90,10 +115,18 @@ fun Now(store: Store) {
             // The maximum threat still in the air. Under the headline rather
             // than in it, because "ТРИВОГА" and "балістика" are two facts and
             // one can change without the other.
-            // The threat keeps the state's own colour, so "БЕЗ ТРИВОГ" above a
-            // тracked drone still reads as something being watched rather than
-            // as nothing happening.
-            screen?.top?.let { top ->
+            // Only while an alert is on, which overrules what I argued
+            // yesterday. I kept the class under the headline because it "does
+            // not lose the information" -- and he sent a screenshot of "БЕЗ
+            // ТРИВОГ" with "Реактивний шахед" beneath it, which contradicts
+            // itself before it informs anybody.
+            //
+            // The information was not worth keeping there either. A class with
+            // no place attached says nothing anybody can act on, and if the
+            // thing were coming here the bell would have rung and the siren
+            // would have followed. `watching` means something is in the air
+            // somewhere, which is the state this app exists to stop reporting.
+            screen?.top?.takeIf { alerting }?.let { top ->
                 Spacer(Modifier.height(6.dp))
                 Text(
                     top.word.replaceFirstChar { it.uppercase() },
@@ -102,9 +135,10 @@ fun Now(store: Store) {
                 )
             }
 
-            // "Дрони, Балістика Дорозвідка" -- the second line of his example.
-            // Reconnaissance is not the threat, so it is never in the headline.
-            screen?.recon?.takeIf { it.isNotEmpty() }?.let { recon ->
+            // "Дрони, Балістика Дорозвідка" -- the second line of his example,
+            // and for the same reason it is only shown during one. What is being
+            // re-checked is a detail of a raid, not news on its own.
+            screen?.recon?.takeIf { alerting && it.isNotEmpty() }?.let { recon ->
                 Spacer(Modifier.height(10.dp))
                 Text(
                     recon.joinToString(", ") {
@@ -115,7 +149,7 @@ fun Now(store: Store) {
                 )
             }
 
-            screen?.cleared?.takeIf { it.isNotEmpty() }?.let { cleared ->
+            screen?.cleared?.takeIf { alerting && it.isNotEmpty() }?.let { cleared ->
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "Знято: " + cleared.joinToString(", ") { it.word },

@@ -1,6 +1,10 @@
 package ua.hovaysya.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,7 +50,12 @@ import ua.hovaysya.Store
  * no runtime prompt -- so if it is not said plainly here, it is not said.
  */
 @Composable
-fun Settings(store: Store, bell: Bell, forgotten: () -> Unit) {
+fun Settings(
+    store: Store,
+    bell: Bell,
+    onBack: () -> Unit,
+    forgotten: () -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -83,7 +92,21 @@ fun Settings(store: Store, bell: Bell, forgotten: () -> Unit) {
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
     ) {
-        Text("Налаштування", style = MaterialTheme.typography.titleLarge)
+        // Its own way out, since it is no longer a tab somebody can leave by
+        // tapping another one.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onBack),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("←", style = MaterialTheme.typography.titleLarge)
+            }
+            Spacer(Modifier.width(4.dp))
+            Text("Налаштування", style = MaterialTheme.typography.titleLarge)
+        }
         Spacer(Modifier.height(4.dp))
         Text(
             "Ти тут як «${store.name ?: "?"}»",

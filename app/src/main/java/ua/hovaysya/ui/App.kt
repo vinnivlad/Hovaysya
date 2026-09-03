@@ -39,7 +39,20 @@ fun App(store: Store, bell: Bell) {
     }
 
     var tab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Зараз", "Ховайся", "Канали", "Налаштування")
+    var settings by remember { mutableStateOf(false) }
+    // Three, not four. Settings is not a place anybody goes as often as the
+    // other three, and giving it a quarter of the bar said it was -- his call:
+    // "не треба під нього виділяти цілу табу знизу". It lives in the corner of
+    // the screen it belongs to instead.
+    val tabs = listOf("Зараз", "Ховайся", "Канали")
+
+    if (settings) {
+        Settings(store, bell, onBack = { settings = false }) {
+            settings = false
+            registered = false
+        }
+        return
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -60,10 +73,9 @@ fun App(store: Store, bell: Bell) {
     ) { insets ->
         Box(Modifier.fillMaxSize().padding(insets)) {
             when (tab) {
-                0 -> Now(store)
+                0 -> Now(store) { settings = true }
                 1 -> HovaysyaFeed(store)
-                2 -> ChannelFeed(store)
-                else -> Settings(store, bell) { registered = false }
+                else -> ChannelFeed(store)
             }
         }
     }
