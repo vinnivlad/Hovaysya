@@ -137,7 +137,10 @@ NEAR_TIERS = ("my-area", "my-district")
 # A rung is not about danger in the abstract but about how little time it leaves,
 # which is why a MiG-31K sits with ballistic: it is the thing that launches one.
 THREAT_LEVEL = {
-    "recon": 1, "shahed": 1, "shahed-jet": 1,
+    # `drone-rocket` is a rung with the drones rather than with the cruise
+    # missiles, which is the whole reason the class exists. The rung measures
+    # how little time is left, and a Бандероль leaves a drone's worth of it.
+    "recon": 1, "shahed": 1, "shahed-jet": 1, "drone-rocket": 1,
     "cruise": 2, "kab": 2,
     "ballistic": 3, "mig": 3, "mixed": 3,
 }

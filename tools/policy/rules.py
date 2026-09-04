@@ -691,7 +691,8 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     #    "⚠️4 реактивні шахеди на Київ/Бровари" was a false wake-up twice over.
     #    A drone night is opened by the siren instead, which is rule 2.
     if obs.live and obs.scope == "city":
-        if threat in ("shahed", "shahed-jet", "recon", "unknown", "none"):
+        if threat in ("shahed", "shahed-jet", "drone-rocket", "recon",
+                      "unknown", "none"):
             return _silent("insufficient: city-wide is not enough for a drone")
         if ep is not None and ep.notified:
             return _silent("already-notified: city-level, already awake")

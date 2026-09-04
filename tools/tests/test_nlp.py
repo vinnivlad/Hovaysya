@@ -106,9 +106,47 @@ def test_ballistic_family():
 
 
 def test_cruise_family():
-    for t in ("❗Група ракет Калібр на Київ.", "1х Бандероль на Жуляни",
-              "Крилата ракета", "Х-101"):
+    for t in ("❗Група ракет Калібр на Київ.", "Крилата ракета", "Х-101",
+              "❗️Крилата ракета Х-31П на Одесу"):
         assert hints.threat_hint(t) == "cruise", t
+
+
+def test_a_banderol_is_a_drone_rocket_and_not_a_cruise_missile():
+    """The channels write "крилаті ракети Бандероль", so the phrase used to
+    reach the cruise rule and take the cruise rules with it — and those are far
+    harsher, because a cruise missile earns a ring on the oblast rung alone.
+    His words: "просто хочу щоб воно дарма не піднімало загрозу до крилатих
+    ракет". 333 messages in the corpus, 60 of them naming Kyiv or its suburbs.
+
+    `мгКР` is the same weapon abbreviated — малогабаритна крилата ракета — and
+    51 messages use it, with no other meaning anywhere in the corpus. Three of
+    them name no weapon beside it, including one over the Vyshhorod district,
+    which until now read as no threat at all.
+    """
+    for t in ("❗️3 крилаті ракети Бандероль з Полтавщини на Дніпропетровщину",
+              "🅿️ 2х мгКР Бандероль у напрямку Одеса",
+              "🚀1х мКР повз Київське водосховище у бік Вишгородського району",
+              "Полтава! 2х мгКР заходять на місто.",
+              "1х Бандероль на Жуляни"):
+        assert hints.threat_hint(t) == "drone-rocket", t
+
+
+def test_only_the_fifth_geran_is_a_drone_rocket():
+    """Герань-5 and no other — his call. The corpus writes the family with a
+    number and no ending, but a declined form is one message away, so the
+    pattern keys on the number rather than on the nominative."""
+    for t in ("🔴2 Герань-5 на Дніпро/Кам'янське.",
+              "На Київщину летять БпЛА Герань-5.",
+              "Герані-5 на Київщину",
+              "гераней-5 курсом на Ніжин",
+              "⚠️2 реактивні шахеди (типу Бандероль/Герань-5)"):
+        assert hints.threat_hint(t) == "drone-rocket", t
+    # The rest of the family keeps the class it had. Герань-3 and Герань-4 are
+    # jet-powered too, and they land on `shahed-jet` — which carries the same
+    # rules, so nothing about the reaction changes.
+    assert hints.threat_hint("Герань-2 на Київ") == "shahed"
+    assert hints.threat_hint("2 реактивні шахеди Герань-3 з Сумщини") == "shahed-jet"
+    assert hints.threat_hint("реактивних Герань-4") == "shahed-jet"
 
 
 def test_bare_rocket_falls_back_to_cruise_not_ballistic():
@@ -134,6 +172,14 @@ def test_alarm_mapping_gives_each_reaction_class_its_own_sound():
     assert hints.alarm_for("shahed-jet") == "drone-jet"
     assert hints.alarm_for("shahed") == "drone"
     assert hints.alarm_for("recon") == "recon"
+
+
+def test_a_drone_rocket_reacts_like_a_jet_shahed():
+    """The class exists to keep the cruise rules off it, not to add a seventh
+    tone: "правила поки такі ж як і для shahed-jet". The alarm is the reaction,
+    and the reaction is the same one — which is also what puts it in
+    `DRONE_TONES`, and so under `drone_needs_home` and the quiet hours."""
+    assert hints.alarm_for("drone-rocket") == "drone-jet"
 
 
 def test_other_aviation_has_no_sound():

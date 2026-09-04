@@ -120,14 +120,17 @@ Mapping from `threat` to `alarm`:
 | `ballistic` | `ballistic` |
 | `mig` | `mig` |
 | `cruise`, `kab` | `cruise` |
-| `shahed-jet` | `drone-jet` |
+| `shahed-jet`, `drone-rocket` | `drone-jet` |
 | `shahed` | `drone` |
 | `recon` | `recon` |
 | `aviation` | `none` |
 | `mixed` | the most severe class present |
 
-Six sounds map one-to-one onto the six reaction classes, which is how the
-labeler presents them, ordered by how little time each leaves:
+Six sounds, and `drone-rocket` is the one class that does not bring a
+seventh: it shares the jet Shahed's tone deliberately, because the class
+exists to keep the cruise rules off it rather than to sound different.
+Ordered by how little time each leaves, which is how the labeler presents
+them:
 
 **розвідник → МіГ-31К → дрон → реактивний дрон → ракета → балістика**
 
@@ -367,12 +370,12 @@ rewrite the value in every label already made.
 
 ### `threat`
 
-`recon` · `mig` · `shahed` · `shahed-jet` · `cruise` · `ballistic` · `kab` ·
-`aviation` · `mixed` · `unknown` · `none`
+`recon` · `mig` · `shahed` · `shahed-jet` · `drone-rocket` · `cruise` ·
+`ballistic` · `kab` · `aviation` · `mixed` · `unknown` · `none`
 
 The labeler's primary row is `none`, `unknown`, `recon`, `mig`, `shahed`,
-`shahed-jet`, `cruise`, `ballistic`. `kab`, `aviation` and `mixed` stay
-secondary.
+`shahed-jet`, `drone-rocket`, `cruise`, `ballistic`. `kab`, `aviation` and
+`mixed` stay secondary.
 
 The two "no type stated" cases lead, because they are the most common and
 because confusing them is the easiest mistake available:
@@ -390,6 +393,21 @@ corpus's 11 609 messages.
 (`реактивний`) is several times faster than a propeller one and appears in 1 511
 messages — more than every ballistic term — so it is neither the slow case nor
 the ballistic case.
+
+`drone-rocket` is Бандероль and Герань-5, and it sits between the jet Shahed
+and the cruise missile because that is where the weapon sits. It is not a
+distinction about the object: it is a distinction about the rules. The
+channels write "крилаті ракети Бандероль" and "мгКР Бандероль"
+(малогабаритна крилата ракета), so 333 messages read as `cruise` and took
+the cruise rules with them -- the climb to the cruise rung, and the oblast
+rung of the cruise ladder, both of which are bought by a missile that flies
+for hours. His ruling: "просто хочу щоб воно дарма не піднімало загрозу до
+крилатих ракет, там сильно суворіші правила". The rules are the jet
+Shahed's, down to the tone, and only the word on the screen is its own.
+
+Only Герань-5 of that family. Герань-3 and Герань-4 are jet-powered too and
+stay `shahed-jet`, which carries the same rules anyway, so what differs is
+the name and not the reaction.
 
 `mixed` is for a combined attack where naming one type would misrepresent it.
 

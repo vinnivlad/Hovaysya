@@ -345,7 +345,7 @@ const SILENT_REASONS = ["too-far", "already-notified", "resolved", "insufficient
 // is what a bare "Тривога" is. The rest follow, ordered by how little time each
 // leaves.
 const THREATS_MAIN = ["none", "unknown", "recon", "mig", "shahed", "shahed-jet",
-                      "cruise", "ballistic"];
+                      "drone-rocket", "cruise", "ballistic"];
 const THREATS_MORE = ["kab", "aviation", "mixed"];
 const MODALITIES = ["live-threat", "aftermath", "summary-news", "non-threat"];
 const SCOPES = ["my-area", "my-district", "city", "oblast", "elsewhere", "unknown"];
@@ -356,11 +356,12 @@ const CERTAINTIES = ["confirmed", "probable", "lost", "clear"];
 const HEADINGS = ["toward", "away", "loitering", "position", "unknown"];
 // Which class a partial all-clear lifts. Derived from the text, shown so it
 // can be corrected — never something to work out by hand.
-const CLEARED = ["ballistic", "mig", "cruise", "shahed-jet", "shahed",
-                 "aviation", "recon"];
+const CLEARED = ["ballistic", "mig", "cruise", "shahed-jet", "drone-rocket",
+                 "shahed", "aviation", "recon"];
 
 const ALARM_FOR = {
   recon: "recon", mig: "mig", shahed: "drone", "shahed-jet": "drone-jet",
+  "drone-rocket": "drone-jet",
   cruise: "cruise", ballistic: "ballistic", kab: "cruise",
   aviation: "none", mixed: "ballistic", unknown: "drone", none: "none",
 };
@@ -374,7 +375,8 @@ const UA = {
   },
   threat: {
     recon: "розвідник", mig: "МіГ-31К", shahed: "дрон",
-    "shahed-jet": "реактивний дрон", cruise: "ракета", ballistic: "балістика",
+    "shahed-jet": "реактивний дрон", "drone-rocket": "дрон-ракета",
+    cruise: "ракета", ballistic: "балістика",
     kab: "КАБ", aviation: "інша авіація", mixed: "змішано",
     unknown: "невідомо", none: "нічого",
   },
@@ -382,7 +384,8 @@ const UA = {
     none: "нічого не летить", unknown: "летить, але що — не сказано",
     recon: "не шкодить",
     mig: "тривога на всю країну", shahed: "хвилини",
-    "shahed-jet": "мало хвилин", cruise: "хвилини", ballistic: "часу немає",
+    "shahed-jet": "мало хвилин", "drone-rocket": "мало хвилин",
+    cruise: "хвилини", ballistic: "часу немає",
     aviation: "задовго до тривоги",
   },
   alarm: {

@@ -39,8 +39,8 @@ LEVELS = {"info", "alert"}
 ALARMS = {"alert", "ballistic", "mig", "cruise", "drone-jet", "drone",
           "recon", "clear-partial", "clear", "none"}
 SILENT_REASONS = {"too-far", "already-notified", "resolved", "insufficient"}
-THREATS = {"none", "unknown", "recon", "mig", "shahed", "shahed-jet", "cruise",
-           "ballistic", "kab", "aviation", "mixed"}
+THREATS = {"none", "unknown", "recon", "mig", "shahed", "shahed-jet",
+           "drone-rocket", "cruise", "ballistic", "kab", "aviation", "mixed"}
 MODALITIES = {"live-threat", "aftermath", "summary-news", "non-threat"}
 SCOPES = {"my-area", "my-district", "city", "oblast", "elsewhere", "unknown"}
 CERTAINTIES = {"confirmed", "probable", "lost", "clear"}

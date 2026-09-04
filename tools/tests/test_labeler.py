@@ -170,8 +170,8 @@ def test_every_threat_maps_to_an_alarm():
     notification with no channel to fire on."""
     from tools.nlp import hints
 
-    for t in ("recon","shahed","shahed-jet","cruise","ballistic","kab",
-              "aviation","mixed","unknown","none"):
+    for t in ("recon","shahed","shahed-jet","drone-rocket","cruise","ballistic",
+              "kab","aviation","mixed","unknown","none"):
         assert hints.alarm_for(t), t
 
 
@@ -300,6 +300,28 @@ def test_the_page_filters_on_the_inherited_scope():
     assert "eff(m)" in block
     # The stated scope must not be consulted directly anywhere in the filters.
     assert "m.s ===" not in block, block
+
+
+def test_every_class_the_hints_can_emit_has_a_button_and_a_word():
+    """The page is where a night gets labelled, so a class the prefill can
+    produce with no button to confirm it is a class nobody can label -- and the
+    prefill would sit there stating something the page has no word for.
+
+    Caught when `drone-rocket` arrived: `hints` began emitting it over 357
+    messages while the page still knew eleven classes."""
+    from tools.nlp import hints
+
+    src = (Path(__file__).resolve().parents[1] / "labeler" / "template.html"
+           ).read_text(encoding="utf-8")
+    rows = src[src.index("const THREATS_MAIN = ["):src.index("const MODALITIES")]
+    alarms = src[src.index("const ALARM_FOR = {"):]
+    alarms = alarms[:alarms.index("};")]
+    words = src[src.index("  threat: {"):]
+    words = words[:words.index("},")]
+    for kind, _pattern in hints.THREAT_RULES:
+        assert f'"{kind}"' in rows, kind
+        assert kind in alarms, kind
+        assert kind in words, kind
 
 
 def test_a_stated_scope_is_never_overridden_by_an_inherited_one():

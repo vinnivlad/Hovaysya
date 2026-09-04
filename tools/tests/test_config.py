@@ -119,6 +119,9 @@ def test_the_quiet_hours_keep_only_what_leaves_minutes():
     assert cfg.sounds_at(3, "ballistic")
     assert not cfg.sounds_at(3, "shahed-jet")
     assert cfg.sounds_at(12, "shahed-jet")          # outside the window
+    # A drone rocket keeps the jet Shahed's night, because it keeps its rules.
+    assert not cfg.sounds_at(3, "drone-rocket")
+    assert cfg.sounds_at(12, "drone-rocket")
     # ...and the window wraps midnight.
     assert not cfg.sounds_at(23, "cruise")
     assert cfg.sounds_at(22, "cruise")

@@ -39,7 +39,8 @@ MAX_EPISODE_GAP_S = 60 * 60
 
 ALARM_FOR_THREAT = {
     "recon": "recon", "mig": "mig", "shahed": "drone",
-    "shahed-jet": "drone-jet", "cruise": "cruise", "kab": "cruise",
+    "shahed-jet": "drone-jet", "drone-rocket": "drone-jet",
+    "cruise": "cruise", "kab": "cruise",
     "ballistic": "ballistic", "aviation": "none", "mixed": "ballistic",
     "unknown": "drone", "none": "none",
 }

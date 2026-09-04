@@ -713,6 +713,9 @@ def test_when_there_is_no_reason_it_just_says_alert():
     named = observe(T0, "⚠️Реактивний шахед на Жуляни.")
     assert _fallback(named, "shahed-jet") == ["Реактивний шахед", "Жуляни"]
 
+    rocket = observe(T0, "❗️Бандероль на Жуляни.")
+    assert _fallback(rocket, "drone-rocket") == ["Дрон-ракета", "Жуляни"]
+
     placeless = observe(T0, "Ще ціль")
     assert _fallback(placeless, None) == []      # ...so the caller says Тривога
 
@@ -1019,6 +1022,42 @@ def test_each_rung_rings_once():
     assert not out[2][1], out                 # a drone is the rung it is already on
     assert out[3][1] and out[3][2] == "threat level rose", out
     assert not out[4][1], out                 # ...and back down does not ring
+
+
+def test_a_drone_rocket_does_not_climb_to_the_cruise_rung():
+    """Why the class exists at all, in his words: "просто хочу щоб воно дарма не
+    піднімало загрозу до крилатих ракет, там сильно суворіші правила".
+
+    Read as cruise, this line rang twice over: once for the climb from the drone
+    rung, and once for the oblast rung of the cruise ladder, which exists
+    because a real cruise missile crossing the oblast buys six minutes. A
+    Бандероль over Chernihivshchyna buys nothing of the kind."""
+    out = _play([
+        (0, "mon1tor_ua", "⚠️2 реактивні шахеди на Київ/Бровари."),
+        (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (200, "mon1tor_ua",
+         "Бандероль на північному сході Київщини - курсом на Вишгород."),
+    ])
+    assert out[1][1], out                     # the siren itself
+    assert not out[2][1], out                 # the same rung, and too far
+    assert out[2][2] != "cruise coming closer", out
+
+
+def test_a_drone_rocket_over_the_city_is_not_enough_to_wake_anybody():
+    """The other half of "правила такі ж як для shahed-jet": rule 12, where a
+    drone over Kyiv is worth knowing and not worth waking for. As cruise this
+    was an `alert` on the city rung."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (200, "mon1tor_ua", "❗️2 крилаті ракети Бандероль на Київ."),
+        (900, "mon1tor_ua", "❗️Ще 2 крилаті ракети Бандероль на Київ."),
+    ])
+    # The first one still explains the siren, in words and without a sound, and
+    # it names the new class while doing it.
+    assert not out[1][1] and out[1][2] == "what the siren was about", out
+    assert "дрон-ракета" in out[1][3], out
+    assert not out[2][1], out
+    assert out[2][2] == "insufficient: city-wide is not enough for a drone", out
 
 
 def test_a_fall_does_not_reset_the_ladder():
@@ -1683,7 +1722,10 @@ def test_a_climb_says_where_it_is_climbing_from():
             # about Sumshchyna and is correctly none of our business.
             (600, "mon1tor_ua", "❗️ 3 групи КР від Конотопа у напрямку Ніжина."
                                 + chr(10) + "Далі рух на Київщину."),
-            (1200, "mon1tor_ua", "🔴2 ракети бандероль на Оболонський район Києва.")):
+            # A real cruise missile, and it used to be a Бандероль -- which now
+            # has a class of its own and a drone's rung, so it no longer climbs
+            # anywhere. See `drone-rocket` in `hints.THREAT_RULES`.
+            (1200, "mon1tor_ua", "🔴2 крилаті ракети на Оболонський район Києва.")):
         o = observe(T0 + off, text, False, channel)
         d = decide(o, tr)
         tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None,

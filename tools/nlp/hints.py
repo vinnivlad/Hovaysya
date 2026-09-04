@@ -25,10 +25,41 @@ THREAT_RULES: tuple[tuple[str, str], ...] = (
     # deliberately does not ring on launch, because a cruise missile flies for
     # hours. For something supersonic that is the wrong end of the trade.
     ("ballistic", r"балісти|іскандер|кн-?23|брсд|кинжал|кинджал|циркон|онікс"),
+    # Between the drones and the cruise missiles, and it exists because of what
+    # the channels call it: "крилаті ракети Бандероль", "мгКР Бандероль". Read
+    # as cruise, a Бандероль crossing the oblast rang twice over -- the climb
+    # from the drone rung, and the oblast rung of the cruise ladder -- and both
+    # of those are bought by a weapon that flies for hours. This one does not.
+    # His ruling: "просто хочу щоб воно дарма не піднімало загрозу до крилатих
+    # ракет, там сильно суворіші правила".
+    #
+    # So it has to sit ABOVE cruise: the phrase names крилата ракета outright,
+    # and the first match wins. Measured over the corpus, 357 messages change
+    # class and every one of them lands here: 333 from cruise, 14 from
+    # shahed-jet, 6 from shahed, 3 from nothing at all, 1 from recon.
+    #
+    # `мгКР` is малогабаритна крилата ракета -- 51 messages, all of them this
+    # weapon, with no other meaning anywhere in the corpus, so the abbreviation
+    # is safe on its own. Three of those name no other weapon beside it,
+    # including one over the Vyshhorod district that read as no threat at all.
+    # `\bмг?кр\b` covers `мКР` too, and the word boundary keeps it out of the
+    # cruise rule's own `\bкр\b`.
+    #
+    # Only Герань-5 of the family, his call. The corpus writes them with a
+    # number and no ending, but a declined form is one message away, so the
+    # pattern keys on the number: `Герані-5` and `гераней-5` land here while
+    # Герань-2 stays a Shahed and Герань-3/4 stay jet ones.
+    #
+    # The cost, measured rather than assumed: a message naming a Бандероль
+    # *and* a real cruise missile now reads as this class. Thirteen such
+    # messages, eight of which stay ballistic because that rule is still first,
+    # and the four that actually drop are all about Odesa and Chornomorsk --
+    # none of them in his ring.
+    ("drone-rocket", r"бандерол|геран\w*[\s\-–—]*5|\bмг?кр\b"),
     # The boundaries around "кр" are load-bearing: the channels abbreviate
     # крилата ракета that way, and without them it also matches Крушинка,
     # кружляють, and Крим.
-    ("cruise", r"крилат|калібр|х-?101|х-?59|х-?55|бандерол|\bкр\b|\bкрів\b"),
+    ("cruise", r"крилат|калібр|х-?101|х-?59|х-?55|\bкр\b|\bкрів\b"),
     # `рБпЛА` is the channels' own abbreviation for a jet drone, and it matched
     # nothing at all — 26 messages read as "nothing is flying". The bare `бпла`
     # rule below cannot catch it: there is no word boundary inside `рбпла`.
@@ -109,6 +140,12 @@ ALARM_FOR_THREAT = {
     "cruise": "cruise",
     "kab": "cruise",
     "shahed-jet": "drone-jet",
+    # The same tone as a jet Shahed, on purpose. A separate class is about
+    # which rules apply, not about a seventh sound -- "правила поки такі ж
+    # як і для shahed-jet" -- and sharing `drone-jet` is what puts it in
+    # `DRONE_TONES`, and so under `drone_needs_home` and the quiet hours,
+    # for free.
+    "drone-rocket": "drone-jet",
     "shahed": "drone",
     "recon": "recon",
     "aviation": "none",
