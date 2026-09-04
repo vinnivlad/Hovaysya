@@ -1110,6 +1110,59 @@ def test_a_forecast_during_an_announced_alert_is_not_news():
     assert out[1][2] != "a siren is expected", out
 
 
+def test_the_nights_standing_advice_does_not_climb_the_ladder():
+    """His report at 21:26 on 2026-09-04, in the middle of a real drone raid:
+    "хибне спрацювання на загрозу балістики" for
+
+        Вночі реагуємо на балістичні удари. Отримано 🔴 сигнал!
+
+    It came out as an `alert` on the ballistic tone saying "Загроза: балістика."
+    The siren had rung for a jet Shahed eleven minutes earlier, so the class
+    alone was a climb from the drone rung to the ballistic one.
+
+    Two things had to be true for it to ring, and both are now false: it counted
+    as evidence of flight, because a preposition matched `place-with-threat`
+    where no place is named; and it counted as confirmed, because nothing in the
+    anticipation vocabulary knew "реагуємо на <class>"."""
+    out = _play([
+        (0, "mon1tor_ua", "⚠️ 3 реактивні шахеди на Київщину, Броварський р-н."),
+        (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (960, "nebo_raketa",
+         "Вночі реагуємо на балістичні удари. Отримано 🔴 сигнал!"),
+    ])
+    assert out[1][1], out                      # the siren still rings
+    assert not out[2][1], out                  # ...and the night's advice does not
+    assert out[2][2] != "threat level rose", out
+
+
+def test_a_warning_for_the_night_ahead_does_not_climb_either():
+    """His own invented case, built to get past the first fix -- and it did,
+    because the `на` that made it a course sits in the next sentence:
+
+        На ніч отримано попередження на балістику. Реагуємо на загрози
+    """
+    out = _play([
+        (0, "mon1tor_ua", "⚠️ 3 реактивні шахеди на Київщину, Броварський р-н."),
+        (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (960, "nebo_raketa",
+         "На ніч отримано попередження на балістику. Реагуємо на загрози"),
+    ])
+    assert not out[2][1], out
+    assert out[2][2] != "threat level rose", out
+
+
+def test_a_ballistic_warning_in_the_moment_still_climbs():
+    """The guard against fixing too much. The rung exists for exactly this: a
+    siren for a drone, then a ballistic warning, which is a different situation
+    and was arriving silently before rule 7 existed."""
+    out = _play([
+        (0, "mon1tor_ua", "⚠️2 реактивні шахеди на Київ/Бровари."),
+        (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (200, "mon1tor_ua", "❗️❗Загроза пуску балістичних ракет Іскандер-М."),
+    ])
+    assert out[2][1] and out[2][2] == "threat level rose", out
+
+
 def test_a_drone_rocket_does_not_climb_to_the_cruise_rung():
     """Why the class exists at all, in his words: "просто хочу щоб воно дарма не
     піднімало загрозу до крилатих ракет, там сильно суворіші правила".

@@ -219,6 +219,90 @@ def test_the_forecast_carries_its_minutes():
     assert hints.forecast_eta("Невдовзі можлива тривога у столиці") is None
 
 
+def test_a_preposition_with_no_place_is_not_a_place():
+    """The shape is called `place-with-threat` and never checked for a place.
+
+    His report at 21:26 on 2026-09-04: "Вночі реагуємо на балістичні удари.
+    Отримано 🔴 сигнал!" rang the ballistic tone in the middle of a drone raid.
+    It names no place at all -- the `на` governs the threat itself -- and rule 7
+    already carries a guard for lines with no evidence of flight, which this
+    shape defeated by calling a preposition evidence.
+
+    Measured over the corpus before changing it: 24 messages hold their live
+    reading on this shape alone while naming no toponym, and not one is a
+    threat. Three are fundraisers ("Збір помсти на 3 далекобійні БпЛА"), the
+    rest are rechecks and negations -- "Над столицею наразі без ракет!",
+    "Чисто на ракети", "На зараз без фіксації балістики".
+    """
+    for text in ("Вночі реагуємо на балістичні удари. Отримано 🔴 сигнал!",
+                 "📡Станом на зараз без фіксації балістичних ракет.",
+                 "Над столицею наразі без ракет!",
+                 "Збір помсти на 3 далекобійні БпЛА для ГУР МОУ!"):
+        assert "place-with-threat" not in hints.live_shapes(text), text
+
+    # ...and it still does its own job, which is a place named between the
+    # preposition and the class.
+    for text in ("🔴 На Жуляни шахед", "над Оболонню реактивний БпЛА"):
+        assert "place-with-threat" in hints.live_shapes(text), text
+
+
+def test_a_preposition_in_the_next_sentence_is_not_a_course():
+    """`threat-toward-place` reads "балістика на Київ" -- a class, then where it
+    is going. Nothing stopped the two from being in different sentences.
+
+    His invented case, and it is the better test because he built it to get
+    past the first fix: "На ніч отримано попередження на балістику. Реагуємо на
+    загрози." The `на` that made this a course is the one in front of
+    "загрози", a sentence later.
+
+    Measured: 30 messages across the corpus stop being live once both this and
+    the shape above are tightened, and they are rechecks, all-clears,
+    negations, fundraisers and commentary. The one real report among them --
+    "Три БпЛА долетіли до зони (ЧЗВ). Рух на захід." -- is oblast-scope and
+    silenced by rule 4 whatever this says.
+    """
+    for text in ("На ніч отримано попередження на балістику. Реагуємо на загрози",
+                 "Балістику зняли. Тривожимось на реактивні",
+                 "Очікуємо на відбій по балістиці, і лягаємо спати"):
+        assert "threat-toward-place" not in hints.live_shapes(text), text
+
+    # One sentence, and it is the shape's whole purpose.
+    for text in ("⚠️2 реактивні шахеди на Київ/Бровари",
+                 "❗Балістична ракета на Київ",
+                 "Крилаті ракети курсом на Вишгород"):
+        assert "threat-toward-place" in hints.live_shapes(text), text
+
+
+def test_a_received_signal_is_a_warning_and_not_an_event():
+    """His words: "Отримано сигнал - це не справжня загроза, а попередження про
+    імовірну загрозу."
+
+    The construction is the discriminator rather than the verb. `реагуємо`
+    appears in 33 messages across six channels and some are real reports --
+    "Заходять групи крилатих ракет в Чернігівську область. Реагуємо." -- so
+    keying on the word alone would cost misses. What marks advice is the class
+    being the *object* of the reaction: реагуємо -> на -> class.
+
+    Measured: 21 messages match this vocabulary, 15 of them change meaning, and
+    every one is a warning or a comment. Three are the same standing form --
+    "Отримано червоний сигнал щодо загрози обстрілу Києва та області протягом
+    двох діб" -- which is his definition word for word.
+    """
+    for text in ("Вночі реагуємо на балістичні удари. Отримано 🔴 сигнал!",
+                 "На ніч отримано попередження на балістику. Реагуємо на загрози",
+                 "🔴 Отримано червоний сигнал щодо загрози обстрілу балістикою "
+                 "Києва та області протягом двох діб!",
+                 "Реагуємо на можливі балістичні загрози впродовж ночі",
+                 "Щодо ночі: з 23:30 реагуємо на балістику, спускаємось в укриття"):
+        assert hints.suggest(text)["certainty"] == "probable", text
+
+    # A report that ends with advice is still a report: the class comes first
+    # and the reaction after it.
+    for text in ("Крилаті на Сумщині, реагуємо!",
+                 "Заходять групи крилатих ракет в Чернігівську область. Реагуємо."):
+        assert hints.suggest(text)["certainty"] == "confirmed", text
+
+
 def test_recon_and_aviation():
     assert hints.threat_hint("📡Дорозвідка розвідувальним БпЛА") == "recon"
     assert hints.threat_hint("✈️ Активність тактичної авіації") == "aviation"

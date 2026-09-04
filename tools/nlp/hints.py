@@ -118,7 +118,22 @@ _ANTICIPATED = re.compile(
     r"ймовірн\w*|"
     r"протягом\s+\d+\s+(годин|діб|дні)|"
     r"на\s+наступн\w*|прогноз|"
-    r"загроза\s+балісти|загроза\s+застосування",
+    r"загроза\s+балісти|загроза\s+застосування|"
+    # A warning *received* is not a threat observed -- his ruling, about the
+    # line that rang: "Отримано сигнал - це не справжня загроза, а
+    # попередження про імовірну загрозу." The same channel writes it as
+    # "Отримано червоний сигнал щодо загрози обстрілу балістикою Києва та
+    # області протягом двох діб", which is that sentence word for word.
+    r"отримано[^.!?\n]{0,25}(попередженн|сигнал)|"
+    # Advice, told apart from a report by which side of the verb the class
+    # is on. `реагуємо` appears in 33 messages across six channels and some
+    # are real -- "Заходять групи крилатих ракет в Чернігівську область.
+    # Реагуємо." -- so the word alone would cost misses. What marks advice is
+    # the class being the *object* of the reaction: реагуємо -> на -> class.
+    # Measured: 21 messages match, 15 change meaning, every one of them a
+    # warning or a comment rather than something in the air.
+    r"реагу\w*\s+(?:\w+\s+){0,2}на\s+(?:\w+\s+){0,3}"
+    r"(балісти|крилат|шахед|бпла|дрон|\bкаб\b|ракет|загроз|тривог)",
     re.IGNORECASE,
 )
 
@@ -169,7 +184,18 @@ _THREAT_WORD = (
 )
 LIVE_SHAPES: tuple[tuple[str, str], ...] = (
     ("count-marker", r"\b\d+\s*[хx]\b"),
-    ("threat-toward-place", _THREAT_WORD + r".{0,40}\b(на|над|з|через|курсом)\b"),
+    # `[^.!?\n]` and not `.`: the class and the preposition have to be in the
+    # same sentence, because "балістика на Київ" is a course and "балістику
+    # зняли. Тривожимось на реактивні" is two facts. His invented case is the
+    # one that named this -- "На ніч отримано попередження на балістику.
+    # Реагуємо на загрози" -- where the `на` that made it a course sits a
+    # sentence later, in front of "загрози".
+    #
+    # The newline counts as a boundary too. The channels write two facts on
+    # two lines constantly, and reading across one is how the feed once folded
+    # a message about two things into one sentence about one.
+    ("threat-toward-place",
+     _THREAT_WORD + r"[^.!?\n]{0,40}\b(на|над|з|через|курсом)\b"),
     ("place-with-threat", r"\b(на|над)\b.{0,25}" + _THREAT_WORD),
     ("movement", r"продовжує рух|залітає|залетіл|наближ|прямує|рухається|"
                  r"зміна курсу|вектор|\bдалі\b|[ву]\s+бік|\bпадає|\bпадают|"
@@ -939,6 +965,23 @@ def _launch_origins() -> frozenset[str]:
 def live_shapes(text: str) -> list[str]:
     """Which structural live-threat templates the text matches, if any."""
     found = [name for name, rx in _LIVE if rx.search(text or "")]
+    # `place-with-threat` means what its name says, and the pattern never
+    # checked for the place: `\b(на|над)\b` followed by a class matches
+    # "реагуємо на балістичні удари", where the preposition governs the threat
+    # and nothing is anywhere. That is what rang at 21:26 on 2026-09-04 --
+    # "Вночі реагуємо на балістичні удари. Отримано 🔴 сигнал!" -- in the middle
+    # of a drone raid, because rule 7's guard asks for evidence of flight and
+    # this shape was supplying it.
+    #
+    # Measured over the corpus: 24 messages hold their live reading on this
+    # shape alone while naming no toponym at all, and not one of them is a
+    # threat. Three are fundraisers, the rest rechecks and negations.
+    #
+    # Filtered here rather than folded into the regex because the requirement is
+    # not a pattern -- it is the gazetteer, the same way `threat-with-place` and
+    # `emoji-with-place` below ask for it.
+    if "place-with-threat" in found and not place_spans(text or ""):
+        found.remove("place-with-threat")
     if is_bare_place_list(text):
         found.append("bare-place-list")
     if has_marker_emoji(text) and place_spans(text):
