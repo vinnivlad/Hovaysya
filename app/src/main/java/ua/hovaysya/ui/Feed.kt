@@ -73,13 +73,13 @@ fun HovaysyaFeed(store: Store) {
 
     Feed(
         title = "Ховайся",
-        subtitle = "що казав Ховайся · найновіші внизу",
+        subtitle = "що казав Ховайся · найновіші зверху",
         empty = "За останні дні Ховайся нічого не казав.",
         problem = problem,
         isEmpty = rows.isEmpty(),
         count = rows.size,
     ) {
-        items(rows, key = { it.cursor }) { row ->
+        items(rows.asReversed(), key = { it.cursor }) { row ->
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -176,13 +176,13 @@ fun ChannelFeed(store: Store) {
 
     Feed(
         title = "Канали",
-        subtitle = "усі канали, останні 30 хв · найновіші внизу",
+        subtitle = "усі канали, останні 30 хв · найновіші зверху",
         empty = "За останні 30 хвилин тихо.",
         problem = problem,
         isEmpty = rows.isEmpty(),
         count = rows.size,
     ) {
-        items(rows, key = { "${it.channel}/${it.id}" }) { post ->
+        items(rows.asReversed(), key = { "${it.channel}/${it.id}" }) { post ->
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -212,18 +212,30 @@ fun ChannelFeed(store: Store) {
 }
 
 /**
- * Oldest at the top, newest at the bottom, and the view sitting at the bottom --
- * his: "зроби новіші повідомлення внизу, а не згори. Так в Телеграм, звичніше."
+ * Newest at the top, and the view sitting at the top -- his direction, after
+ * living with the other way round: "в додатку фід Ховайся і фід всіх каналів
+ * давай вертаємо щоб новіші зверху."
  *
- * Which is more than habit. A feed that grows downwards puts the newest line
- * where the thumb already is and where the eye last was, and every message app
- * anybody here uses has taught that for years. Reading a raid upwards means
- * re-learning the direction of time at the moment least suited to it.
+ * It was the Telegram habit before this ("зроби новіші повідомлення внизу, а не
+ * згори. Так в Телеграм, звичніше"), and the argument for it was that a feed
+ * growing downwards puts the newest line where the thumb already is. What that
+ * argument missed is what these two screens are for. A chat is a conversation
+ * you are inside of, so it reads forwards; these answer "what is happening" and
+ * "why do you say that", and the answer to both is the last line rather than the
+ * first. Opening the app during a raid should not mean scrolling to the end of
+ * half an hour of channel traffic to find out. The main screen has said the
+ * newest thing first since it existed, so this also stops two screens out of
+ * three from disagreeing about which way time runs.
  *
- * The list follows new arrivals only when it is already at the bottom. Somebody
- * scrolled up is reading something, and yanking them away from it to show a line
- * they have not asked for is how a feed becomes unusable during exactly the hour
- * it matters.
+ * The list follows new arrivals only when it is already at the top. Somebody
+ * scrolled down is reading something, and yanking them away from it to show a
+ * line they have not asked for is how a feed becomes unusable during exactly the
+ * hour it matters.
+ *
+ * What makes that safe with the newest first is the `key` on every row: new
+ * messages now arrive *above* whatever is being read, and a list keyed by index
+ * alone would shift the reader down by one row for each of them. Keyed, the
+ * scroll position stays on the message it was on.
  */
 @Composable
 private fun Feed(
@@ -239,11 +251,9 @@ private fun Feed(
     var opened by remember { mutableStateOf(false) }
     LaunchedEffect(count) {
         if (count == 0) return@LaunchedEffect
-        val info = listState.layoutInfo
-        val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
-        val wasAtBottom = lastVisible >= info.totalItemsCount - 2
-        if (!opened || wasAtBottom) {
-            listState.scrollToItem(count - 1)
+        val wasAtTop = listState.firstVisibleItemIndex <= 1
+        if (!opened || wasAtTop) {
+            listState.scrollToItem(0)
             opened = true
         }
     }
