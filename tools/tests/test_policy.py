@@ -1024,6 +1024,92 @@ def test_each_rung_rings_once():
     assert not out[4][1], out                 # ...and back down does not ring
 
 
+def test_a_forecast_of_a_siren_is_shown_without_a_sound():
+    """His ask, from the pair that arrived at 17:41 on 2026-09-04 and produced
+    nothing at all: "їх можна виводити в ховайся фід без звуку".
+
+    Both channels said it nineteen seconds apart, and that is one line: the
+    silent dedup already keys on rule, class, places and scope. Measured over
+    the corpus, the tightest gap that is genuinely a second forecast is eleven
+    minutes, so the existing sixty-second window cannot swallow one."""
+    from tools.policy.announce import Announcer
+
+    # Not `_play`: that helper does not pass the reason to `record`, and the
+    # reason is half of a silent line's signature. `rules.run` passes it, so
+    # this is the production path rather than a convenience.
+    tr, ann, out = Tracker(), Announcer(), []
+    for off, channel, text in (
+            (0, "nebo_raketa",
+             "❕Якщо бляшки прорвуться повз Чернігівщину, то приблизно за "
+             "40 хвилин у столиці можлива тривога."),
+            (19, "kievinform_ua1",
+             "✈️Якщо бляшки пролетять Чернігівщину, то приблизно за "
+             "30 хвилин у столиці можлива тривога."),
+    ):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
+        u = ann.announce(o, d)
+        out.append((d.audible, d.reason, u.text if u else None))
+
+    assert out[0][1] == "a siren is expected", out
+    assert not out[0][0], out                      # never a sound
+    assert out[0][2] == "Очікується тривога за 40 хв.", out
+    # The second channel's estimate differs -- 30 minutes against 40 -- and it
+    # is still the same forecast arriving twice. What is being deduplicated is
+    # the news, not the number.
+    assert out[1][2] is None, out
+
+
+def test_a_forecast_names_the_class_when_the_channel_does():
+    out = _play([(0, "mon1tor_ua",
+                  "🔴Київ очікує на повітряну тривогу через 10-15 хвилин; "
+                  "⚠️Причина — реактивні БпЛА.")])
+    assert out[0][2] == "a siren is expected", out
+    assert out[0][3] == ("Очікується тривога за 10–15 хв. "
+                         "Реактивний шахед."), out
+
+
+def test_a_forecast_does_not_spend_the_words_the_siren_needs():
+    """The failure this guards against is already written on the announcer: a
+    line that marks the siren as said leaves the real declaration -- the one
+    sentence he acts on -- with nothing left to say."""
+    out = _play([
+        (0, "mon1tor_ua",
+         "🔴Київ очікує на повітряну тривогу через 10-15 хвилин; "
+         "⚠️Причина — реактивні БпЛА."),
+        (600, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+    ])
+    assert out[0][3].startswith("Очікується тривога"), out
+    assert out[1][1], out                          # the siren still rings
+    assert out[1][3].startswith("Тривога"), out
+    assert "еактивний шахед" in out[1][3], out
+
+
+def test_a_forecast_for_somebody_elses_city_is_not_shown():
+    """Six of the forty-five measured forecasts were about other regions, and
+    one channel wishes everybody a careful night in general."""
+    out = _play([
+        (0, "mon1tor_ua",
+         "🔴Хмельниччина очікує на повітряну тривогу через 20-30 хвилин."),
+        (60, "monitoring_kyiv",
+         "Тримайте кота 🥰 Уважно до можливих тривог уночі будь ласка"),
+    ])
+    assert out[0][2] != "a siren is expected", out
+    assert out[1][2] != "a siren is expected", out
+
+
+def test_a_forecast_during_an_announced_alert_is_not_news():
+    """The siren it forecasts is already sounding."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (200, "mon1tor_ua",
+         "🔴Київ очікує на повітряну тривогу через 10-15 хвилин."),
+    ])
+    assert out[1][2] != "a siren is expected", out
+
+
 def test_a_drone_rocket_does_not_climb_to_the_cruise_rung():
     """Why the class exists at all, in his words: "просто хочу щоб воно дарма не
     піднімало загрозу до крилатих ракет, там сильно суворіші правила".

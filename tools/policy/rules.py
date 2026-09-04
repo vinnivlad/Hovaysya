@@ -100,6 +100,11 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     ep = tracker.before(obs)
     cfg = tracker.config
 
+    # A siren forecast about his city, computed once because two rules need it:
+    # rule 4, whose premise it contradicts, and rule 11d, which shows it.
+    forecast_here = (hints.siren_forecast(obs.text)
+                     and bool(obs.ring_places or hints.names_capital(obs.text)))
+
     # A message stating no type inherits the episode's. "Жуляни" during a
     # ballistic wave is that wave, not a new drone — reading it in isolation
     # produced a false wake-up the user annotated "Ця балістика вже розбудила".
@@ -302,7 +307,17 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
 
     # 4. Another region's target is not our business. Checked after modality so
     #    an all-clear or a launch with no target still gets through above.
-    if not obs.nationwide and obs.scope in ("elsewhere", "unknown"):
+    #
+    #    A forecast of a siren *here* is the one exception, because for those
+    #    this rule's premise is simply false. "Приблизно за 40 хвилин у столиці
+    #    можлива тривога" carries one gazetteer name -- Чернігівщина, where the
+    #    drones are now -- and resolves to `elsewhere` while being entirely
+    #    about Kyiv. Both channels' lines at 17:41 on 2026-09-04 died right
+    #    here. The exception is narrow on purpose: it lets the message travel
+    #    on down the ordered rules rather than deciding anything itself, so
+    #    every rule that can ring still gets it first.
+    if (not obs.nationwide and obs.scope in ("elsewhere", "unknown")
+            and not forecast_here):
         return _silent("too-far: not near me")
 
     # 5. Falling on Zhuliany always rings, whatever has already been said. His
@@ -683,6 +698,28 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             if wanted:
                 return _notify("alert", alarm, "cruise coming closer")
             return _notify("info", "none", "cruise coming closer, sound off")
+
+    # 11d. A siren that has not happened yet. Shown, never sounded -- his ask,
+    #      about the pair that arrived at 17:41 on 2026-09-04 and produced
+    #      nothing at all: "їх можна виводити в ховайся фід без звуку".
+    #
+    #      Measured before it was written: 1.3 a day about Kyiv, 88% followed
+    #      by a real declaration within ninety minutes, median eleven minutes
+    #      of warning. Neither rare enough to skip nor frequent enough to
+    #      flood.
+    #
+    #      It sits here on purpose -- after every rule that can ring, so a
+    #      forecast can never pre-empt a real one, and before rule 12, which is
+    #      what silenced all of them until now. The geography is read off the
+    #      *text* rather than off the scope: see `names_capital`.
+    #
+    #      Repeats need nothing of their own: the silent dedup in `decide`
+    #      already keys on rule, class, places and scope, and the tightest gap
+    #      in the corpus that is genuinely a second forecast is eleven minutes
+    #      against its sixty-second window. Two channels nineteen seconds apart
+    #      -- which is what happened at 17:41 -- are one line.
+    if forecast_here and not (ep is not None and ep.alert_announced):
+        return _notify("info", "none", "a siren is expected")
 
     # 12. In the city but not near: worth knowing, not worth waking twice — and
     #    for a drone, not worth waking at all. His rule from the first

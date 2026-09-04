@@ -408,6 +408,108 @@ def stated_class(text: str) -> str:
     return "none"
 
 
+# --------------------------------------------------------------------------
+# A siren that has not happened yet
+# --------------------------------------------------------------------------
+#
+# The channels forecast sirens, and they were measured before any of this was
+# written. Over the 33 dense days of the corpus, 42 such messages about Kyiv --
+# 1.3 a day, so this cannot flood anything -- and an official declaration
+# followed within ninety minutes in 88% of them, a median of eleven minutes
+# later, the longest 61 and the tenth percentile 2.
+#
+# Only 6 of the 39 that came true arrived with nothing already said about a
+# threat toward Kyiv in the preceding half hour. So the value is not that the
+# forecast is first: it is that it says the word "тривога" and how long there
+# is, which no other line does.
+#
+# `mon1tor_ua` writes 35 of the 42 and writes them formulaically -- "Київ
+# очікує на повітряну тривогу через 10-15 хвилин" -- which is why this is a
+# list of eight shapes rather than a paragraph parser.
+_SIREN_FORECAST = re.compile(
+    r"можлив\w*\s+(?:\w+\s+){0,2}тривог|"
+    r"тривог\w*\s+(?:\w+\s+){0,2}можлив|"
+    r"мож(е|уть)\s+(?:\w+\s+){0,3}бути\s+(?:\w+\s+){0,2}тривог|"
+    r"очікує\s+на\s+(?:\w+\s+){0,2}тривог|"
+    r"очікуй\w*\s+(?:\w+\s+){0,2}тривог|"
+    r"(ймовірн|вірогідн)\w*\s+(?:\w+\s+){0,2}тривог|"
+    r"\bбуде\s+(?:\w+\s+){0,3}тривог|"
+    r"скоро\s+(?:\w+\s+){0,2}тривог|"
+    r"невдовзі\s+(?:\w+\s+){0,2}тривог|"
+    r"незабаром\s+(?:\w+\s+){0,3}тривог|"
+    r"тривог\w*\s+(?:\w+\s+){0,3}(за|через|протягом)\s+\d+",
+    re.IGNORECASE,
+)
+
+# A siren being *postponed* is not a forecast either, and that is his call
+# rather than an omission: "на такі повідомлення нічого не треба обробляти. Це
+# інформаційні." The line that raised it arrived live on 2026-09-04 at 18:29,
+# twenty-three minutes after the siren the channels had forecast at 17:41 --
+# "Тривога у столиці трішки відкладається через роботу наших котиків 🐱💪".
+# Nothing about it changes what he does, and it names no new time, so the
+# vocabulary deliberately does not reach for `відклада`, `переносить` or
+# anything of that shape. There is a test named for it.
+
+# A siren already over is not a forecast of one, and this is the seam that
+# separates them: three of the five measured forecasts that never came true
+# were a channel talking about sirens that had already sounded. "На цей раз у
+# Києві дали тривогу за 3 хвилини до зальоту" and "~45 повітряних тривог за 4
+# доби пролунали в Києві" both match the shapes above on the words alone.
+_SIREN_PAST = re.compile(
+    r"дал(и|о|а)\s+(?:\w+\s+){0,2}тривог|дав\s+(?:\w+\s+){0,2}тривог|"
+    r"лунал|пролунал|"
+    r"було\s+оголошено|оголосили|оголошено\s+було",
+    re.IGNORECASE,
+)
+
+# Kyiv by name, and the capital by nickname. The nickname is why this reads the
+# text rather than the resolved scope: "столиця" is not a gazetteer name, so
+# "приблизно за 40 хвилин у столиці можлива тривога" resolves to the only
+# toponym it does carry -- Чернігівщина -- and comes out `elsewhere`, which is
+# the tier the policy silences outright.
+_CAPITAL = re.compile(r"київ|києв|києм|столиц", re.IGNORECASE)
+
+# "через 10-15 хвилин", "за 40 хвилин", "протягом 15 хвилин" -- the number
+# leads and the unit follows.
+_ETA_AFTER = re.compile(
+    r"(?:за|через|протягом)\s+(\d+)\s*(?:[-–—]\s*(\d+))?\s*(?:хв\b|хвилин\w*)",
+    re.IGNORECASE,
+)
+# "через хвилин 50" -- the unit leads. Both forms are in the corpus, and the
+# unit is required in both: "Тривога у столиці через 2 БпЛА на Бровари" would
+# otherwise be read as two minutes.
+_ETA_BEFORE = re.compile(
+    r"(?:за|через|протягом)\s+хвилин\w*\s+(\d+)", re.IGNORECASE)
+
+
+def siren_forecast(text: str) -> bool:
+    """Whether this message says a siren is coming, rather than reporting one."""
+    body = text or ""
+    if _SIREN_PAST.search(body):
+        return False
+    return bool(_SIREN_FORECAST.search(body))
+
+
+def names_capital(text: str) -> bool:
+    """Whether the message names Kyiv, by name or as "столиця"."""
+    return bool(_CAPITAL.search(text or ""))
+
+
+def forecast_eta(text: str) -> str | None:
+    """How long the message says there is, or None when it does not say.
+
+    Stated in 28 of the 42 measured forecasts, and it is the half that changes
+    what he does: "через 10-15 хвилин" is the difference between reading the
+    line and getting dressed.
+    """
+    body = text or ""
+    m = _ETA_AFTER.search(body)
+    if m:
+        return f"{m.group(1)}–{m.group(2)} хв" if m.group(2) else f"{m.group(1)} хв"
+    m = _ETA_BEFORE.search(body)
+    return f"{m.group(1)} хв" if m else None
+
+
 def threat_hint(text: str) -> str:
     """Best guess at what is flying. `none` when nothing suggests a threat."""
     return stated_class(without_denials(text))

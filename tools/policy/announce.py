@@ -332,6 +332,25 @@ class Announcer:
                     and here and here <= spoken_places):
                 return None
 
+        # A forecast says the one thing no other line says: that a siren is
+        # coming, and how long there is. It builds its own sentence and returns
+        # here rather than falling through, and that is the point rather than a
+        # shortcut -- the machinery below would mark the siren as said and the
+        # class as named, so the real declaration ten minutes later, the one
+        # sentence he acts on, would have nothing left to say. There is a
+        # comment about exactly that failure in the block it skips.
+        if decision.reason == "a siren is expected":
+            from ..nlp import hints
+
+            eta = hints.forecast_eta(obs.text)
+            said_parts = ["Очікується тривога" + (f" за {eta}." if eta else ".")]
+            if threat:
+                said_parts.append(CLASS_WORD.get(threat, threat).capitalize() + ".")
+            utterance = Utterance(ts=obs.ts, lead=decision.alarm or "none",
+                                  text=" ".join(said_parts))
+            self.queue.append(utterance)
+            return utterance
+
         # "Дорозвідка" is a status, not a threat, and the sentence machinery
         # below would render it as one -- or, with no class stated, as a bare
         # "Тривога". It says what it is.

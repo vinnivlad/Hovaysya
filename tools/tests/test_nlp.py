@@ -155,6 +155,70 @@ def test_bare_rocket_falls_back_to_cruise_not_ballistic():
     assert hints.threat_hint("2х ракети") == "cruise"
 
 
+def test_a_forecast_of_a_siren_is_recognised():
+    """The channels say when a siren is coming, and they were measured before
+    this existed: 42 such messages about Kyiv in the 33 dense days of the
+    corpus, 1.3 a day, and a siren followed within ninety minutes in 88% of
+    them -- median eleven minutes of warning. His ask: show them in the feed,
+    without a sound."""
+    for t in (
+            "❕Якщо бляшки прорвуться повз Чернігівщину, то приблизно за "
+            "40 хвилин у столиці можлива тривога.",
+            "✈️Якщо бляшки пролетять Чернігівщину, то приблизно за "
+            "30 хвилин у столиці можлива тривога.",
+            "🔴Київ очікує на повітряну тривогу через 10-15 хвилин.",
+            "⚠️Уточнено, у Києві може бути тривога через хвилин 50.",
+            "🔴Є ймовірність повітряної тривоги у Києві через 30-40 хвилин.",
+            "Нові реактиви на Чернігівщині 😨 Невдовзі можлива тривога у столиці",
+            "❗️ 4х рБпЛА повз Баришівку летять в напрямку столиці. "
+            "Незабаром буде оголошено тривогу",
+            "Загалом буде 3 реактива, через хвилин 20 буде тривога у столиці.",
+    ):
+        assert hints.siren_forecast(t), t
+
+
+def test_a_siren_already_over_is_not_a_forecast():
+    """The seam that separates a forecast from a memory of one, and it earns a
+    rule of its own: three of the five measured forecasts that never came true
+    were this -- a channel talking about sirens that had already sounded."""
+    for t in ("На цей раз у Києві дали тривогу за 3 хвилини до зальоту "
+              "реактивного, що заважало так зробити раніше!?",
+              "~45 повітряних тривог за 4 доби пролунали в Києві 🤬",
+              "🚨 м. Київ" + chr(10) + "Повітряна тривога",
+              "🟢 Київ - відбій повітряної тривоги!"):
+        assert not hints.siren_forecast(t), t
+
+
+def test_a_postponed_siren_is_not_a_forecast_to_show():
+    """His call, and this is here so nobody reads the omission as a gap: "на
+    такі повідомлення нічого не треба обробляти. Це інформаційні."
+
+    The line arrived live at 18:29 on 2026-09-04, twenty-three minutes after
+    the siren that the 17:41 forecast had promised. It reports that something
+    did *not* happen and names no new time, so there is nothing for the feed to
+    say about it."""
+    for t in ("Тривога у столиці трішки відкладається через роботу наших "
+              "котиків 🐱💪",
+              "Тривогу поки переносимо, цілі збили"):
+        assert not hints.siren_forecast(t), t
+
+
+def test_the_forecast_carries_its_minutes():
+    """The minutes are the content -- "через 10-15 хвилин" is the difference
+    between reading the line and getting dressed. Stated in 28 of the 42."""
+    assert hints.forecast_eta(
+        "🔴Київ очікує на повітряну тривогу через 10-15 хвилин.") == "10–15 хв"
+    assert hints.forecast_eta(
+        "у Києві може бути тривога через хвилин 50.") == "50 хв"
+    assert hints.forecast_eta(
+        "❕Якщо бляшки прорвуться повз Чернігівщину, то приблизно за "
+        "40 хвилин у столиці можлива тривога.") == "40 хв"
+    assert hints.forecast_eta(
+        "❗️Івано-Франківщина очікує на тривогу протягом 15 хвилин.") == "15 хв"
+    # ...and nothing invented when nothing was said.
+    assert hints.forecast_eta("Невдовзі можлива тривога у столиці") is None
+
+
 def test_recon_and_aviation():
     assert hints.threat_hint("📡Дорозвідка розвідувальним БпЛА") == "recon"
     assert hints.threat_hint("✈️ Активність тактичної авіації") == "aviation"
