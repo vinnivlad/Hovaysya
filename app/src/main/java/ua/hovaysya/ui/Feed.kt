@@ -280,7 +280,7 @@ private fun LazyListState.atNewest(): Boolean = with(layoutInfo) {
 }
 
 @Composable
-private fun Feed(
+internal fun Feed(
     title: String,
     subtitle: String,
     empty: String,

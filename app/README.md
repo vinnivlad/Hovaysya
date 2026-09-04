@@ -1,7 +1,9 @@
 # Ховайся, the phone half
 
 Four screens over the API in `tools/serve/api.py`. Kotlin and Jetpack Compose,
-one module, and no dependency that is not AndroidX.
+one module, and no dependency that is not AndroidX -- in the APK. The tests
+add JUnit and Robolectric, which cannot be AndroidX because nothing AndroidX
+runs a JVM test or fakes an Android for one.
 
 ## Why native, and not React Native or a web page
 
@@ -68,6 +70,37 @@ emulator at `http://10.0.2.2:8080` -- but it answers less than it looks like it
 does: `/state` and `/decisions` come from files the watcher writes, so without a
 watcher running locally the first screen reads "НЕ ЗНАЮ" and both feeds are
 empty. `/places`, `/config` and registration work fully.
+
+## Tests
+
+    ./gradlew :app:testDebugUnitTest
+
+**On this machine's JVM, never on a device**, and that is the whole point: they
+run in the same command that builds, so a fault can be watched failing before it
+is called fixed. Robolectric supplies what a plain JVM lacks -- `org.json`,
+`SharedPreferences`, and enough of a window for Compose to lay a list out.
+
+Nothing here is an instrumented test. One that needs an emulator is a test only
+the person with the emulator can run, which leaves the same hole in the
+verification that having no tests did.
+
+What is covered, and why each earned it rather than being reached for:
+
+| | |
+| --- | --- |
+| `ClockTest` | Kyiv time whatever the phone is set to. Every test first moves the default zone to Los Angeles, because the emulator once read 06:28 while Kyiv said 09:28 -- which looks exactly like a watcher that died three hours ago. |
+| `FeedFollowTest` | Sixty rows in, sixty rows out, and the feed still follows. This is his "бісяча бага" written down: the follow keyed on the number of rows, and neither feed changes it when something arrives. Reverting that one word makes four of these six fail. |
+| `ApiTest` | The contract with the watcher, over real HTTP from a `ServerSocket` fixture. The two halves deploy separately -- the server on a timer, the phone when he installs it -- so a renamed field is a screen that silently says nothing. |
+| `SaidPlainlyTest` | That no status code ever reaches the screen. `HTTP 502` did, and it arrives every time the API restarts. |
+| `StoreTest` | The defaults that are decisions: the quiet window off until chosen, and what `forget` has to reach. |
+| `LineTest` | Read the field, never the sentence -- an all-clear is `level="alert"` with `alarm="clear"`, so colouring by level alone drew the end of a raid in the same red as the raid. |
+| `HeldTest` | That forgetting the device leaves nothing of the previous person on the screens, with a count of the fields as a tripwire so a new one cannot be quietly left out. |
+| `WordsTest` | The wordings that are rulings of his: "БЕЗ ТРИВОГ" for watching, "НЕ ЗНАЮ" for not knowing, never calm by default. |
+
+The vibration alphabet is **not** tested here. It is already guarded from the
+Python side, which parses this source for the patterns and checks the pulse
+counts and the gaps in milliseconds -- see `tools/tests/test_repo_hygiene.py`.
+Two tests of one thing is one test and one liability.
 
 ## What is here
 

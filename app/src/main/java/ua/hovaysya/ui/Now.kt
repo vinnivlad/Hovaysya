@@ -314,7 +314,7 @@ private fun Status(health: Health?, problem: String?) {
  * it belongs. What is never collapsed is not knowing: an app that reports calm
  * because it failed to ask is worse than one that admits it.
  */
-private fun headline(screen: Screen?, problem: String?): String = when {
+internal fun headline(screen: Screen?, problem: String?): String = when {
     screen == null && problem != null -> "НЕ ЗНАЮ"
     screen == null -> "…"
     !screen.known -> "НЕ ЗНАЮ"

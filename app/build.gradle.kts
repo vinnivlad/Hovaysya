@@ -135,6 +135,18 @@ android {
         jvmTarget = "17"
     }
 
+    // Unit tests run on this machine's JVM, never on a device, and that is the
+    // whole point: they run in the same command that builds, so a fault can be
+    // watched failing before it is called fixed. Robolectric supplies the parts
+    // of Android that a plain JVM lacks -- `org.json`, `SharedPreferences`, and
+    // enough of a window for Compose to lay a list out -- and needs the app's
+    // resources on the classpath to do it.
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
     buildFeatures {
         compose = true
         // So the app can show which build a phone is running, which is the other
@@ -162,4 +174,17 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // Test only, and never in the APK -- which is what keeps the line in
+    // app/README.md about AndroidX-only dependencies true of the app itself.
+    // `junit` and `robolectric` are not AndroidX and cannot be: nothing
+    // AndroidX runs a JVM test or fakes an Android for it.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core-ktx:1.6.1")
+    testImplementation(compose)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    // The stub activity `createComposeRule` needs. It lives in the debug
+    // manifest because that is the variant the unit tests are built against.
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
