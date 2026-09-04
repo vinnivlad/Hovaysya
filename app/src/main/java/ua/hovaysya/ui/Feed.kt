@@ -13,9 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,13 +26,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import ua.hovaysya.Held
 import ua.hovaysya.Post
 import ua.hovaysya.clock
@@ -71,15 +77,19 @@ fun HovaysyaFeed(store: Store) {
         }
     }
 
+    // One key function, used both to key the list and to tell `Feed` which rows
+    // it is looking at. Two copies would drift, and the follow would then be
+    // watching something the list does not show.
+    val keyOf = { row: Verdict -> row.cursor }
+
     Feed(
         title = "Ховайся",
-        subtitle = "що казав Ховайся · найновіші зверху",
+        subtitle = "що казав Ховайся · найновіші внизу",
         empty = "За останні дні Ховайся нічого не казав.",
         problem = problem,
-        isEmpty = rows.isEmpty(),
-        count = rows.size,
+        keys = rows.map(keyOf),
     ) {
-        items(rows.asReversed(), key = { it.cursor }) { row ->
+        items(rows, key = keyOf) { row ->
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -174,15 +184,16 @@ fun ChannelFeed(store: Store) {
         }
     }
 
+    val keyOf = { post: Post -> "${post.channel}/${post.id}" }
+
     Feed(
         title = "Канали",
-        subtitle = "усі канали, останні 30 хв · найновіші зверху",
+        subtitle = "усі канали, останні 30 хв · найновіші внизу",
         empty = "За останні 30 хвилин тихо.",
         problem = problem,
-        isEmpty = rows.isEmpty(),
-        count = rows.size,
+        keys = rows.map(keyOf),
     ) {
-        items(rows.asReversed(), key = { "${it.channel}/${it.id}" }) { post ->
+        items(rows, key = keyOf) { post ->
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -212,50 +223,116 @@ fun ChannelFeed(store: Store) {
 }
 
 /**
- * Newest at the top, and the view sitting at the top -- his direction, after
- * living with the other way round: "в додатку фід Ховайся і фід всіх каналів
- * давай вертаємо щоб новіші зверху."
+ * Oldest at the top, newest at the bottom, and the view following the newest --
+ * back where it started, and the round trip is worth recording because the
+ * detour proves what the fault was not.
  *
- * It was the Telegram habit before this ("зроби новіші повідомлення внизу, а не
- * згори. Так в Телеграм, звичніше"), and the argument for it was that a feed
- * growing downwards puts the newest line where the thumb already is. What that
- * argument missed is what these two screens are for. A chat is a conversation
- * you are inside of, so it reads forwards; these answer "what is happening" and
- * "why do you say that", and the answer to both is the last line rather than the
- * first. Opening the app during a raid should not mean scrolling to the end of
- * half an hour of channel traffic to find out. The main screen has said the
- * newest thing first since it existed, so this also stops two screens out of
- * three from disagreeing about which way time runs.
+ * His first instruction was the Telegram habit: "зроби новіші повідомлення
+ * внизу, а не згори. Так в Телеграм, звичніше." Then, because new lines were not
+ * appearing without a scroll, "давай вертаємо щоб новіші зверху" -- and that
+ * changed nothing, which was the useful part: "Я думав якщо зробити свіжі
+ * зверху, то це пофікситься." The order was never the fault. So the order goes
+ * back to the one he wanted for its own sake.
  *
- * The list follows new arrivals only when it is already at the top. Somebody
- * scrolled down is reading something, and yanking them away from it to show a
- * line they have not asked for is how a feed becomes unusable during exactly the
- * hour it matters.
+ * **The fault was the trigger.** The follow ran from `LaunchedEffect(count)`,
+ * where `count` is the number of rows -- and neither feed changes its number of
+ * rows when something arrives:
  *
- * What makes that safe with the newest first is the `key` on every row: new
- * messages now arrive *above* whatever is being read, and a list keyed by index
- * alone would shift the reader down by one row for each of them. Keyed, the
- * scroll position stays on the message it was on.
+ *   - `/decisions?said=1&limit=60` answers with exactly sixty rows once three
+ *     days of logs hold that many, and one run alone said eighty-six things. A
+ *     new line pushes the oldest out: sixty before, sixty after. The effect
+ *     never re-ran once -- broken permanently, not intermittently.
+ *   - `/messages?back=30m` is a sliding half hour. One in, one out, and the
+ *     count is unchanged; it worked only when the numbers happened to differ.
+ *
+ * So the key is the identity of the newest row. That is what "something arrived"
+ * means, and it is true of both feeds whatever their length does.
+ *
+ * Whether to follow is decided by **gestures**, not by arrivals. `following` is
+ * set when a scroll *ends*, to whether that scroll ended at the bottom, and
+ * arrivals do not scroll, so they cannot change it. Sampling "am I at the
+ * bottom" at the moment a row lands would answer no every time: the row is
+ * already there, below the fold, so `canScrollForward` has just become true for
+ * the very reason we are asking.
+ *
+ * Somebody scrolled up is reading something, and yanking them away from it is
+ * how a feed becomes unusable during exactly the hour it matters. So instead
+ * they get the count of what arrived while they were reading, on a button that
+ * takes them there -- and the button needs no flag of its own, because the
+ * position already is one: at the bottom is following, away from it is not.
  */
+/**
+ * Whether the newest row is on screen, which is what following means here.
+ *
+ * Not `canScrollForward`. A row taller than the screen -- `war_monitor` writes
+ * nightly summaries that easily are -- leaves the list able to scroll further
+ * after it has been scrolled to, because the rest of that one row is still
+ * below. Read that way, following would drop to false the moment the follow
+ * itself succeeded, and the button would appear while he is looking at the very
+ * line it offers to take him to.
+ *
+ * `totalItemsCount` rather than the row list: this runs inside a long-lived
+ * collector, so anything captured from the composition would go stale on the
+ * next poll while the layout never does.
+ */
+private fun LazyListState.atNewest(): Boolean = with(layoutInfo) {
+    totalItemsCount == 0 || visibleItemsInfo.lastOrNull()?.index == totalItemsCount - 1
+}
+
 @Composable
 private fun Feed(
     title: String,
     subtitle: String,
     empty: String,
     problem: String?,
-    isEmpty: Boolean,
-    count: Int,
+    keys: List<String>,
     rows: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    val newest = keys.lastOrNull()
     var opened by remember { mutableStateOf(false) }
-    LaunchedEffect(count) {
-        if (count == 0) return@LaunchedEffect
-        val wasAtTop = listState.firstVisibleItemIndex <= 1
-        if (!opened || wasAtTop) {
-            listState.scrollToItem(0)
-            opened = true
+    var following by remember { mutableStateOf(true) }
+    // The newest row already counted, so a poll that brings three lines counts
+    // three and not the whole window.
+    var accounted by remember { mutableStateOf<String?>(null) }
+    var unseen by remember { mutableStateOf(0) }
+
+    // Reaching the newest row by hand says the same thing as pressing the
+    // button, so it clears the count the same way. Reading `isScrollInProgress`
+    // rather than the position means this fires once per gesture, at its end,
+    // instead of on every frame of it.
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
+            if (!scrolling) {
+                following = listState.atNewest()
+                if (following) unseen = 0
+            }
         }
+    }
+
+    LaunchedEffect(newest) {
+        if (newest == null) return@LaunchedEffect
+        val last = keys.lastIndex
+        if (!opened) {
+            // Opening the screen lands on the newest line with no animation --
+            // his ask, and an animation here would only be a scroll he did not
+            // make.
+            listState.scrollToItem(last)
+            opened = true
+        } else if (following) {
+            listState.animateScrollToItem(last)
+        } else {
+            // How many arrived since the last one counted. A window that turned
+            // over completely while he was reading -- half an hour of channel
+            // traffic -- has nothing left to count from, and then everything on
+            // screen is fairly called new.
+            val at = keys.indexOf(accounted)
+            unseen += if (at < 0) keys.size else last - at
+        }
+        accounted = newest
+        if (following) unseen = 0
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -268,7 +345,7 @@ private fun Feed(
                         else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (isEmpty && problem == null) {
+        if (keys.isEmpty() && problem == null) {
             Box(
                 Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
@@ -280,12 +357,39 @@ private fun Feed(
                 )
             }
         } else {
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                state = listState,
-                verticalArrangement = Arrangement.Top,
-                content = rows,
-            )
+            Box(Modifier.fillMaxSize()) {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    state = listState,
+                    verticalArrangement = Arrangement.Top,
+                    content = rows,
+                )
+                if (unseen > 0) {
+                    FloatingActionButton(
+                        onClick = {
+                            // Set here as well as in the scroll observer: the
+                            // animation takes a moment, and a button that
+                            // answers next frame feels broken.
+                            unseen = 0
+                            following = true
+                            scope.launch {
+                                listState.animateScrollToItem(keys.lastIndex)
+                            }
+                        },
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = colourFor(Screen.WATCHING),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(20.dp),
+                    ) {
+                        Text(
+                            "↓ " + if (unseen > 99) "99+" else unseen.toString(),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                }
+            }
         }
     }
 }
