@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.IBinder
 import kotlinx.coroutines.CoroutineScope
@@ -212,7 +213,7 @@ class AlertService : Service() {
         }
 
         val accent = getColor(colourOf(screen, problem))
-        return Notification.Builder(this, bell.status)
+        val line = Notification.Builder(this, bell.status)
             .setSmallIcon(R.drawable.ic_bell)
             .setContentTitle(title(screen))
             .setContentText(body)
@@ -229,7 +230,27 @@ class AlertService : Service() {
             // signal that adds no information is just something else to read.
             .setColor(accent)
             .setColorized(true)
-            .build()
+
+        // The same hush on a button, and **only where the gesture cannot
+        // happen**. His report from a second phone, on Android 12: "не дає себе
+        // свайпнути повністю."
+        //
+        // A foreground service's notification is not dismissible before
+        // Android 13 -- the system refuses the swipe, and `setOngoing` above is
+        // not even what refuses it. Google made them dismissible in 13, which
+        // is why the gesture works on his own phone and this read as a fault in
+        // one build rather than as a floor under the whole design.
+        //
+        // Not added on 13 and up, his call: there the swipe is the gesture, and
+        // a button beside it would be a second way to do one thing on the line
+        // he sees all day.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            line.addAction(
+                Notification.Action.Builder(
+                    Icon.createWithResource(this, R.drawable.ic_bell),
+                    "Замовкни", hush).build())
+        }
+        return line.build()
     }
 
     /** Red for an alert, green for none, muted for not knowing. */
