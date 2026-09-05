@@ -75,7 +75,7 @@ class LineTest {
     }
 
     private fun screen(state: String?) = Screen(
-        state = state, at = null, top = null, threat = null,
+        state = state, home = "Жуляни", at = null, top = null, threat = null,
         recon = emptyList(), cleared = emptyList(), peak = 0,
         said = emptyList(), ended = null, note = null, version = null,
     )

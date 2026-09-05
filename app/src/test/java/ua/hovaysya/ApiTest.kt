@@ -131,6 +131,7 @@ class ApiTest {
         val screen = runBlocking { api().screen() }
 
         assertNull(screen.state)
+        assertNull(screen.home)
         assertEquals(false, screen.known)
         assertEquals("7", screen.version)
         assertEquals(0, screen.peak)
@@ -148,7 +149,7 @@ class ApiTest {
              "said": [{"at": "2026-09-04T18:41:25+00:00", "level": "alert",
                        "alarm": "clear", "text": "Відбій тривоги."}],
              "ended": {"at": 1788547000, "lasted_s": 1800},
-             "note": "нотатка", "v": "8"}
+             "note": "нотатка", "home": "Жуляни", "v": "8"}
         """.trimIndent())
 
         val screen = runBlocking { api().screen(wait = 25, version = "7") }
@@ -156,6 +157,8 @@ class ApiTest {
         assertTrue(seen.single(), seen.single().contains("wait=25"))
         assertTrue(seen.single().contains("v=7"))
         assertEquals(Screen.ALERT, screen.state)
+        // Whose sky this answer is about, so the first screen can say so.
+        assertEquals("Жуляни", screen.home)
         assertEquals("дрон-ракета", screen.threat?.word)
         assertEquals("drone-rocket", screen.threat?.cls)
         assertEquals(listOf("балістика"), screen.recon.map { it.word })

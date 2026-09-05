@@ -135,6 +135,13 @@ def snapshot(recipient, said=(), now: int | None = None) -> dict:
     """
     ep = recipient.tracker.episode
     at = int(now if now is not None else 0)
+    # Whose sky this is an answer about. Every number here is decided from it
+    # and the phone had no way to know it: the home lives in the recipient's
+    # settings, which the app can fetch separately -- but a name read twice is
+    # a name that can disagree with itself, and this payload is the one the
+    # first screen already holds open. His ask: "зразу не зрозуміло, де слухає
+    # тривогу".
+    home = getattr(recipient.config, "home", None)
     alerting = ep is not None and ep.official_alert
     lines = _lines(said, ep.opened_at if ep is not None else None, at, alerting)
     ended = None if alerting else _ended(recipient.tracker, at)
@@ -144,7 +151,7 @@ def snapshot(recipient, said=(), now: int | None = None) -> dict:
         # is recognised -- there is nothing left to describe.
         return {"at": at, "state": QUIET, "since": None, "top": None,
                 "threat": None, "recon": [], "cleared": [], "launched": [],
-                "peak": 0, "said": lines, "ended": ended}
+                "peak": 0, "said": lines, "ended": ended, "home": home}
 
     cleared = set(ep.cleared)
     # Reconnaissance is not the threat -- it is the thing his example puts on the
@@ -158,6 +165,7 @@ def snapshot(recipient, said=(), now: int | None = None) -> dict:
 
     return {
         "at": at,
+        "home": home,
         "state": ALERT if ep.official_alert else WATCHING,
         "since": ep.opened_at,
         # The worst thing still in the air, or None when everything named has

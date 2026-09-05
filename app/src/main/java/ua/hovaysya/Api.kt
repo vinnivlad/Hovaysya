@@ -63,6 +63,12 @@ data class Line(
  */
 data class Screen(
     val state: String?,
+    /**
+     * The place every answer here was decided from, which the phone otherwise
+     * has no way to show. Null from a server too old to send it, and from one
+     * that has not been told where somebody lives yet.
+     */
+    val home: String?,
     val at: Long?,
     val top: Named?,
     val threat: Named?,
@@ -220,6 +226,7 @@ class Api(private val base: String, private val token: String?) {
         return get("/state$query", readTimeoutMs = (wait + 10) * 1_000) { o ->
             Screen(
                 state = o.stringOrNull("state"),
+                home = o.stringOrNull("home"),
                 at = o.longOrNull("at"),
                 top = o.namedOrNull("top"),
                 threat = o.namedOrNull("threat"),

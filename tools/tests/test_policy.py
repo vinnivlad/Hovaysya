@@ -2610,6 +2610,30 @@ def test_the_closing_line_survives_the_next_episode_opening():
     assert screen["ended"]["lasted_s"] == 4800, screen["ended"]
 
 
+def test_the_state_says_whose_sky_it_is_watching():
+    """His ask: "додай зверху на 1й табі назву вибраного мікрорайону, бо зразу
+    не зрозуміло, де слухає тривогу."
+
+    The screen is decided from a home the phone never sees. It is in the
+    recipient's own settings, which the app can read separately -- but this
+    payload is the one the first screen already holds open, and a name fetched
+    twice is a name that can disagree with itself."""
+    from tools.policy.config import DEFAULTS, replace
+    from tools.policy.recipients import Recipient
+    from tools.policy.status import snapshot
+
+    here = Recipient(name="він", config=replace(DEFAULTS, home="Жуляни"))
+    assert snapshot(here, now=T0)["home"] == "Жуляни"
+
+    # ...and with an episode open, which is a different return.
+    o = observe(T0, "⚠️Реактивний шахед на Жуляни.", False, "mon1tor_ua")
+    d = decide(o, here.tracker)
+    here.tracker.record(o, d.level if d.notify else None,
+                        d.alarm if d.notify else None, d.reason)
+    assert here.tracker.episode is not None
+    assert snapshot(here, now=T0)["home"] == "Жуляни"
+
+
 def test_a_fresh_alert_clears_the_last_raids_epitaph():
     """"Відбій тривоги" under a headline reading "ТРИВОГА" tells somebody it is
     over while it is not. Once a siren is declared again, the previous raid is

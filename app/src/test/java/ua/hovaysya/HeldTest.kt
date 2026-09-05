@@ -20,7 +20,7 @@ class HeldTest {
     @Before
     fun fill() {
         Held.screen = Screen(
-            state = Screen.ALERT, at = 1L, top = Named("drone-jet", "реактивний"),
+            state = Screen.ALERT, home = "Жуляни", at = 1L, top = Named("drone-jet", "реактивний"),
             threat = null, recon = emptyList(), cleared = emptyList(), peak = 2,
             said = listOf(Line("x", "alert", "drone-jet", "Жуляни")),
             ended = null, note = "нотатка", version = "v1",

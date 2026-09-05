@@ -97,8 +97,19 @@ fun Now(store: Store, onSettings: () -> Unit) {
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+                // ...over where, which the screen never said. Every number
+                // below is decided from one place and it was nowhere on the
+                // screen -- his: "зразу не зрозуміло, де слухає тривогу".
+                //
+                // Nominative and set off with a dot rather than folded into the
+                // sentence: "над Жулянами" is an instrumental, and the app has
+                // no morphology for arbitrary names -- the gazetteer's stems
+                // recognise them, they do not decline them. A wrong case on the
+                // one line that says where somebody lives is worse than a plain
+                // one.
                 Text(
-                    "Стежить за небом.",
+                    "Стежить за небом" +
+                        (screen?.home?.let { " · $it" } ?: "."),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
