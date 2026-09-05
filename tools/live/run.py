@@ -662,18 +662,32 @@ def warm_one(who, conn, now: float) -> tuple[int, list]:
         handle(solo, row["channel"], row["message_id"], row["ts"],
                row["text_norm"], row["reply_to"] is not None, now, warm=True)
         seen += 1
-    # And if ninety minutes of replay left them thinking the sky is clear, ask
-    # the declaring channel. His point, and it is the same bug wearing a
-    # different hat: "це ж і для нового користувача є така бага. У нього немає
-    # історії, як у того, що тільки оновлює застосунок."
+    # And then the declaring channel, unconditionally, exactly as the watcher's
+    # own start-up does it. His point when this began: "це ж і для нового
+    # користувача є така бага. У нього немає історії, як у того, що тільки
+    # оновлює застосунок."
     #
     # He suggested a bigger replay window for this case. One row of declaration
     # does the same job strictly better: a window has to be guessed and 20% of
     # raids outlive ninety minutes, so any window is a bet -- while the official
     # channel's last unanswered word is the answer regardless of when the raid
     # began, and costs one query per registration instead of hours of replay.
-    if who.tracker.episode is None:
-        confirm_with_official([who], conn, now)
+    #
+    # **Unconditionally**, and the condition it used to carry -- only when the
+    # replay had left no episode at all -- is the fault he found on 2026-09-05:
+    # a fresh user registered during an alert declared hours earlier, and the
+    # phone still said "БЕЗ ТРИВОГ". On any real night something is flying, so
+    # an ordinary live message opens an episode, and "there is an episode" was
+    # being read as "we know about the sky". The one it found had been opened by
+    # a drone over another oblast and carried no siren.
+    #
+    # `confirm_with_official` corrects rather than replaces -- that is its own
+    # rule -- so calling it when there is already an episode is safe by
+    # construction, and calling it when the last official word is an all-clear
+    # changes nothing. The two warm paths agreeing is the point: every fault in
+    # this function so far has been one of them doing something the other did
+    # not.
+    confirm_with_official([who], conn, now)
     return seen, solo.log
 
 

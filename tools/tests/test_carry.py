@@ -469,6 +469,48 @@ def test_somebody_who_registers_during_a_raid_is_told_there_is_one():
     assert newcomer.tracker.episode.official_alert is True
 
 
+def test_a_busy_night_does_not_hide_the_raid_from_a_newcomer():
+    """The same case again, and the test above could not see it.
+
+    His report, 2026-09-05: registered a fresh test user on the emulator during
+    an alert declared long before, and the phone still said "БЕЗ ТРИВОГ".
+
+    The replay window is ninety minutes and the declaration was older, which the
+    test above covers -- but only because nothing else happened in those ninety
+    minutes. On a real night something is always flying, an ordinary live
+    message opens an episode, and the guard read "there is an episode" as "we
+    know about the sky". The episode it found was opened by a drone over
+    somebody else's oblast and carried no siren at all.
+
+    The watcher's own start-up asks the declaring channel unconditionally. This
+    path asked only when it had nothing, and that asymmetry between the two warm
+    paths is the same shape as the last two faults in this file."""
+    from tools.live.run import warm_one
+    from tools.policy.config import DEFAULTS, replace
+    from tools.policy.recipients import Recipient
+
+    now = 1_780_000_000
+    conn = _official([
+        # Declared three hours ago: outside any replay window.
+        ("alarm_kyiv", 2, now - 3 * 3600, "🚨 м. Київ Повітряна тривога"),
+        # ...and the night went on, as nights do. Inside the window, live,
+        # somebody else's region, and enough to open an episode.
+        ("mon1tor_ua", 7, now - 900,
+         "⚠️2 шахеди з Сумщини на Полтавщину, Лубенський район."),
+    ])
+    newcomer = Recipient(name="тест", config=replace(DEFAULTS, home="Жуляни"))
+    newcomer.tracker.official_source = True
+
+    warm_one(newcomer, conn, now)
+
+    episode = newcomer.tracker.episode
+    assert episode is not None
+    assert episode.official_alert is True, "the siren is the declaring channel's"
+    assert episode.alert_announced is True
+    # And seated when it began rather than when we noticed.
+    assert episode.opened_at == now - 3 * 3600
+
+
 def test_the_declaration_corrects_a_worse_episode_instead_of_losing_to_it():
     """The ordering fault the startup log exposed.
 
