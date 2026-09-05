@@ -1,6 +1,8 @@
 package ua.hovaysya.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +21,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +35,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -117,10 +126,10 @@ fun HovaysyaFeed(store: Store) {
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    row.alarm?.takeIf { it != "none" }?.let {
+                    bellWord(row.alarm)?.let {
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            it.uppercase(),
+                            it,
                             style = MaterialTheme.typography.labelSmall,
                             color = colourFor(Screen.WATCHING),
                         )
@@ -155,6 +164,42 @@ fun HovaysyaFeed(store: Store) {
             }
         }
     }
+}
+
+/**
+ * The bell, in words. His list, and the two ends of it are not weapons at all:
+ * "Alert - Увага, Clear - Чисто".
+ *
+ * It names the **bell that rang** rather than what is flying, because that is
+ * what a decision carries: `alarm` travels in `/decisions` and the threat class
+ * does not. So "Ракета-Дрон" is deliberately not here -- by his own ruling
+ * yesterday it shares the jet drone's tone, and the sentence beside it names it
+ * anyway ("Загроза: дрон-ракета"). A word here would claim a bell that does not
+ * exist.
+ *
+ * `Шахед` became `Дрон` on his correction, and the reason carries across the
+ * row: the screen says what a person would say, and half of what flies is not a
+ * Shahed.
+ *
+ * Sentence case rather than his capitals, which is the Ukrainian norm for a
+ * two-word name and matches the sentences already on the screen. The old chip
+ * shouted because it was printing an enum.
+ *
+ * Null for anything unrecognised, `none` included. A screen printing a class it
+ * has no word for is a fault already fixed once on the other side of the wire,
+ * where it read "All — дорозвідка".
+ */
+internal fun bellWord(alarm: String?): String? = when (alarm) {
+    "alert" -> "Увага"
+    "clear" -> "Чисто"
+    "clear-partial" -> "Частковий відбій"
+    "ballistic" -> "Балістика"
+    "mig" -> "МіГ"
+    "cruise" -> "Крилата ракета"
+    "drone-jet" -> "Реактивний дрон"
+    "drone" -> "Дрон"
+    "recon" -> "Розвідувальний дрон"
+    else -> null
 }
 
 // The field, never the sentence. A word in a sentence is a guess about a
@@ -303,9 +348,20 @@ internal fun Feed(
     // button, so it clears the count the same way. Reading `isScrollInProgress`
     // rather than the position means this fires once per gesture, at its end,
     // instead of on every frame of it.
+    // ...but not before the screen has opened, and that `opened` is the whole
+    // of a fault he reported: "при переході на іншу табу буває що я не на
+    // останньому повідомленні і бачу кнопку."
+    //
+    // Switching tabs destroys this composition, so coming back builds a new
+    // `listState` sitting at index 0 while the rows are already there. And
+    // `snapshotFlow` hands a new collector the current value immediately --
+    // not scrolling -- so the question "is he at the newest" was asked and
+    // answered `false` before the opening scroll had run. The screen then
+    // opened already believing he had scrolled away, and the next arrival
+    // counted itself onto a button while he was looking at the newest line.
     LaunchedEffect(listState) {
         snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
-            if (!scrolling) {
+            if (!scrolling && opened) {
                 following = listState.atNewest()
                 if (following) unseen = 0
             }
@@ -365,30 +421,97 @@ internal fun Feed(
                     content = rows,
                 )
                 if (unseen > 0) {
-                    FloatingActionButton(
-                        onClick = {
-                            // Set here as well as in the scroll observer: the
-                            // animation takes a moment, and a button that
-                            // answers next frame feels broken.
-                            unseen = 0
-                            following = true
-                            scope.launch {
-                                listState.animateScrollToItem(keys.lastIndex)
-                            }
-                        },
-                        shape = CircleShape,
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = colourFor(Screen.WATCHING),
+                    ToNewest(
+                        count = unseen,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(20.dp),
                     ) {
-                        Text(
-                            "↓ " + if (unseen > 99) "99+" else unseen.toString(),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
+                        // Set here as well as in the scroll observer: the
+                        // animation takes a moment, and a button that answers
+                        // next frame feels broken.
+                        unseen = 0
+                        following = true
+                        scope.launch {
+                            listState.animateScrollToItem(keys.lastIndex)
+                        }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * The way back to the newest line, from his mockup: the count above the circle
+ * rather than inside it, in the colour the text already is, and the circle
+ * outlined rather than filled.
+ *
+ * Outlined and not raised, which is the part worth writing down. A filled
+ * button floating over a feed reads as the screen's main action, and this one
+ * is an offer -- the feed is doing its job whether or not anybody presses it.
+ *
+ * The count sits outside the circle because it is a fact about the feed rather
+ * than a label on the button, and because it can then reach three characters
+ * without the circle changing size.
+ */
+@Composable
+private fun ToNewest(
+    count: Int,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val ink = colourFor(Screen.WATCHING)
+    // His colour, `#4A4458`, and read from the scheme rather than typed: "це по
+    // задуму той самий колір що і в лінії над назвою активної таби". That line
+    // is `NavigationBar`'s indicator, which is `secondaryContainer` -- left at
+    // Material's dark baseline here, which is exactly that value. Taking it from
+    // the scheme is what keeps the two the same thing rather than two things
+    // that happen to match today.
+    val edge = MaterialTheme.colorScheme.secondaryContainer
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.background)
+                .border(1.dp, edge, CircleShape)
+                .padding(7.dp, 2.dp),
+        ) {
+            Text(
+                if (count > 99) "99+" else count.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                color = ink,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        FloatingActionButton(
+            onClick = onClick,
+            shape = CircleShape,
+            containerColor = MaterialTheme.colorScheme.background,
+            contentColor = ink,
+            // No shadow. An outline and a shadow are two ways of saying the
+            // same thing, and together they say it twice.
+            elevation = FloatingActionButtonDefaults.elevation(
+                0.dp, 0.dp, 0.dp, 0.dp),
+            modifier = Modifier
+                .size(48.dp)
+                .border(1.dp, edge, CircleShape)
+                .semantics { contentDescription = "до останнього повідомлення" },
+        ) {
+            // Drawn rather than typed: the glyphs available for a chevron (⌄ ▾
+            // v) are a comma, a solid triangle and a letter, and at twenty
+            // density-independent pixels that difference is the whole look.
+            Canvas(Modifier.size(20.dp)) {
+                val chevron = Path().apply {
+                    moveTo(size.width * 0.22f, size.height * 0.38f)
+                    lineTo(size.width * 0.50f, size.height * 0.66f)
+                    lineTo(size.width * 0.78f, size.height * 0.38f)
+                }
+                drawPath(
+                    chevron, ink,
+                    style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round,
+                                   join = StrokeJoin.Round),
+                )
             }
         }
     }

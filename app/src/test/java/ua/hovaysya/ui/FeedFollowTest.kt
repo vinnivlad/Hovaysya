@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
@@ -52,22 +53,71 @@ class FeedFollowTest {
     /** Sixty rows, the way both feeds answer: a window, not a growing list. */
     private fun window(from: Int) = (from until from + 60).map { "рядок $it" }
 
+    /** Standing in for the tabs, which are a `when` over an index. */
+    private var onScreen by mutableStateOf(true)
+
     private fun show() {
         rule.setContent {
             HovaysyaTheme {
-                Feed(
-                    title = "Ховайся",
-                    subtitle = "тест",
-                    empty = "нічого",
-                    problem = null,
-                    keys = keys,
-                ) {
-                    items(keys, key = { it }) { key ->
-                        Text(key, Modifier.height(60.dp))
+                if (onScreen) {
+                    Feed(
+                        title = "Ховайся",
+                        subtitle = "тест",
+                        empty = "нічого",
+                        problem = null,
+                        keys = keys,
+                    ) {
+                        items(keys, key = { it }) { key ->
+                            Text(key, Modifier.height(60.dp))
+                        }
                     }
+                } else {
+                    Text("інша таба")
                 }
             }
         }
+    }
+
+    /** Away and back, which destroys this screen's composition and its state. */
+    private fun switchTabs() {
+        onScreen = false
+        rule.waitForIdle()
+        onScreen = true
+        rule.waitForIdle()
+    }
+
+    @Test
+    fun `coming back to a tab lands on the newest line`() {
+        show()
+        rule.onNode(hasScrollAction()).performScrollToIndex(0)
+        rule.waitForIdle()
+
+        switchTabs()
+
+        rule.onNodeWithText("рядок 60").assertIsDisplayed()
+        rule.onNodeWithText("1").assertDoesNotExist()
+    }
+
+    @Test
+    fun `coming back to a tab does not leave a phantom count behind`() {
+        """His report: "при переході на іншу табу буває що я не на останньому
+        повідомленні і бачу кнопку."
+
+        A fresh composition starts its list at index 0 while the rows are
+        already there, and `snapshotFlow` hands the collector the current value
+        the moment it subscribes -- not scrolling. Read then, "am I at the
+        newest" is false, because the initial scroll has not run yet. So the
+        screen opened already believing he had scrolled away, and the next
+        arrival counted itself onto a button while he was looking at the newest
+        line."""
+        show()
+        switchTabs()
+
+        keys = window(2)
+        rule.waitForIdle()
+
+        rule.onNodeWithText("рядок 61").assertIsDisplayed()
+        rule.onNodeWithText("1").assertDoesNotExist()
     }
 
     @Test
@@ -104,11 +154,11 @@ class FeedFollowTest {
         // much he is behind rather than being taken there.
         rule.onNodeWithText("рядок 2").assertIsDisplayed()
         rule.onNodeWithText("рядок 61").assertIsNotDisplayed()
-        rule.onNodeWithText("↓ 1").assertIsDisplayed()
+        rule.onNodeWithText("1").assertIsDisplayed()
 
         keys = window(3)
         rule.waitForIdle()
-        rule.onNodeWithText("↓ 2").assertIsDisplayed()
+        rule.onNodeWithText("2").assertIsDisplayed()
     }
 
     @Test
@@ -119,11 +169,12 @@ class FeedFollowTest {
         keys = window(2)
         rule.waitForIdle()
 
-        rule.onNodeWithText("↓ 1").performClick()
+        rule.onNodeWithContentDescription("до останнього повідомлення")
+            .performClick()
         rule.waitForIdle()
 
         rule.onNodeWithText("рядок 61").assertIsDisplayed()
-        rule.onNodeWithText("↓ 1").assertDoesNotExist()
+        rule.onNodeWithText("1").assertDoesNotExist()
     }
 
     @Test
@@ -133,12 +184,12 @@ class FeedFollowTest {
         rule.waitForIdle()
         keys = window(2)
         rule.waitForIdle()
-        rule.onNodeWithText("↓ 1").assertIsDisplayed()
+        rule.onNodeWithText("1").assertIsDisplayed()
 
         rule.onNode(hasScrollAction()).performScrollToIndex(keys.lastIndex)
         rule.waitForIdle()
 
-        rule.onNodeWithText("↓ 1").assertDoesNotExist()
+        rule.onNodeWithText("1").assertDoesNotExist()
     }
 
     @Test
@@ -152,6 +203,6 @@ class FeedFollowTest {
         keys = window(1)
         rule.waitForIdle()
 
-        rule.onNodeWithText("↓ 1").assertDoesNotExist()
+        rule.onNodeWithText("1").assertDoesNotExist()
     }
 }

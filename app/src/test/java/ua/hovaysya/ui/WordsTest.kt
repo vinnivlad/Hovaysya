@@ -1,6 +1,7 @@
 package ua.hovaysya.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import ua.hovaysya.Screen
 
@@ -45,6 +46,31 @@ class WordsTest {
         // No state and no failure yet: the request is still in flight, and an
         // ellipsis is the honest answer for that second.
         assertEquals("…", headline(null, null))
+    }
+
+    @Test
+    fun `the bell is named in words, and the two ends are not weapons`() {
+        // His list: "Alert - Увага, Clear - Чисто", then the classes. `Шахед`
+        // became `Дрон` on his own correction a minute later.
+        assertEquals("Увага", bellWord("alert"))
+        assertEquals("Чисто", bellWord("clear"))
+        assertEquals("Частковий відбій", bellWord("clear-partial"))
+        assertEquals("Балістика", bellWord("ballistic"))
+        assertEquals("Крилата ракета", bellWord("cruise"))
+        assertEquals("Реактивний дрон", bellWord("drone-jet"))
+        assertEquals("Дрон", bellWord("drone"))
+        assertEquals("Розвідувальний дрон", bellWord("recon"))
+        assertEquals("МіГ", bellWord("mig"))
+    }
+
+    @Test
+    fun `a bell with no word of its own is not drawn at all`() {
+        // Rather than the raw class, which is a fault already fixed once on the
+        // server side where it read "All — дорозвідка". `none` is the common
+        // case: most decisions are quiet, and a chip saying NONE is noise.
+        assertNull(bellWord("none"))
+        assertNull(bellWord(null))
+        assertNull(bellWord("drone-rocket"))
     }
 
     @Test
