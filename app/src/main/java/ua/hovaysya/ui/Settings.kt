@@ -186,7 +186,7 @@ fun Settings(
             // "коли летить балістика і Жуляни" -- so a drone over Жуляни
             // arrives as "Загроза сюди", and this row taught the alphabet wrong.
             Bells(
-                "В укриття", "············", "балістика",
+                "В укриття", "··· ···", "балістика",
                 onRing = {
                     bell.ring(context, bell.shelter, "В укриття",
                         "Тривога. Балістика. Жуляни.")

@@ -314,9 +314,11 @@ def test_the_drawn_rhythm_matches_the_pattern_it_names():
                 pulses["CLEAR"], 0]
     assert counts == expected, (drawn, counts, expected)
 
-# `SHELTER` is meant to be felt as one continuous thing, so its gaps are
-# deliberately too short to separate anything.
-BLURRED = {"SHELTER"}
+# Nothing is exempt any more. `SHELTER` used to be: twelve pulses at 100 ms,
+# meant to be felt as one continuous thing rather than counted. It is three and
+# three now on his instruction, so it has to be countable like the rest, and the
+# gap check below is what says it is.
+BLURRED: set[str] = set()
 
 # How long a gap has to be before a hand reads it as a gap. A vibration motor
 # does not stop when the pattern says off -- it spins down -- so a gap of the

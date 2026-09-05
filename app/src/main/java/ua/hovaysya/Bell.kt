@@ -265,7 +265,12 @@ class Bell(private val store: Store) {
         val volume = store.volumeNow()
         when (channel) {
             siren -> Siren.alert(volume)
-            shelter, near -> Siren.rhythm(NEAR, volume)
+            // Ballistic had been playing the drone's rhythm, which is his
+            // report: "зараз звук як у наближення дрона". Three sounds for five
+            // channels is still the arrangement; what was wrong was which two
+            // shared one.
+            shelter -> Siren.rhythm(SHELTER, volume)
+            near -> Siren.rhythm(NEAR, volume)
             clear -> Siren.clear(volume)
             else -> Unit
         }
@@ -361,10 +366,25 @@ class Bell(private val store: Store) {
             420, 140, 200, 140, 200, 140,
         )
 
-        /** A dense stutter. Nothing structured about it, which is the point. */
+        /**
+         * Three short, then three short. His call, and it replaces a dense
+         * stutter of twelve pulses at 100 ms that was designed to be felt as
+         * one continuous thing.
+         *
+         * The stutter was the wrong idea twice over. It was indistinguishable
+         * from a phone buzzing at nothing in particular, which is the one thing
+         * the loudest pattern in the alphabet must not be, and its gaps were
+         * below the width a hand can feel -- so what it actually delivered was
+         * an undifferentiated hum, not a chosen texture.
+         *
+         * Six pulses split three and three, gapped like the rest of the
+         * alphabet so they can be counted. The sound follows the same array,
+         * because a bell and a buzz saying different things is how somebody
+         * learns neither.
+         */
         private val SHELTER = longArrayOf(
-            0, 150, 100, 150, 100, 150, 100, 150, 100, 150, 100, 150,
-            100, 150, 100, 150, 100, 150, 100, 150, 100, 150, 100, 150,
+            0, 90, 220, 90, 220, 90,
+            500, 90, 220, 90, 220, 90,
         )
 
         /**
