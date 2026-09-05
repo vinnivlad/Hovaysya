@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
@@ -20,7 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -70,7 +72,7 @@ fun Settings(
     var home by remember { mutableStateOf<String?>(null) }
     var radius by remember { mutableStateOf(6f) }
     var volume by remember { mutableStateOf(store.volume) }
-    var quiet by remember { mutableStateOf(store.quietHours) }
+    var sound by remember { mutableStateOf(store.sound) }
     var saved by remember { mutableStateOf<String?>(null) }
     var problem by remember { mutableStateOf<String?>(null) }
 
@@ -255,24 +257,40 @@ fun Settings(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Тихі години", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "22:00–08:00 без звуку. Вібрація лишається, і в " +
-                            "укриття все одно розбудить.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            // One axis with three stops rather than a switch and a hidden
+            // slider position. "Тільки вібрація" was always available -- the
+            // volume at zero -- and nobody would find it there.
+            Spacer(Modifier.height(12.dp))
+            Text("Звук", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(6.dp))
+            Row(Modifier.fillMaxWidth()) {
+                Choice("завжди", sound == Store.ALWAYS, Modifier.weight(1f)) {
+                    sound = Store.ALWAYS; store.sound = Store.ALWAYS
                 }
-                Switch(
-                    checked = quiet,
-                    onCheckedChange = { quiet = it; store.quietHours = it },
-                )
+                Spacer(Modifier.width(6.dp))
+                Choice("крім тихих годин", sound == Store.OUTSIDE_QUIET,
+                       Modifier.weight(1.4f)) {
+                    sound = Store.OUTSIDE_QUIET
+                    store.sound = Store.OUTSIDE_QUIET
+                }
+                Spacer(Modifier.width(6.dp))
+                Choice("ніколи", sound == Store.NEVER, Modifier.weight(1f)) {
+                    sound = Store.NEVER; store.sound = Store.NEVER
+                }
             }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                when (sound) {
+                    Store.NEVER ->
+                        "Тільки вібрація. В укриття все одно розбудить."
+                    Store.OUTSIDE_QUIET ->
+                        "22:00–08:00 без звуку. Вібрація лишається, і в " +
+                            "укриття все одно розбудить."
+                    else -> "Звук завжди, коли є що сказати."
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         // --- where I live ---------------------------------------------------
@@ -418,5 +436,39 @@ private fun Card(bad: Boolean = false, content: @Composable () -> Unit) {
             .padding(16.dp),
     ) {
         content()
+    }
+}
+
+/**
+ * One stop on a setting that has three of them.
+ *
+ * A row rather than a dropdown: three options that fit on a line are three
+ * things somebody can compare without opening anything, and the one in force is
+ * the one that is filled in. The outline is the same colour as the tab
+ * indicator, which is what the rest of this app uses to mean "an edge".
+ */
+@Composable
+private fun Choice(
+    label: String,
+    chosen: Boolean,
+    modifier: Modifier = Modifier,
+    onPick: () -> Unit,
+) {
+    val edge = MaterialTheme.colorScheme.secondaryContainer
+    Surface(
+        onClick = onPick,
+        shape = RoundedCornerShape(10.dp),
+        color = if (chosen) edge else MaterialTheme.colorScheme.background,
+        border = BorderStroke(1.dp, edge),
+        modifier = modifier,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            textAlign = TextAlign.Center,
+            color = if (chosen) MaterialTheme.colorScheme.onSurface
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth().padding(6.dp, 10.dp),
+        )
     }
 }

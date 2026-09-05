@@ -23,12 +23,13 @@ class StoreTest {
 
     private lateinit var store: Store
 
+    private fun context(): Context = ApplicationProvider.getApplicationContext()
+
     @Before
     fun fresh() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        context.getSharedPreferences("hovaysya", Context.MODE_PRIVATE)
+        context().getSharedPreferences("hovaysya", Context.MODE_PRIVATE)
             .edit().clear().commit()
-        store = Store(context)
+        store = Store(context())
     }
 
     @Test
@@ -40,23 +41,55 @@ class StoreTest {
     }
 
     @Test
-    fun `the quiet window is off until somebody chooses it`() {
-        // "a window that silences an air-raid alarm is a thing somebody has to
+    fun `sound is on until somebody chooses otherwise`() {
+        // "anything that silences an air-raid alarm is a thing somebody has to
         // choose, never a thing they discover."
-        assertFalse(store.quietHours)
+        assertEquals(Store.ALWAYS, store.sound)
         assertEquals(0.8f, store.volume, 0.001f)
         assertEquals(store.volume, store.volumeNow(), 0.001f)
     }
 
     @Test
     fun `the quiet window is consulted before the volume is used`() {
-        store.quietHours = true
+        store.sound = Store.OUTSIDE_QUIET
         // Whether the window is open right now depends on the clock, and the
         // point is only that the setting is read at all -- a `volumeNow` that
         // ignored it would fail this at some hour of the day and pass at
         // others, which is worse than failing.
         val expected = if (inQuietHours()) 0f else store.volume
         assertEquals(expected, store.volumeNow(), 0.001f)
+    }
+
+    @Test
+    fun `never means never, whatever the hour`() {
+        // His fourth position and his third are the same state, and it already
+        // existed as the volume slider at zero -- where nobody would find it.
+        store.sound = Store.NEVER
+        assertEquals(0f, store.volumeNow(), 0.001f)
+        // ...and the volume it would have used is remembered, so turning sound
+        // back on does not also turn it up from silence.
+        assertEquals(0.8f, store.volume, 0.001f)
+    }
+
+    @Test
+    fun `a phone that already had quiet hours keeps them`() {
+        // The setting used to be a boolean. A phone upgrading with it on must
+        // not silently get its nights back.
+        context().getSharedPreferences("hovaysya", Context.MODE_PRIVATE)
+            .edit().putBoolean("quietHours", true).commit()
+        assertEquals(Store.OUTSIDE_QUIET, Store(context()).sound)
+
+        context().getSharedPreferences("hovaysya", Context.MODE_PRIVATE)
+            .edit().putBoolean("quietHours", false).commit()
+        assertEquals(Store.ALWAYS, Store(context()).sound)
+    }
+
+    @Test
+    fun `choosing explicitly outranks whatever the old flag said`() {
+        val prefs = context().getSharedPreferences("hovaysya", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("quietHours", true).commit()
+        Store(context()).sound = Store.ALWAYS
+        assertEquals(Store.ALWAYS, Store(context()).sound)
     }
 
     @Test
@@ -124,15 +157,15 @@ class StoreTest {
     }
 
     @Test
-    fun `the volume and the quiet window survive forgetting`() {
+    fun `the volume and the sound setting survive forgetting`() {
         // They belong to the phone rather than to the registration -- how loud
         // this handset is allowed to be is not a fact about who is holding it.
         store.volume = 0.3f
-        store.quietHours = true
+        store.sound = Store.NEVER
 
         store.forget()
 
         assertEquals(0.3f, store.volume, 0.001f)
-        assertTrue(store.quietHours)
+        assertEquals(Store.NEVER, store.sound)
     }
 }

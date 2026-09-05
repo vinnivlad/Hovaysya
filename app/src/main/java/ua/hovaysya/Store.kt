@@ -71,21 +71,40 @@ class Store(context: Context) {
             .apply()
 
     /**
-     * Withhold sound between 22:00 and 08:00 Kyiv time. **Off by default**, and
-     * that default is the safe one: a window that silences an air-raid alarm is
-     * a thing somebody has to choose, never a thing they discover.
+     * When this app is allowed to make a sound: [ALWAYS], [OUTSIDE_QUIET] or
+     * [NEVER]. **[ALWAYS] by default**, and that default is the safe one:
+     * anything that silences an air-raid alarm is a thing somebody has to
+     * choose, never a thing they discover.
      *
-     * Vibration is not affected -- "коли звук не видається" is about sound, and
-     * the shelter channel still bypasses night mode. So the quiet window makes
-     * the phone buzz instead of wail; it does not make it ignore a raid.
+     * Three positions and not his four. "Тільки вібрація" and "без звуку" are
+     * the same state -- and it already existed, as the volume slider at zero,
+     * where nobody would ever find it as a mode. What the list really holds is
+     * one axis with three stops.
+     *
+     * **Vibration is not on this axis at all**, which is the reason the quiet
+     * window was safe to have in the first place: it makes the phone buzz
+     * instead of wail, it does not make it ignore a raid. A switch that took
+     * the buzz away too would leave an air-raid app that can only light up.
      */
-    var quietHours: Boolean
-        get() = prefs.getBoolean(KEY_QUIET_HOURS, false)
-        set(value) = prefs.edit().putBoolean(KEY_QUIET_HOURS, value).apply()
+    var sound: String
+        get() = prefs.getString(KEY_SOUND, null) ?: migratedSound()
+        set(value) = prefs.edit().putString(KEY_SOUND, value).apply()
 
-    /** The volume to use right now, which the quiet window can zero. */
-    fun volumeNow(): Float =
-        if (quietHours && inQuietHours()) 0f else volume
+    /**
+     * What the old boolean meant, for a phone that has one and no [KEY_SOUND].
+     *
+     * Read rather than rewritten: a getter that writes is a getter that can
+     * fail, and this answers the same thing every time it is asked.
+     */
+    private fun migratedSound(): String =
+        if (prefs.getBoolean(KEY_QUIET_HOURS, false)) OUTSIDE_QUIET else ALWAYS
+
+    /** The volume to use right now, which the setting above can zero. */
+    fun volumeNow(): Float = when (sound) {
+        NEVER -> 0f
+        OUTSIDE_QUIET -> if (inQuietHours()) 0f else volume
+        else -> volume
+    }
 
     fun api(): Api = Api(base, secret)
 
@@ -115,5 +134,13 @@ class Store(context: Context) {
         private const val KEY_LAST_SAID = "lastSaid"
         private const val KEY_VOLUME = "volume"
         private const val KEY_QUIET_HOURS = "quietHours"
+        private const val KEY_SOUND = "sound"
+
+        /** Sound whenever there is something to say. */
+        const val ALWAYS = "always"
+        /** Silent between 22:00 and 08:00 Kyiv time, the vibration staying. */
+        const val OUTSIDE_QUIET = "outside-quiet"
+        /** Never a sound from this app; the vibration alphabet on its own. */
+        const val NEVER = "never"
     }
 }
