@@ -699,8 +699,68 @@ def warm_one(who, conn, now: float) -> tuple[int, list]:
     return seen, solo.log
 
 
+def sweep_orphans(names, state_dir: Path | None,
+                  carry_dir: Path | None) -> list[str]:
+    """Files left by people who were deleted while nothing was watching.
+
+    `refresh_recipients` catches a departure it witnesses. This catches the ones
+    it could not: `tools.people --forget` between restarts, which is how his
+    directory came to hold five names that had been gone for days.
+
+    Guarded on knowing more than the fallback. If the index were ever unreadable
+    `from_dir` answers with the Telegram channel alone, and a sweep on that would
+    throw away the carried episode of everybody real -- the one file here that
+    cannot simply be rewritten on the next poll.
+    """
+    known = {Path(name).name for name in names}
+    if len(known) <= 1:
+        return []
+    gone: set[str] = set()
+    for directory in (state_dir, carry_dir):
+        if directory is None or not directory.is_dir():
+            continue
+        for path in directory.glob("*.json"):
+            if path.stem in known:
+                continue
+            gone.add(path.stem)
+            try:
+                path.unlink()
+            except OSError:
+                pass
+    return sorted(gone)
+
+
+def _sweep(name: str, state_dir: Path | None, carry_dir: Path | None) -> None:
+    """Take the two files the watcher owns away with the person.
+
+    His question, looking at a directory full of names he had deleted days
+    earlier: "І чому повернуло стейт для видалених користувачів?" Because the
+    broom swept half of it -- `tools.people --forget` owns the index and the
+    settings, and these two are the watcher's.
+
+    It is not a leak, because `/state` is served against a token and theirs is
+    gone with the rest. It matters when a name comes back, which for test users
+    is constantly: the new person's very first request would be answered with
+    the previous one's screen, lines and all, decided from a home that is not
+    theirs. `Held.clear` exists on the phone for exactly that, and this is its
+    other half.
+
+    Failing to delete is not worth stopping a watch over -- a stale file is what
+    we already have -- so an unlink that cannot happen is skipped in silence.
+    """
+    for directory in (state_dir, carry_dir):
+        if directory is None:
+            continue
+        try:
+            (directory / f"{Path(name).name}.json").unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def refresh_recipients(session: Session, conn, directory: Path,
-                       fallback, now: float) -> list[str]:
+                       fallback, now: float,
+                       state_dir: Path | None = None,
+                       carry_dir: Path | None = None) -> list[str]:
     """Take on whoever appeared, drop whoever left, reload changed settings.
 
     His answer to needing a restart, and it is the better one: "чому б
@@ -724,6 +784,7 @@ def refresh_recipients(session: Session, conn, directory: Path,
     for name, who in have.items():
         if name not in fresh:
             notes.append(f"-{name}")
+            _sweep(name, state_dir, carry_dir)
         elif fresh[name].config != who.config:
             who.config = fresh[name].config
             who.tracker.config = who.config
@@ -916,6 +977,13 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"  телефон: вимкнено (нема {TOKEN_HINT})")
 
+    # Whoever was deleted while nothing was watching leaves two files behind,
+    # and the departure that would have swept them was never witnessed.
+    orphans = sweep_orphans([who.name for who in session.recipients],
+                            STATE_DIR, CARRY_DIR)
+    if orphans:
+        print(f"  прибрано екрани, яких нікому читати: {', '.join(orphans)}")
+
     # Warm the tracker from what is already stored, before polling at all. A
     # restart mid-alert has nothing to catch up on and would otherwise start with
     # no episode — announcing a wave already announced, at the quiet interval.
@@ -1025,7 +1093,9 @@ def main(argv: list[str] | None = None) -> int:
         if signature != last_recipients:
             last_recipients = signature
             for note in refresh_recipients(session, conn, RECIPIENTS_DIR, cfg,
-                                           time.time()):
+                                           time.time(),
+                                           state_dir=STATE_DIR,
+                                           carry_dir=CARRY_DIR):
                 print(f"  · отримувачі: {note}", flush=True)
 
         poll_once(client, conn, watchers, session, warm=slept, args=args)

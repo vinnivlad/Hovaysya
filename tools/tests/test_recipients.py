@@ -252,6 +252,99 @@ def test_the_directory_is_only_read_when_it_changes(tmp_path):
     assert recipients_signature(directory) != first
     # A directory that is not there yet is not an error.
     assert recipients_signature(tmp_path / "absent") == ()
+def test_startup_sweeps_screens_nobody_owns(tmp_path):
+    """The other half of the same broom, and the half his directory needed.
+
+    `refresh_recipients` only sees somebody leave while the watcher is running.
+    His five orphans -- `reasd`, `rere`, `test-9e36`, and two more -- were
+    deleted between restarts, so no run ever witnessed the departure and the
+    files sat there for days.
+
+    Guarded on having more than the fallback recipient: if the index were ever
+    unreadable, `from_dir` answers with the Telegram channel alone, and sweeping
+    on that would throw away the carried episode of everybody real.
+    """
+    from tools.live.run import sweep_orphans
+
+    state_dir = tmp_path / "state"
+    carry_dir = tmp_path / "carry"
+    for directory in (state_dir, carry_dir):
+        directory.mkdir()
+        for name in ("telegram_channel", "Володимир", "rere", "test-9e36"):
+            (directory / f"{name}.json").write_text("{}", encoding="utf-8")
+
+    swept = sweep_orphans(["telegram_channel", "Володимир"], state_dir, carry_dir)
+
+    assert sorted(swept) == ["rere", "test-9e36"], swept
+    assert (state_dir / "Володимир.json").exists()
+    assert (carry_dir / "telegram_channel.json").exists()
+    assert not (state_dir / "rere.json").exists()
+    assert not (carry_dir / "test-9e36.json").exists()
+
+
+def test_startup_sweeps_nothing_when_it_knows_only_the_fallback(tmp_path):
+    """An unreadable index is not a reason to forget everybody."""
+    from tools.live.run import sweep_orphans
+    from tools.policy.recipients import TELEGRAM_NAME
+
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    (state_dir / "Володимир.json").write_text("{}", encoding="utf-8")
+
+    assert sweep_orphans([TELEGRAM_NAME], state_dir, None) == []
+    assert (state_dir / "Володимир.json").exists()
+
+
+def test_forgetting_somebody_takes_their_screen_with_them(tmp_path):
+    """His question, looking at the state directory: "І чому повернуло стейт для
+    видалених користувачів?"
+
+    Because the broom swept half of it. `tools.people --forget` removes the row
+    from the index and the person's own settings, and the two files the watcher
+    owns -- their last screen and their carried tracker -- stayed behind. Three
+    names that had been deleted days earlier still had a `state/<name>.json`.
+
+    Not a leak: `/state` is served against a token and theirs is gone. It
+    matters when a name comes back, which for test users is constantly -- the
+    new person's first request would answer with the previous one's screen,
+    lines and all, decided from a home that is not theirs. That is the same
+    thing `Held.clear` exists for on the phone.
+    """
+    import json
+    import time
+
+    from tools.live.run import Session, refresh_recipients
+    from tools.policy.config import load as load_config
+
+    now = time.time()
+    conn = _corpus(tmp_path, now)
+    cfg = load_config(warn=lambda _m: None)
+    state_dir = tmp_path / "state"
+    carry_dir = tmp_path / "carry"
+    state_dir.mkdir()
+    carry_dir.mkdir()
+
+    session = Session()
+    directory = _dir_with(tmp_path, оля={"home": "Виноградар"})
+    refresh_recipients(session, conn, directory, cfg, now,
+                       state_dir=state_dir, carry_dir=carry_dir)
+    assert "оля" in [who.name for who in session.recipients]
+
+    # Whatever the watcher had written about her.
+    (state_dir / "оля.json").write_text(json.dumps({"state": "alert"}),
+                                        encoding="utf-8")
+    (carry_dir / "оля.json").write_text("{}", encoding="utf-8")
+
+    # ...and then she is forgotten.
+    gone = _dir_with(tmp_path)
+    notes = refresh_recipients(session, conn, gone, cfg, now,
+                               state_dir=state_dir, carry_dir=carry_dir)
+
+    assert "-оля" in notes, notes
+    assert not (state_dir / "оля.json").exists(), "her screen outlived her"
+    assert not (carry_dir / "оля.json").exists(), "her tracker outlived her"
+
+
 def test_the_telegram_recipient_is_a_user_that_always_exists(tmp_path):
     """His call, and it settles what I had made conditional: "телеграм - нехай
     буде користувач за замовченням який завжди вже створений в системі."
