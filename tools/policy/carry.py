@@ -37,7 +37,10 @@ from .episodes import Episode, Sent
 # `official_seen` is the important one: without it a restart mid-raid does not
 # know the authoritative channel is present in this stream, and every chat
 # all-clear becomes evidence again.
-CARRIED = ("official_seen", "said_clear_at", "home_rang_at", "home_said_at")
+CARRIED = ("official_seen", "said_clear_at", "home_rang_at", "home_said_at",
+           # How long the last raid ran is drawn for an hour after it ends, and
+           # deploys are frequent enough that an hour reliably contains one.
+           "alert_began")
 
 # Refuse a file older than this rather than trust it. A watcher that has been
 # off for a day has missed the all-clear along with everything else, and an

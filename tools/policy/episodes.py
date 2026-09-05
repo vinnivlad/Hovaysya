@@ -171,6 +171,10 @@ class Episode:
     # later gets explained by it -- which is what happened on 2026-09-02.
     threat_at: int = 0
     alert_announced: bool = False
+    # When the siren for this episode began. Set where `alert_announced` is, and
+    # by the declaring channel when it seats one after the fact -- which is the
+    # case with no announcement of ours to measure from.
+    alert_at: int = 0
     # Whether the siren we announced actually named a place. A bare "🛑 ТРИВОГА"
     # is usually his — 68% of scope-less sirens come from the Kyiv channel — but
     # not always, and when it is not, the real city siren arrives minutes later
@@ -512,6 +516,13 @@ class Tracker:
         # ever standing in for it. On the labelled nights it is absent, and they
         # go back to declaring, which is what keeps those nights scoring.
         self.official_seen: int | None = None
+        # When the alert now ending began -- not when we said so, and not the
+        # episode's opening, which any drone three regions away can trigger an
+        # hour earlier. Two integers are all "how long did it run" needs, and
+        # keeping them here rather than deriving them from finished episodes is
+        # what lets the answer outlive a deploy: `closed` is not carried across
+        # a restart, and the closing line it belongs to is kept for an hour.
+        self.alert_began: int | None = None
         # Whether the authoritative channel is part of this stream at all. Set
         # by the caller, which is the only one that knows.
         #
@@ -793,6 +804,9 @@ class Tracker:
                 if obs.scope in ("my-area", "my-district", "city"):
                     ep.alert_scope_known = True
             if newly and ep.alert_announced:
+                # The start of this alert, for the length reported after it.
+                ep.alert_at = obs.ts
+                self.alert_began = obs.ts
                 # Seeded once, with whatever was already known. A declaration
                 # carries the class with it — "Тривога. Балістика. Жуляни." — so
                 # starting below that made the next ballistic warning ring

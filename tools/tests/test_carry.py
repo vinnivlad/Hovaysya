@@ -469,6 +469,57 @@ def test_somebody_who_registers_during_a_raid_is_told_there_is_one():
     assert newcomer.tracker.episode.official_alert is True
 
 
+def test_how_long_the_raid_ran_survives_a_deploy(tmp_path):
+    """His report, and the timestamps say it was my own deploy that erased it.
+
+        09:53:03  the all-clear
+        09:53:37  an episode reopens, as they do
+        10:01     three commits pushed, and the watcher restarts on the timer
+        10:32     "Відбій тривоги 09:53" on the screen with no duration beside it
+
+    The closing line outlives the raid by an hour on purpose -- it is the one
+    number people read in the official app. It was computed from
+    `tracker.closed`, which is not carried across a restart at all, so the line
+    survived the deploy and the number did not. Deploys are frequent; this file
+    says so itself, two functions up.
+
+    What the number actually needs is two integers -- when the alert began and
+    when it was called off -- and neither of them belongs in a list of finished
+    episodes."""
+    from tools.policy import carry, status
+    from tools.policy.config import DEFAULTS, replace
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.recipients import Recipient
+    from tools.policy.rules import decide
+
+    now = 1_780_000_000
+    siren = ("alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога")
+    clear = ("alarm_kyiv", "🟢 м. Київ" + chr(10) + "Відбій повітряної тривоги")
+
+    before = Recipient(name="він", config=replace(DEFAULTS, home="Жуляни"))
+    before.tracker.official_source = True
+    for offset, (channel, text) in ((0, siren), (4800, clear)):
+        o = observe(now + offset, text, False, channel)
+        d = decide(o, before.tracker)
+        before.tracker.record(o, d.level if d.notify else None,
+                              d.alarm if d.notify else None, d.reason)
+
+    # It worked before the restart, which is what made it hard to see.
+    ran = status.snapshot(before, now=now + 5400)["ended"]
+    assert ran is not None and ran["lasted_s"] == 4800, ran
+
+    # ...and then a deploy.
+    carry.save(tmp_path, before, before.tracker, now + 5400)
+    after = Recipient(name="він", config=replace(DEFAULTS, home="Жуляни"))
+    after.tracker.official_source = True
+    carry.load(tmp_path, after, after.tracker, now + 5400)
+
+    ran = status.snapshot(after, now=now + 5400)["ended"]
+    assert ran is not None, "the deploy ate the length of the raid"
+    assert ran["lasted_s"] == 4800, ran
+    assert ran["at"] == now + 4800, ran
+
+
 def test_a_busy_night_does_not_hide_the_raid_from_a_newcomer():
     """The same case again, and the test above could not see it.
 

@@ -186,20 +186,29 @@ def _ended(tracker, at: int) -> dict | None:
     open one an hour before anything is declared. The number worth reading is the
     one the official app shows, which is how long the alert was on.
 
-    None when the last episode never had a siren -- there is nothing to report
-    about an hour of watching that ended quietly.
+    None when no alert has been declared, or when one is running again: there
+    is nothing to report about an hour of watching that ended quietly, and
+    during a raid the last raid's length is not the question.
+
+    Two integers rather than the last finished episode, and that is the fix for
+    a fault he found on 2026-09-05: the closing line said "Відбій тривоги 09:53"
+    with no length beside it, thirty-nine minutes after the all-clear and well
+    inside the hour it is kept for. A deploy had restarted the watcher at 10:01,
+    and `tracker.closed` -- which this used to walk -- is not carried across a
+    restart. The line survived the deploy and the number did not.
     """
-    closed = getattr(tracker, "closed", None)
-    if not closed:
+    began = getattr(tracker, "alert_began", None)
+    finished = tracker.said_clear_at
+    if not began or not finished:
         return None
-    last = closed[-1]
-    sirens = [s.ts for s in getattr(last, "sent", ()) if s.alarm == "alert"]
-    if not sirens:
+    # A siren declared after the last all-clear is a new raid, and during one
+    # the question is not how long the previous ran. His rule, and it used to
+    # fall out of walking the finished episodes; now it is the comparison.
+    if finished < began:
         return None
-    finished = tracker.said_clear_at or last.last_live or 0
-    if not finished or at - finished > ENDED_SHOWN_S:
+    if at - finished > ENDED_SHOWN_S:
         return None
-    return {"at": finished, "lasted_s": max(0, finished - min(sirens))}
+    return {"at": finished, "lasted_s": max(0, finished - began)}
 
 
 def write(directory: Path, recipient, said=(), now: int | None = None) -> Path:

@@ -497,6 +497,7 @@ def confirm_with_official(recipients, conn, now: float) -> int | None:
             if episode is None:
                 who.tracker.episode = Episode(
                     opened_at=row["ts"],
+                    alert_at=row["ts"],
                     # Alive now, because the declaration is unanswered now.
                     # Stamping this with the declaration's own time would have
                     # the tracker close the episode as idle on the first message
@@ -511,10 +512,17 @@ def confirm_with_official(recipients, conn, now: float) -> int | None:
                 # everything else in the episode belongs to whoever built it.
                 episode.official_alert = True
                 episode.alert_announced = True
+                episode.alert_at = min(episode.alert_at or row["ts"], row["ts"])
                 # The earlier opening, because a raid that began at 10:58 did
                 # not begin at 11:41 just because that is when we noticed.
                 episode.opened_at = min(episode.opened_at, row["ts"])
             who.tracker.official_seen = row["ts"]
+            # ...and the length of it, for the line that outlives it. Nothing
+            # was announced here -- a siren from three hours ago is not news --
+            # so there is no `Sent` to measure from, which is why this is a
+            # number of its own.
+            who.tracker.alert_began = min(
+                who.tracker.alert_began or row["ts"], row["ts"])
         return row["ts"]
     return None
 
