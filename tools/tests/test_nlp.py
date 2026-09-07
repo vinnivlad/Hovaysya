@@ -382,6 +382,91 @@ def test_nightly_summary_is_not_a_live_threat():
     assert hints.modality_hint(t) == "summary-news"
 
 
+# The evening bulletin, verbatim. Two separate defects met in this one message,
+# so both tests read it from here.
+BULLETIN = ("❕На поточний момент — для нашого регіону загрози немає • Станом на "
+            "зараз тушки не активні, а масових пусків шахедів не було. У разі "
+            "загрози ми вас повідомимо. Всім тихої ночі🫂❤️ Впродовж ночі ситуація "
+            "з БАЛІСТИКОЮ може змінюватись, тож не ігноруйте сигнали тривоги.")
+
+
+def test_the_nightly_all_quiet_bulletin_is_not_a_launch():
+    """The single loudest thing in the corpus that never should have rung. The
+    evening bulletin says outright that there is nothing, and named a class and
+    the word "пуск" while doing it, so it rang the ballistic bell 19 times
+    across 737 nights -- more than the channel ads and the retractions put
+    together."""
+    assert hints.modality_hint(BULLETIN) == "summary-news"
+
+
+def test_advice_about_sirens_does_not_declare_one():
+    """`ALERT_ON_TERMS` is the bare stem `тривог`, so any mention of one reads as
+    a declaration unless a guard says otherwise -- and the nightly bulletin ends
+    "тож не ігноруйте сигнали тривоги". That footer alone announced a raid, and
+    it is why the bulletin kept ringing after modality already called it a
+    summary: rule 2 declares before rule 3 can veto.
+
+    Measured: 71 messages pair a signal phrase with the siren stem and not one
+    is a declaration -- 68 are this bulletin, the rest commentary ("надіятися на
+    сигнали тривоги вже немає сенсу")."""
+    assert hints.alert_state(BULLETIN) is None
+    assert hints.alert_state("Тому реагуємо на всі сигнали тривоги!") is None
+
+
+def test_a_real_siren_still_declares_one():
+    """The guard against fixing too much: the canonical formulas are never
+    advice, and one of them beside the phrase must still win."""
+    assert hints.alert_state("🚨 м. Київ" + chr(10) + "Повітряна тривога") == "alert"
+    assert hints.alert_state("⚠️❗️КИЇВ - ТРИВОГА. В укриття!") == "alert"
+    assert hints.alert_state(
+        "Оголошено повітряну тривогу. Не ігноруйте сигнали тривоги.") == "alert"
+
+
+def test_a_retracted_launch_is_not_a_launch():
+    """A report withdrawn carries every word the report did. Three of these rang
+    the shelter tone, and "не підтверджується" is the channels' own phrase for
+    taking it back."""
+    for t in ("Пуски балістики о 2:43 не підтверджуються.",
+              "⚪️Інформація про пуск балістики з Брянської області не підтверджується.",
+              "Пуски «Калібрів» не підтвердились. Очікуємо на Х-101",
+              "Фальш-старт по балістиці, уважно слідкуйте за повідомленнями."):
+        assert hints.modality_hint(t) == "non-threat", t
+
+
+def test_an_ad_for_another_channel_is_not_a_launch():
+    """Six of these rang. The shape is a recommendation to subscribe, and the
+    launch words are what the other channel is being praised for reporting --
+    "Вони одні з перших повідомили про пуски балістики"."""
+    for t in ("‼️🚀 Вони одні з перших повідомили про пуски балістики: @Kyiv 👆"
+              "Сьогодні, обов'язково треба бути підписаними на них!",
+              "❗️Кияни, про пуски балістики та її траєкторію також повідомляють "
+              "наші колеги👇",
+              "❗️Кияни, в разі моєї відсутності цієї ночі попередження в режимі "
+              "реального часу про пуски балістики дивимось в каналі наших колег 👉 @Kyiv",
+              "‼️🚀КИЯНИ УВАГА! Вони найперші повідомили про пуски балістики: "
+              "https://t.me/ppo_kiev 👆Сьогодні, обов'язково треба бути підписаними на них!"):
+        assert hints.modality_hint(t) == "non-threat", t
+
+
+def test_an_arsenal_ready_to_fire_is_not_a_launch():
+    """"Коли саме буде пуск — ніхто не знає" is the sentence saying it has not
+    happened, and the message rang anyway."""
+    t = ("🔻 20+ балістичних ракет у ворога готові до застосування. Коли саме "
+         "буде пуск — сьогодні вночі чи наступної ночі — ніхто не знає.")
+    assert hints.modality_hint(t) == "summary-news"
+
+
+def test_a_real_launch_is_still_a_launch():
+    """The guard against fixing too much: 92 of the 121 audible launch decisions
+    in the corpus are genuine and must stay that way."""
+    for t in ("🚀 Є пуск балістики!",
+              "❗️❗Є інформація про пуск балістичних ракет з Курської області.",
+              "☄ Вихід балістики з Брянська. Уважно",
+              "‼️ Київ — спуск балістики!"):
+        assert hints.modality_hint(t) == "live-threat", t
+        assert hints.certainty_hint(t) == "confirmed", t
+
+
 def test_social_content_is_not_a_threat():
     assert hints.modality_hint("Актуальна ставка — 100 грн. Щоб перебити задонатьте") == "non-threat"
 

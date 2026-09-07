@@ -314,6 +314,39 @@ SUMMARY_TERMS = (
 # without them every threat in the corpus read as a thunderstorm.
 _WEATHER = re.compile(r"\bрозкати грому|\bгрім\b|\bгрозов|\bнегод|\bблискав|\bгроза\b|\bгрози\b", re.IGNORECASE)
 
+# A report withdrawn carries every word the report did, and nothing downstream
+# could tell the two apart: "Пуски балістики о 2:43 не підтверджуються." came
+# out `says_launch`, `confirmed`, `live-threat` -- identical in every field to
+# "🚀 Є пуск балістики!" -- and rang the shelter tone. Three did.
+#
+# Scoped to a withdrawal *of something*, and to the tense that means it has
+# already happened. Bare `не підтвер` was measured and is no discriminator: it
+# also catches aftermath, and a hope about the future -- "є неприємна
+# інформація, яка сподіваємось не підтвердиться" is a live Shahed warning, not a
+# retraction. Ten messages match, seven genuine withdrawals and three aftermath
+# that was silent anyway.
+_RETRACTED = re.compile(
+    r"(пуск\w*|виліт|вильот|вихід|інформаці\w+)[^.!?]{0,40}не\s+підтвердж\w*|"
+    r"(пуск\w*|виліт|вильот|вихід|інформаці\w+)[^.!?]{0,40}не\s+підтвердил\w*|"
+    r"фальш-старт",
+    re.IGNORECASE,
+)
+
+# An advertisement for another channel, where the launch words are what that
+# channel is being praised for reporting: "‼️🚀 Вони одні з перших повідомили про
+# пуски балістики: @Kyiv". Six of these rang the ballistic tone.
+#
+# Keyed on the praise rather than on the subscribe imperative, which was
+# measured and is no discriminator: `підписуйтес` sits in a promo footer under
+# real reports, and vetoing on it silenced "🔴 Пряме попадання у підземний перехід
+# на Лук'янівці в Києві". These nine matches are all promotion and nothing else.
+_CHANNEL_PROMO = re.compile(
+    r"(одні з перших|найперші|перші за \d+ хвилин)\s+повідом|"
+    r"також повідомляють наш|дивимось в каналі наш|"
+    r"радимо підписатись на канал",
+    re.IGNORECASE,
+)
+
 SOCIAL_TERMS = (
     "аукціон", "ставка", "задонат", "донат", "monobank", "send.mono", "банк",
     "дякую", "підтримку", "мітинг", "розігру", "картки", "грн", "збір",
@@ -874,6 +907,19 @@ AWAITING_TERMS = (
     "дадут", "буде відбій", "оголосят",
 )
 
+# Advice about sirens in general, which is not one being declared.
+# `ALERT_ON_TERMS` is the bare stem `тривог`, so any mention at all reads as a
+# declaration unless something says otherwise, and the nightly all-quiet
+# bulletin ends "тож не ігноруйте сигнали тривоги". That footer announced a raid
+# 19 times across 737 nights -- and it kept doing so after the bulletin was
+# already read as a summary, because rule 2 declares before rule 3 can veto.
+#
+# Measured: 71 messages pair a signal phrase with the siren stem and not one is
+# a declaration. 68 are this bulletin; the other three are commentary --
+# "тому реагуємо на всі сигнали тривоги!", "через постійні сигнали тривоги
+# особовий склад змучений", "надіятися на сигнали тривоги вже немає сенсу".
+_SIREN_AS_ADVICE = re.compile(r"сигнал\w*\s+тривог", re.IGNORECASE)
+
 # The forms the channels use to state the event itself, never to forecast it.
 CANONICAL_SIREN = ("відбій тривоги", "відбій повітряної тривоги",
                    "- тривога", "— тривога", "оголошено повітряну тривогу")
@@ -899,6 +945,11 @@ def alert_state(text: str) -> str | None:
     # all-clear. It has not occurred in 4.5 months; it costs one line to make
     # sure it never matters.
     if _hits(text, AWAITING_TERMS) and not _hits(text, CANONICAL_SIREN):
+        return None
+    # Advice about sirens, not a siren. Same escape hatch as above and for the
+    # same reason: a real "🚨 м. Київ / Повітряна тривога" that also tells him
+    # not to ignore the signals is still a declaration.
+    if _SIREN_AS_ADVICE.search(text or "") and not _hits(text, CANONICAL_SIREN):
         return None
     # The mirror case, and it woke the user for nothing: "У Києві у найближчі
     # хвилини можуть оголосити повітряну тривогу" is a forecast of a siren, and
@@ -1161,7 +1212,21 @@ _FORECAST = re.compile(
     # "Опишу коротко загальну обстановку з балістикою", "⚠️Стосовно загрози від
     # бомбардувальників", "Ніч на 20 червня пройшла тихо".
     r"\bопишу\b|стосовно загроз|пройшла тихо|пройшло тихо|"
-    r"загальна обстановка|коротко про",
+    r"загальна обстановка|коротко про|"
+    # The nightly all-quiet bulletin, and the loudest thing in the corpus that
+    # never should have rung: it says outright that there is nothing, names a
+    # class and the word "пуск" while saying so, and rang the ballistic tone 19
+    # times across 737 nights -- more than the promos and the retractions put
+    # together. Anchored on the template rather than on "загрози немає", which
+    # was measured and would take two real messages with it: "В повітрі є 2
+    # бомбардувальники Ту-22М3, зараз прямої загрози немає, якщо буде — напишемо"
+    # is a bomber report, and "🟢Києву наразі загрози немає" is the good news he
+    # waits for. The template catches 70 and neither of those.
+    r"на поточний момент[^.!?]{0,40}загрози немає|"
+    # An arsenal counted is not an arsenal fired, and the message says so
+    # itself: "Коли саме буде пуск — сьогодні вночі чи наступної ночі — ніхто не
+    # знає."
+    r"готові до застосування",
     re.IGNORECASE,
 )
 
@@ -1187,6 +1252,14 @@ def modality_hint(text: str) -> str:
     # report because "балістиці" is in it. Seven such messages in the corpus,
     # all unmistakable.
     if _OURS.search(text or ""):
+        return "non-threat"
+    # Before the impact rule for the same reason the two above are: a
+    # withdrawal names what it withdraws, so every word of the original
+    # report is still in the text.
+    if _RETRACTED.search(text or ""):
+        return "non-threat"
+    # An advertisement is not a report, whatever it is advertising.
+    if _CHANNEL_PROMO.search(text or ""):
         return "non-threat"
     if _hits(text, IMPACT_TERMS):
         return "live-threat"

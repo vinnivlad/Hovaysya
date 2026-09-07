@@ -425,6 +425,35 @@ Note the boundary that measurement established: `вибух` and `влучанн
 88% of `вибух` messages land within ten minutes of a live threat. An explosion
 report usually means the wave is still in progress.
 
+#### Messages that carry every word of a report and mean the opposite
+
+`_WEATHER` and `_OURS` were the first two of these — thunder mistaken for
+explosions, our own drones over Bryansk read as a ballistic threat. An audit of
+every audible ballistic launch in the corpus found three more families. Of 121
+such notifications across 737 nights, **30 were not launches at all**:
+
+| family | rang | what it actually was |
+| --- | --- | --- |
+| the nightly all-quiet bulletin | 19 | "для нашого регіону загрози немає" |
+| an ad for another channel | 7 | "Вони одні з перших повідомили про пуски балістики: @Kyiv" |
+| a launch withdrawn | 3 | "Пуски балістики о 2:43 не підтверджуються." |
+| an arsenal counted | 1 | "20+ балістичних ракет готові до застосування" |
+
+All 30 are silent now and all 91 genuine launches still ring. Each pattern is
+scoped to the shape rather than to a keyword, because every keyword was measured
+and every one of them was a false lead: bare `не підтвер` also catches aftermath
+and a hope about the future; `підписуйтес` sits in a promo footer under real
+reports; bare `загрози немає` would take a live bomber report with it.
+
+The bulletin is worth its own note, because two separate defects met in one
+message. Calling it a summary was not enough: it ends "тож не ігноруйте сигнали
+тривоги", `ALERT_ON_TERMS` is the bare stem `тривог`, and **rule 2 declares an
+alert before rule 3 can veto anything**. So the footer was announcing a raid on
+the evening post that says there is nothing. Advice about sirens is now not a
+siren, with the same canonical-formula escape the awaiting guard carries — a
+real "🚨 м. Київ / Повітряна тривога" that also says not to ignore the signals is
+still a declaration.
+
 ### `scope`
 
 | value | meaning |
