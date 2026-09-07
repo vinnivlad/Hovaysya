@@ -827,6 +827,22 @@ anticipation writes a status line, a two-day forecast would sit there saying
 "Загроза: балістика" all night. Sixty-five such messages are now read as
 summaries.
 
+The other half of the same problem is a warning that reads as neither summary
+nor forecast and still has nothing behind it. "❗️Якщо ракетний удар усе ж
+відбудеться, додатково можуть застосувати й балістичні ракети." arrived at 21:16
+on 2026-09-07 under a running alert and put "Загроза: балістика." on the status,
+because the anticipation rule asked only whether a class was named. So the
+ballistic half of it now asks for `strength` too, the way the ladder and the
+launch rule already did: no count, no place, no movement and no phase word is
+commentary about ballistics, not a warning of one. Thirteen messages in the
+corpus, every one a forecast, a news quote, a channel ad or a two-day warning.
+
+Cruise is deliberately left out, on the physics that keeps it off the launch
+path: what matters about a cruise missile is where it is, and the channels say
+so in words `live_strength` shrugs at — "Калібри ймовірно на столицю повз
+Обухів/Українку" carries no count and no phase word and is still the most useful
+sentence of the night.
+
 ## The threat level ladder
 
 His rule: **дрон (будь-який) → крилата ракета → балістика**, and every climb

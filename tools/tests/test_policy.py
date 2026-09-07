@@ -1151,6 +1151,49 @@ def test_a_warning_for_the_night_ahead_does_not_climb_either():
     assert out[2][2] != "threat level rose", out
 
 
+def test_a_hypothetical_strike_says_nothing_about_ballistics():
+    """His report at 21:16 on 2026-09-07, in the middle of a running alert:
+
+        ❗️Якщо ракетний удар усе ж відбудеться, додатково можуть
+        застосувати й балістичні ракети.
+
+    His words: "то було більше інформаційне повідомлення". It arrived as a quiet
+    notification and wrote "Загроза: балістика." onto the status, because the
+    anticipation rule asks only whether a class was named and never whether
+    anything is in the air. Nothing here is: no count, no place, no movement,
+    no phase word. The whole clause hangs off "якщо ... відбудеться".
+
+    The same guard the ladder and the launch rule already carry."""
+    out = _play([
+        (0, "mon1tor_ua", "⚠️2 реактивні шахеди на Київ/Бровари."),
+        (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (960, "nebo_raketa",
+         "❗️Якщо ракетний удар усе ж відбудеться, додатково "
+         "можуть застосувати й балістичні ракети."),
+    ])
+    assert not out[2][1], out                  # it never rang, and still must not
+    assert out[2][3] is None, out              # ...and it says nothing either
+
+
+def test_a_cruise_missile_still_reports_where_it_is():
+    """The guard against fixing too much, and the reason the guard above is
+    ballistic-only. What matters about a cruise missile is its position, and the
+    channels give it in words `live_strength` shrugs at:
+
+        Калібри ймовірно на столицю повз Обухів/Українку.
+
+    No count, no phase word — and it is still the most useful sentence of the
+    night. Of the ten such cruise messages in the corpus, four are position
+    reports like this one; of the thirteen ballistic ones, none is."""
+    out = _play([
+        (0, "mon1tor_ua", "⚠️2 реактивні шахеди на Київ/Бровари."),
+        (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (960, "nebo_raketa", "Калібри ймовірно на столицю повз Обухів/Українку."),
+    ])
+    assert not out[2][1], out                  # still no sound
+    assert out[2][3] == "Загроза: крилаті ракети.", out
+
+
 def test_a_ballistic_warning_in_the_moment_still_climbs():
     """The guard against fixing too much. The rung exists for exactly this: a
     siren for a drone, then a ballistic warning, which is a different situation

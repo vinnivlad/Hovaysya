@@ -389,6 +389,36 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     # аеродрому", which reads as anticipation, but for a MiG-31K the takeoff *is*
     # the event — the whole country is alerted at that moment.
     if obs.certainty == "probable" and threat in ("ballistic", "cruise"):
+        # `strength` guards the ballistic half the same way it guards the ladder
+        # and the launch rule, and for the same reason: no count, no place, no
+        # movement and no phase word is commentary about ballistics, not a
+        # warning of one. This rule was the only one of the three that never
+        # asked.
+        #
+        # "❗️Якщо ракетний удар усе ж відбудеться, додатково можуть застосувати й
+        # балістичні ракети." arrived at 21:16 on 2026-09-07 under a running
+        # alert. The whole clause hangs off "якщо ... відбудеться": nothing had
+        # been launched and nothing was said to be. It went out as a quiet
+        # notification and wrote "Загроза: балістика." onto the status. His
+        # words: "то було більше інформаційне повідомлення".
+        #
+        # Keyed on evidence rather than on "якщо", which was measured and is no
+        # discriminator: of 34 messages pairing it with a named class, half are
+        # live reports carrying a trailing condition -- "🛵 Якщо долетять, ще
+        # два БпЛА можуть зайти з боку Чернігівщини."
+        #
+        # **Cruise is deliberately excluded**, on the same physics that keeps it
+        # off the launch path above: what matters about a cruise missile is
+        # where it is, and the channels report that in words `live_strength`
+        # shrugs at. Of the 13 ballistic messages in the corpus this silences,
+        # every one is a forecast, a news quote, a channel ad or a two-day
+        # warning -- none is a report of anything in the air. Of the 10 cruise
+        # ones it would have silenced, four are genuine position reports
+        # ("КР починають повертати у напрямку Білоцерківського району Київщини",
+        # "До 15 крилатих ракет йдуть в наш бік"), which is the info line
+        # working as intended.
+        if threat == "ballistic" and obs.strength == "none":
+            return _silent("commentary: threatened, but nothing is in the air")
         if ep is not None and ep.notified:
             # Also words, no sound — this is the second half of his example:
             # "Тривога", then "Загроза балістики", and he wants to hear the
