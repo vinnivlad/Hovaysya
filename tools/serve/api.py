@@ -172,8 +172,9 @@ def messages(conn: sqlite3.Connection | None, since: str | None,
     if back is not None:
         floor = int((time.time() if now is None else now) - back)
         rows = conn.execute(
-            "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
-            "WHERE text_norm <> '' AND ts >= ? "
+            "SELECT channel, message_id, ts, text_norm, reply_to, media_url "
+            "FROM messages "
+            "WHERE (COALESCE(text_norm, '') <> '' OR media_url IS NOT NULL) AND ts >= ? "
             "ORDER BY ts DESC, channel DESC, message_id DESC LIMIT ?",
             (floor, limit)).fetchall()
         rows = list(reversed(rows))
@@ -189,7 +190,7 @@ def messages(conn: sqlite3.Connection | None, since: str | None,
             # with a cursor of its own there is nothing left for it to do.
             newest = conn.execute(
                 "SELECT ts, channel, message_id FROM messages "
-                "WHERE text_norm <> '' "
+                "WHERE COALESCE(text_norm, '') <> '' OR media_url IS NOT NULL "
                 "ORDER BY ts DESC, channel DESC, message_id DESC "
                 "LIMIT 1").fetchone()
             return {"messages": [],
@@ -198,13 +199,25 @@ def messages(conn: sqlite3.Connection | None, since: str | None,
     else:
         ts, channel, mid = _parse_cursor(since)
         rows = conn.execute(
-            "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
-            "WHERE text_norm <> '' AND (ts, channel, message_id) > (?, ?, ?) "
+            "SELECT channel, message_id, ts, text_norm, reply_to, media_url "
+            "FROM messages "
+            "WHERE (COALESCE(text_norm, '') <> '' OR media_url IS NOT NULL) "
+            "AND (ts, channel, message_id) > (?, ?, ?) "
             "ORDER BY ts, channel, message_id LIMIT ?",
             (ts, channel, mid, limit)).fetchall()
 
+    # Two addresses for one picture, because they fail in opposite ways. `photo`
+    # is Telegram's own CDN and is what can be shown inline -- 800px, 13-56 KB --
+    # but it expires: the URL captured in `tme_media.html` answers 404 today.
+    # `post` never expires and can never be shown inline, because it is the
+    # message's page. So the app tries the first and falls back to the second,
+    # which is also what makes scrolling back through June behave sensibly.
     out = [{"channel": r["channel"], "id": r["message_id"], "ts": r["ts"],
-            "text": r["text_norm"], "reply": r["reply_to"]} for r in rows]
+            "text": r["text_norm"] or "", "reply": r["reply_to"],
+            "photo": r["media_url"],
+            "post": f"https://t.me/{r['channel']}/{r['message_id']}"
+                    if r["media_url"] else None}
+           for r in rows]
     return {"messages": out,
             "next": _cursor(rows[-1]["ts"], rows[-1]["channel"],
                             rows[-1]["message_id"]) if rows else (since or "")}

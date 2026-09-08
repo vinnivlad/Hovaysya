@@ -144,6 +144,20 @@ data class Post(
     val ts: Long,
     val text: String,
     val reply: String?,
+    /**
+     * Telegram's own CDN, and the only address a picture can be *shown* from --
+     * one size, 800px wide, 13-56 KB. Null when the message has no photo.
+     *
+     * It expires. A URL captured in August answers 404 now, which is why [post]
+     * exists beside it rather than instead of it.
+     */
+    val photo: String? = null,
+    /**
+     * The message's page on t.me. Never expires, can never be shown inline, and
+     * is therefore what a photo from June still opens. Null unless there is a
+     * picture to open.
+     */
+    val post: String? = null,
 )
 
 /** One decision, from the watcher's own log. */
@@ -291,6 +305,8 @@ class Api(private val base: String, private val token: String?) {
                     ts = row.optLong("ts"),
                     text = row.optString("text"),
                     reply = row.stringOrNull("reply"),
+                    photo = row.stringOrNull("photo"),
+                    post = row.stringOrNull("post"),
                 )
             }
         }

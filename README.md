@@ -143,6 +143,27 @@ worker, not just the one that hit it.
   backfill must follow the cursor the server returns rather than stepping the id
   by a page size.
 
+### Photos travel as two links and no bytes
+
+The channels sometimes post a map with the drones marked on it, and that is worth
+seeing. Nothing is downloaded or stored: the page gives the picture's address and
+the app is handed it.
+
+- The address is in the wrapper's own `style`, and that is the only place it
+  appears — there is no `<img>` and no `srcset`. **Anchor on
+  `tgme_widget_message_photo_wrap`, never on `background-image`**: every custom
+  emoji on the page is a `background-image` too, dozens per message.
+- One size, 800px wide and 13–56 KB measured across four live photos. Small
+  enough to be the preview and the full picture at once, so nothing resizes.
+- **The address expires.** The URL captured in `tme_media.html` answers 404
+  today. So the feed carries two: `photo`, Telegram's CDN, which shows inline and
+  goes stale; and `post`, `t.me/<channel>/<id>`, which never expires and can only
+  be opened. Tonight's picture opens in place, June's opens in Telegram.
+
+A photo with **no caption** is now in the feed, where it used to be dropped by
+`text_norm <> ''` — 71 of the corpus's 819 photos, and exactly the case the maps
+fall into.
+
 ### Quoted replies are stored, and they matter
 
 Roughly 28% of messages in `mon1tor_ua` are replies, and the channel uses them

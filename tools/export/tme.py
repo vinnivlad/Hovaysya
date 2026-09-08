@@ -126,6 +126,32 @@ def _div_inner(html: str, class_marker: str, start: int = 0) -> tuple[str, int] 
     return None
 
 
+# Where a photo can be fetched from, and the only place the page says so: the
+# wrapper carries it in its own `style`, and there is no `<img>` tag and no
+# `srcset` anywhere near it.
+#
+# Anchored on `tgme_widget_message_photo_wrap` and not on `background-image`,
+# because every custom emoji on the page is one too -- dozens per message,
+# `//telegram.org/img/emoji/40/F09F9189.png`.
+#
+# One size, 800px wide and 13-56 KB across four live photos, which is small
+# enough to serve as both the preview and the full picture on a phone. Nothing
+# here resizes anything.
+#
+# **These URLs expire.** The one captured in `tme_media.html` answers 404 today.
+# So this is what shows a photo from tonight, and `t.me/<channel>/<id>` -- which
+# the app can always build for itself -- is what still opens one from June.
+_PHOTO_URL = re.compile(
+    r"tgme_widget_message_photo_wrap[^>]*?background-image:\s*url\('([^']+)'\)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _media_url(chunk: str) -> str | None:
+    m = _PHOTO_URL.search(chunk)
+    return m.group(1) if m else None
+
+
 def _media_type(chunk: str) -> str | None:
     for name, marker in _MEDIA_CLASSES:
         if marker in chunk:
@@ -168,6 +194,7 @@ def parse_message(chunk: str, channel: str, message_id: int) -> Msg | None:
         reply_to=int(reply.group(1)) if reply else None,
         reply_text=reply_text,
         media_type=_media_type(chunk),
+        media_url=_media_url(chunk),
         fwd_from=fwd.group(1).strip() if fwd else None,
     )
 

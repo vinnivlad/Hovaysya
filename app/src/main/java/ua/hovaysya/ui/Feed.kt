@@ -2,6 +2,7 @@ package ua.hovaysya.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +27,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.net.URL
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -260,11 +272,102 @@ fun ChannelFeed(store: Store) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(post.text, style = MaterialTheme.typography.bodyMedium)
+                if (post.text.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(post.text, style = MaterialTheme.typography.bodyMedium)
+                }
+                if (post.photo != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Photo(post)
+                }
             }
         }
     }
+}
+
+/**
+ * A picture the channel posted, folded away until it is asked for.
+ *
+ * Collapsed by his call, and the measurement is why: of the eighteen most recent
+ * photos in the corpus, two are the maps he wants -- "карти з мітками де дрони
+ * летять" -- and the rest are damage, weather, news and an advertisement for a
+ * washing machine. A feed that opens itself onto a photograph of a wrecked
+ * building at three in the morning is worse than one that waits to be asked.
+ *
+ * No image library. This app has no dependency outside the compiler's own, which
+ * is a decision worth more than the fifty lines it costs here: `BitmapFactory`
+ * off the main thread is the whole of it.
+ *
+ * The two addresses fail in opposite ways and that is the design. `photo` is
+ * Telegram's CDN -- 800px, 13-56 KB, small enough that no resizing is needed --
+ * and it expires, which a URL captured in August proves by answering 404. `post`
+ * is the message's own page, which never expires and can never be shown inline.
+ * So a picture from tonight opens in place, one from June opens in Telegram, and
+ * neither case needs the user to know which.
+ */
+@Composable
+private fun Photo(post: Post) {
+    var bitmap by remember(post.photo) { mutableStateOf<ImageBitmap?>(null) }
+    var loading by remember(post.photo) { mutableStateOf(false) }
+    var gone by remember(post.photo) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val open = {
+        post.post?.let {
+            runCatching {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(it))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        }
+        Unit
+    }
+
+    val shown = bitmap
+    if (shown != null) {
+        Image(
+            bitmap = shown,
+            contentDescription = null,
+            contentScale = ContentScale.FillWidth,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = open),
+        )
+        return
+    }
+
+    Text(
+        when {
+            loading -> "\u25A6 вантажу…"
+            // Not an error and not a retry: the picture is genuinely no longer
+            // where Telegram put it, and the only thing left to offer is the
+            // post itself.
+            gone -> "\u25A6 фото — відкрити в Telegram"
+            else -> "\u25A6 фото"
+        },
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.clickable(enabled = !loading) {
+            if (gone) {
+                open()
+            } else {
+                loading = true
+                scope.launch {
+                    val loaded = withContext(Dispatchers.IO) {
+                        runCatching {
+                            URL(post.photo).openStream().use {
+                                BitmapFactory.decodeStream(it)
+                            }
+                        }.getOrNull()
+                    }
+                    loading = false
+                    if (loaded == null) gone = true else bitmap = loaded.asImageBitmap()
+                }
+            }
+        },
+    )
 }
 
 /**

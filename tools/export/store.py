@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS messages (
     reply_to    INTEGER,
     reply_text  TEXT,
     media_type  TEXT,
+    media_url   TEXT,
     fwd_from    TEXT,
     PRIMARY KEY (channel, message_id)
 );
@@ -72,6 +73,7 @@ class Msg:
     reply_to: int | None = None
     reply_text: str | None = None
     media_type: str | None = None
+    media_url: str | None = None
     fwd_from: str | None = None
 
     @property
@@ -99,7 +101,7 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
 def _migrate(conn: sqlite3.Connection) -> None:
     """Add columns introduced after a database was first created."""
     have = {r["name"] for r in conn.execute("PRAGMA table_info(messages)")}
-    for column, decl in (("reply_text", "TEXT"),):
+    for column, decl in (("reply_text", "TEXT"), ("media_url", "TEXT")):
         if column not in have:
             conn.execute(f"ALTER TABLE messages ADD COLUMN {column} {decl}")
 
@@ -122,6 +124,7 @@ def insert_messages(conn: sqlite3.Connection, msgs: Iterable[Msg]) -> int:
                 m.reply_to,
                 normalize_text(m.reply_text) or None,
                 m.media_type,
+                m.media_url,
                 m.fwd_from,
             )
         )
@@ -132,8 +135,9 @@ def insert_messages(conn: sqlite3.Connection, msgs: Iterable[Msg]) -> int:
         """
         INSERT OR IGNORE INTO messages (
             channel, message_id, ts, date_utc, text_raw, text_norm,
-            fingerprint, edit_ts, reply_to, reply_text, media_type, fwd_from
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            fingerprint, edit_ts, reply_to, reply_text, media_type, media_url,
+            fwd_from
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         rows,
     )

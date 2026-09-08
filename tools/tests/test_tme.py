@@ -125,6 +125,28 @@ def test_photo_is_detected(media_page):
     assert [m.message_id for m in photos] == [4999]
 
 
+def test_a_photo_carries_the_url_it_can_be_shown_from(media_page):
+    """His ask: "інколи вони постять карти з мітками де дрони летять".
+
+    The page hands the address out in the wrapper's own style attribute, which
+    is the only place it appears -- there is no `<img>` and no `srcset`, and the
+    single size it offers is 800px wide and 13-56 KB measured across four live
+    photos. Small enough to be both the preview and the full picture on a phone,
+    which is why nothing here resizes anything."""
+    photo = next(m for m in media_page.messages if m.media_type == "photo")
+    assert photo.media_url is not None
+    assert photo.media_url.startswith("https://cdn")
+    assert photo.media_url.endswith(".jpg")
+
+
+def test_an_emoji_background_is_not_a_photo(media_page):
+    """The guard, and it is the whole difficulty of the pattern: every custom
+    emoji on the page is a `background-image` too, dozens per message --
+    `//telegram.org/img/emoji/40/F09F9189.png`."""
+    for m in media_page.messages:
+        assert "telegram.org/img/emoji" not in (m.media_url or "")
+
+
 def test_text_only_messages_report_no_media(page):
     assert all(m.media_type is None for m in page.messages)
 

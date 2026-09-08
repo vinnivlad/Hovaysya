@@ -178,6 +178,23 @@ none of the others do, and that division is not this app's to make twice: the
 server has already decided whether this person should be woken, and all that is
 left here is what it feels like.
 
+## Photos, folded away
+
+A channel's picture arrives as a chip under the text and loads only when tapped.
+His call, and the measurement behind it: of the eighteen most recent photos in
+the corpus two are the maps he asked for and the rest are damage, weather, news
+and an advertisement for a washing machine. A feed that opens itself onto a
+wrecked building at three in the morning is worse than one that waits.
+
+No image library — `BitmapFactory` off the main thread is the whole of it, which
+keeps the promise that this app has no dependency outside the compiler's own.
+
+The two links fail in opposite ways, and the chip uses that: `photo` is
+Telegram's CDN and expires, `post` is the message's page and never does. Tap
+loads the first; if it has gone, the chip says so and the next tap opens
+Telegram. The device talks to `cdn*.telesco.pe` directly, so Telegram sees its
+address — the price of handing over links instead of proxying bytes.
+
 ## В укритті
 
 A mode for the case the rest of the app is not written for: he is already where

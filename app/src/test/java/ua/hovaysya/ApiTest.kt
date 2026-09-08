@@ -125,6 +125,52 @@ class ApiTest {
     }
 
     @Test
+    fun `a photo arrives as two addresses, and a message without one as none`() {
+        // They fail in opposite ways, which is why there are two: the CDN link
+        // is the only one that can be shown inline and it expires, the t.me link
+        // never expires and can never be shown inline.
+        serve("/messages", payload = """
+            {"messages": [
+              {"channel": "mon1tor_ua", "id": 20, "ts": 1788547285,
+               "text": "", "reply": null,
+               "photo": "https://cdn4.telesco.pe/file/map.jpg",
+               "post": "https://t.me/mon1tor_ua/20"},
+              {"channel": "mon1tor_ua", "id": 21, "ts": 1788547300,
+               "text": "самий текст", "reply": null,
+               "photo": null, "post": null}
+            ], "next": "1788547300:mon1tor_ua:21"}
+        """.trimIndent())
+
+        val posts = runBlocking { api().posts(minutes = 30) }
+
+        assertEquals("https://cdn4.telesco.pe/file/map.jpg", posts[0].photo)
+        assertEquals("https://t.me/mon1tor_ua/20", posts[0].post)
+        // A caption-less photo is in the feed now, and its text is empty rather
+        // than absent -- the row is drawn from the picture.
+        assertEquals("", posts[0].text)
+        assertNull(posts[1].photo)
+        assertNull(posts[1].post)
+    }
+
+    @Test
+    fun `an older server that says nothing about photos still parses`() {
+        // The phone updates on its own schedule and the instance on a timer, so
+        // for a while one of them is behind. Absent is not the same as null in
+        // `org.json`, and the difference has bitten this file before.
+        serve("/messages", payload = """
+            {"messages": [
+              {"channel": "mon1tor_ua", "id": 22, "ts": 1788547285,
+               "text": "текст", "reply": null}
+            ], "next": ""}
+        """.trimIndent())
+
+        val posts = runBlocking { api().posts(minutes = 30) }
+
+        assertNull(posts.single().photo)
+        assertNull(posts.single().post)
+    }
+
+    @Test
     fun `a state with no state is read as unknown and not as calm`() {
         serve("/state", payload = """{"at": 1788547285, "v": "7"}""")
 

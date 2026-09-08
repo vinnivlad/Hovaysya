@@ -25,18 +25,54 @@ TOKEN = "sekret"
 
 @pytest.fixture
 def db(tmp_path):
+    """The real schema, not a copy of it.
+
+    This fixture used to spell the table out itself, and the copy drifted the
+    moment a column was added: every test here failed with `no such column`
+    while the code was right. `store.connect` is the same call the exporter
+    makes, migrations and all.
+    """
+    from tools.export.store import connect
+
     path = tmp_path / "m.db"
-    con = sqlite3.connect(str(path))
-    con.execute("CREATE TABLE messages (channel TEXT, message_id INTEGER, "
-                "ts INTEGER, date_utc TEXT, text_raw TEXT, text_norm TEXT, "
-                "fingerprint TEXT, edit_ts INTEGER, reply_to INTEGER, "
-                "reply_text TEXT, media_type TEXT, fwd_from TEXT, "
-                "PRIMARY KEY (channel, message_id))")
-    rows = [("a", 2, 100, "", "", "друге", "", None, None, "", "", ""),
-            ("a", 1, 100, "", "", "перше", "", None, None, "", "", ""),
-            ("b", 9, 101, "", "", "третє", "", None, None, "", "", ""),
-            ("b", 8, 99, "", "", "", "", None, None, "", "", "")]
-    con.executemany("INSERT INTO messages VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+    con = connect(path)
+    rows = [
+        ("a", 2, 100, "друге", None),
+        ("a", 1, 100, "перше", None),
+        ("b", 9, 101, "третє", None),
+        # Neither text nor picture: nothing to show, and it stays out.
+        ("b", 8, 99, "", None),
+    ]
+    con.executemany(
+        "INSERT INTO messages (channel, message_id, ts, date_utc, text_raw, "
+        "text_norm, media_url) VALUES (?, ?, ?, '', '', ?, ?)", rows)
+    con.commit()
+    con.close()
+    return path
+
+
+@pytest.fixture
+def db_photos(tmp_path):
+    """Its own database rather than more rows in `db`.
+
+    Every cursor and ordering test above is written against those four rows, and
+    a fifth moved all of them -- five failures that said nothing about photos.
+    """
+    from tools.export.store import connect
+
+    path = tmp_path / "photos.db"
+    con = connect(path)
+    rows = [
+        ("c", 1, 200, "з підписом", "https://cdn4.telesco.pe/file/one.jpg"),
+        # The case his ask is about: the channels post maps with no words at all.
+        ("c", 2, 201, "", "https://cdn4.telesco.pe/file/map.jpg"),
+        ("c", 3, 202, "самий текст", None),
+        # Neither text nor picture.
+        ("c", 4, 203, "", None),
+    ]
+    con.executemany(
+        "INSERT INTO messages (channel, message_id, ts, date_utc, text_raw, "
+        "text_norm, media_url) VALUES (?, ?, ?, '', '', ?, ?)", rows)
     con.commit()
     con.close()
     return path
@@ -183,11 +219,39 @@ def test_a_cursor_we_never_issued_means_the_beginning(db):
     assert len(messages(conn, "", 10)["messages"]) == 3
 
 
-def test_a_message_with_no_text_is_not_in_the_feed(db):
-    """A photo with no caption decides nothing and says nothing."""
-    conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+def test_a_message_with_nothing_in_it_is_not_in_the_feed(db_photos):
+    """Nothing to read and nothing to look at."""
+    conn = sqlite3.connect(f"file:{db_photos}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
-    assert all(m["text"] for m in messages(conn, None, 10)["messages"])
+    feed = messages(conn, None, 10)["messages"]
+    assert all(m["text"] or m["photo"] for m in feed)
+
+
+def test_a_photo_with_no_caption_is_in_the_feed(db_photos):
+    """It used to be excluded, on the reasoning that "a photo with no caption
+    decides nothing and says nothing". That was true while the feed was text:
+    the picture was not being shown, so the row was an empty line.
+
+    Now that it is shown, the reasoning inverts -- and it is exactly the case
+    his ask is about, "карти з мітками де дрони летять", which the channels post
+    with no words at all. 71 of the corpus's 819 photos are captionless."""
+    conn = sqlite3.connect(f"file:{db_photos}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    feed = messages(conn, None, 10)["messages"]
+    shown = [m for m in feed if m["photo"]]
+    assert len(shown) == 2, feed
+    bare = next(m for m in shown if not m["text"])
+    assert bare["post"] == "https://t.me/c/2"
+
+
+def test_a_message_without_a_photo_offers_no_links(db_photos):
+    """The permanent link is only worth having where there is a picture behind
+    it, and a null is how the app knows not to draw the chip."""
+    conn = sqlite3.connect(f"file:{db_photos}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    for m in messages(conn, None, 10)["messages"]:
+        if not m["photo"]:
+            assert m["post"] is None
 
 
 def test_the_limit_cannot_be_talked_into_reading_everything(api):
