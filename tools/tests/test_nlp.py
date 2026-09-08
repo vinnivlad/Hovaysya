@@ -422,6 +422,93 @@ def test_a_real_siren_still_declares_one():
         "Оголошено повітряну тривогу. Не ігноруйте сигнали тривоги.") == "alert"
 
 
+def test_the_official_level_wording_names_no_class():
+    """His report on the night of 2026-09-07: at 00:23 the threat was ballistic
+    and the siren line said "Крилаті ракети".
+
+    `alarm_kyiv` relays the app's red level as "Ракетна загроза", which covers
+    ballistic and cruise alike -- it is a level, not a class -- and the bare
+    `ракет` fallback resolved it to cruise. Two chat channels had said "Загроза
+    балістики з Курська" a minute earlier, so the class was known and the
+    declaration overwrote it with a guess.
+
+    Naming nothing is right here: a declaration with no class stated inherits
+    the episode's, which is the same rule `suggest` already applies to a siren.
+    The yellow level stays as it is -- "Дронова загроза" names drones and means
+    drones."""
+    assert hints.threat_hint("Ракетна загроза") == "none"
+    assert hints.threat_hint(
+        "🔴 м. Київ Повітряна тривога (червоний рівень) Ракетна загроза "
+        "Святошинський район") == "none"
+    assert hints.threat_hint("Без ракетних загроз.") == "none"
+    # ...and the level word does not blind the pattern to a class that *is* named
+    assert hints.threat_hint(
+        "Ракетна загроза: балістика з Курська") == "ballistic"
+    assert hints.threat_hint("Дронова загроза") == "shahed"
+
+
+def test_br_is_the_channels_shorthand_for_ballistic():
+    """His ask. `rocketskyiv` and `war_monitor` write it this way and it matched
+    nothing at all: 27 messages in the corpus, every one ballistic."""
+    for t in ("☄ Вихід БР на Київ", "☄ БР на Кременчук!",
+              "☄ 1х БР Миколаївський район",
+              "‼️ Ворог готує запуск 20 БР Іскандер-М з Брянської області."):
+        assert hints.threat_hint(t) == "ballistic", t
+
+
+def test_br_without_fixing_is_a_recheck_on_ballistic():
+    """The second half of his ask -- "БР без фіксації можна позначати так само і
+    світити статус дорозвідка". `без фіксац` was already a recheck term; what was
+    missing was the class, so the line had nothing to be a recheck *about*."""
+    t = "БР без подальшої фіксації"
+    assert hints.threat_hint(t) == "ballistic"
+    assert hints.recheck(t) is True
+
+
+def test_a_fast_target_is_ballistic():
+    """His ask: "Швидкісні цілі" може означати балістику. 27 in the corpus and
+    every one read as nothing flying at all."""
+    for t in ("Швидкісна ціль! В укриття!", "Швидкісна ціль на Білу Церкву.",
+              "❗️ 3х швидкісні цілі на Дніпро. Увага."):
+        assert hints.threat_hint(t) == "ballistic", t
+
+
+def test_no_fast_targets_is_a_recheck_not_a_threat():
+    """The trap the class mapping opens, and the reason it is not just a class:
+    the channels say the same words to mean the opposite, and with `ballistic`
+    now attached these would have been a confirmed threat.
+
+    They are rechecks in his own sense -- nothing is being tracked any more."""
+    for t in ("Швидкісних цілей наразі нема📡",
+              "Без повторних швидкісних цілей наразі, очікуємо відбій",
+              "Наразі без повторних швидкісних цілей 📻"):
+        assert hints.recheck(t) is True, t
+        assert hints.certainty_hint(t) != "confirmed", t
+
+
+def test_enemy_air_defence_work_is_a_recheck():
+    """His ask: after a ballistic warning, "робота ворожого ППО" can mean the
+    launch never happened -- what was seen was their own air defence. 38 such
+    standalone reports in the corpus and every one was silent, so he had never
+    seen one."""
+    for t in ("🟣 Робота ворожої ППО в Криму.", "Робота ППО в Курську.",
+              "❗️Ймовірно робота ворожої ППО над Курською областю.",
+              "Була робота ворожого ППО", "📡Без фіксації, ймовірно робота ворожого ППО."):
+        assert hints.recheck(t) is True, t
+
+
+def test_the_warning_template_that_mentions_air_defence_is_not_a_recheck():
+    """The guard against fixing too much, and it matters more than the fix: the
+    `war_monitor` ballistic warning carries the phrase as one of two
+    possibilities, and reading it as a recheck would turn 90 warnings into
+    reassurance."""
+    t = ("🟣 Загроза балістики з Криму. Увага. Імовірний пуск балістичних ракет "
+         "комплексів «Іскандер» / С-400. або робота ворожої ППО С-300. "
+         "Не знаходьтесь під відкритим небом — це небезпечно!")
+    assert hints.recheck(t) is False
+    assert hints.threat_hint(t) == "ballistic"
+
+
 def test_a_retracted_launch_is_not_a_launch():
     """A report withdrawn carries every word the report did. Three of these rang
     the shelter tone, and "не підтверджується" is the channels' own phrase for

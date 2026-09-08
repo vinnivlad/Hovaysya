@@ -24,7 +24,18 @@ THREAT_RULES: tuple[tuple[str, str], ...] = (
     # the bare-"ракета" rule and came out cruise -- which is the class that
     # deliberately does not ring on launch, because a cruise missile flies for
     # hours. For something supersonic that is the wrong end of the trade.
-    ("ballistic", r"балісти|іскандер|кн-?23|брсд|кинжал|кинджал|циркон|онікс"),
+    # `БР` is how `rocketskyiv` and `war_monitor` abbreviate балістична ракета,
+    # and it matched nothing: "☄ Вихід БР на Київ", "☄ 1х БР Миколаївський
+    # район", "БР без подальшої фіксації". 27 messages in the corpus and every
+    # one is ballistic. The word boundaries are load-bearing the same way the
+    # cruise rule's `\bкр\b` are -- without them it also matches Бровари.
+    #
+    # `швидкісна ціль` is his ruling, and it is the same shape: 27 messages, all
+    # of them reading as nothing flying at all -- "Швидкісна ціль! В укриття!",
+    # "❗️ 3х швидкісні цілі на Дніпро. Увага." A fast target is what the channels
+    # call a ballistic one before they know which missile it is.
+    ("ballistic", r"балісти|іскандер|кн-?23|брсд|кинжал|кинджал|циркон|онікс|"
+                  r"\bбр\b|швидкісн\w*\s+ціл"),
     # Between the drones and the cruise missiles, and it exists because of what
     # the channels call it: "крилаті ракети Бандероль", "мгКР Бандероль". Read
     # as cruise, a Бандероль crossing the oblast rang twice over -- the climb
@@ -445,6 +456,18 @@ def without_denials(text: str) -> str:
     return text
 
 
+# The official app's red level, which `alarm_kyiv` relays as "Ракетна загроза".
+# It is a *level*, not a class -- it covers ballistic and cruise alike -- and the
+# bare `ракет` fallback at the end of the rule list resolved it to cruise. On the
+# night of 2026-09-07 that put "Тривога. Крилаті ракети." on a siren whose cause
+# two channels had already named as ballistic a minute earlier.
+#
+# Masked rather than vetoed, so a class named beside the level still wins:
+# "Ракетна загроза: балістика з Курська" is ballistic. The yellow level is left
+# alone on purpose -- "Дронова загроза" names drones and means drones.
+_OFFICIAL_LEVEL = re.compile(r"ракетн\w*\s+загроз\w*", re.IGNORECASE)
+
+
 def stated_class(text: str) -> str:
     """The class a message *names*, whether or not it names it to deny it.
 
@@ -461,6 +484,7 @@ def stated_class(text: str) -> str:
     """
     if _MIG.search(text or "") and not _LAUNCHED.search(text or ""):
         return "mig"
+    text = _OFFICIAL_LEVEL.sub(" ", text or "")
     for kind, rx in _THREAT:
         if rx.search(text or ""):
             return kind
@@ -855,8 +879,54 @@ def missile_kinds(text: str) -> frozenset[str]:
     return frozenset(name for name, rx in _KINDS if rx.search(text or ""))
 
 
+# His ruling, after the night of 2026-09-07: a report of the enemy's own air
+# defence working can mean the ballistic launch never happened -- what was seen
+# was their S-300, not an Iskander. 38 standalone reports in the corpus and every
+# one of them was silent, so he had never seen one.
+_AD_WORK = re.compile(r"робот\w*\s+(?:ворож\w+\s+)?ппо", re.IGNORECASE)
+
+# ...and the shape that must not be caught, which matters more than the fix:
+# `war_monitor`'s ballistic warning carries the same phrase as one of two
+# possibilities -- "Імовірний пуск балістичних ракет комплексів «Іскандер» /
+# С-400. **або робота ворожої ППО** С-300." Reading that as a recheck would turn
+# 90 warnings into reassurance. Measured: 90 of the 128 messages containing the
+# phrase are this template, and all 90 carry "або робота".
+_AD_WORK_AS_WARNING = "або робота"
+
+# The absent-fast-target forms, which the class mapping above made necessary:
+# with `ballistic` now attached, "Швидкісних цілей наразі нема📡" would have been
+# a confirmed ballistic threat. Three messages, and they are rechecks in his own
+# sense -- nothing is being tracked any more.
+_FAST_TARGET_GONE = re.compile(
+    r"швидкісн\w*\s+цілей[^.!?]{0,20}(нема|немає)|"
+    r"без\s+(?:повторних\s+)?швидкісних\s+цілей",
+    re.IGNORECASE,
+)
+
+
+def _ad_work_report(text: str) -> bool:
+    """Their air defence working, reported as such rather than as a hedge."""
+    if _AD_WORK_AS_WARNING in _low(text):
+        return False
+    return bool(_AD_WORK.search(text or ""))
+
+
+# A word may sit between, and 18 messages did: `без фіксац` is a substring term
+# and the channels write "Остання БР без подальшої фіксації.", "КР без подальшої
+# фіксації.", "Балістична ракета без подальшої фіксації". Every one of the 18 is
+# a recheck, and none of them was read as one. Found by his "БР без фіксації"
+# ask -- the class was missing, and so was this.
+_NO_FIXING = re.compile(r"без\s+(?:\w+\s+)?фіксац", re.IGNORECASE)
+
+
+def _nothing_tracked(text: str) -> bool:
+    return (_ad_work_report(text)
+            or bool(_FAST_TARGET_GONE.search(text or ""))
+            or bool(_NO_FIXING.search(text or "")))
+
+
 def recheck(text: str) -> bool:
-    return _hits(text, RECHECK_TERMS)
+    return _hits(text, RECHECK_TERMS) or _nothing_tracked(text)
 
 
 def partial_clear(text: str) -> bool:
@@ -1293,6 +1363,11 @@ def certainty_hint(text: str) -> str:
     """
     low = _low(text)
     if any(t in low for t in RESOLUTION_UNKNOWN):
+        return "lost"
+    # `lost` and not `clear`, which is the distinction this function exists to
+    # keep: their air defence firing says we no longer know whether anything was
+    # launched. It is not safety.
+    if _nothing_tracked(text):
         return "lost"
     if any(t in low for t in RESOLUTION_CLOSING):
         return "clear"

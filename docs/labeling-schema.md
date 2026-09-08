@@ -389,6 +389,39 @@ Both were behind the collapsed secondary row at first, which is why they were
 hard to find — the same friction, twice. `none` alone accounts for 4 148 of the
 corpus's 11 609 messages.
 
+#### Three ways the channels name ballistic that matched nothing
+
+From his report on the morning of 2026-09-08, and all three measured over the
+corpus before being added:
+
+| written as | messages | was |
+| --- | --- | --- |
+| `БР` — `☄ Вихід БР на Київ` | 27 | nothing flying |
+| `швидкісна ціль` — `Швидкісна ціль! В укриття!` | 27 | nothing flying |
+| `Ракетна загроза` — the official red level | — | **cruise** |
+
+The last is the opposite mistake and the one he noticed live: `alarm_kyiv` relays
+the app's red level as "Ракетна загроза", which covers ballistic and cruise
+alike, and the bare `ракет` fallback resolved it to cruise. At 00:23 on
+2026-09-08 the siren said "Тривога. Крилаті ракети." on an episode two channels
+had already called ballistic. The level is now masked out rather than vetoed, so
+a class named beside it still wins; the yellow level is untouched, because
+"Дронова загроза" names drones and means drones.
+
+Attaching a class opens the mirror trap, which is why `швидкісна ціль` needed
+two changes and not one: the channels use the same words to mean the opposite,
+and `Швидкісних цілей наразі нема` would have become a confirmed ballistic
+threat. Those forms are rechecks — nothing is being tracked any more — and so is
+their air defence firing, which is his ruling from the same morning: "робота
+ворожого ППО" after a ballistic warning can mean the launch never happened. 38
+standalone reports in the corpus, every one silent before this.
+
+The guard there matters more than the fix. `war_monitor`'s ballistic warning
+carries the same phrase as one of two possibilities — "Імовірний пуск ...
+**або робота ворожої ППО** С-300" — and reading that as a recheck would turn 90
+warnings into reassurance. All 90 carry `або робота`, which is what tells them
+apart.
+
 `shahed` and `shahed-jet` are separate on purpose. A jet-powered Shahed
 (`реактивний`) is several times faster than a propeller one and appears in 1 511
 messages — more than every ballistic term — so it is neither the slow case nor
