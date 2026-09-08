@@ -1151,6 +1151,83 @@ def test_a_warning_for_the_night_ahead_does_not_climb_either():
     assert out[2][2] != "threat level rose", out
 
 
+def test_a_siren_does_not_borrow_the_place_a_drone_came_from():
+    """The other half of his 00:23 line on 2026-09-07. It read
+
+        Тривога. Крилаті ракети. Рожни.
+
+    and both halves were wrong. The class was the level word, fixed in the
+    vocabulary; the place came from "Київщина: 🅿️1х реактив від Рожни на
+    Бровари." 33 seconds earlier -- silenced as oblast, but still remembered,
+    and the far-place memory takes the last name it saw. Рожни is where the
+    drone started.
+
+    Measured over the corpus: of 9 533 messages reaching that memory, preferring
+    the destination changes the chosen name in 242 and leaves 9 119 alone."""
+    out = _play([
+        # the order of his night: the drone report sits between two ballistic
+        # warnings, so the class the siren inherits is the ballistic one
+        (0, "monitoring_kyiv", "Загроза балістики з Курська."),
+        (29, "war_monitor", "Київщина: 🅿️1х реактив від Рожни на Бровари."),
+        (51, "kievinform_ua1", "⚠️ Загроза балістики 🚀"),
+        (62, "alarm_kyiv", "🚨 м. Київ" + chr(10)
+         + "Повітряна тривога (червоний рівень) Ракетна загроза"),
+    ])
+    said = out[3][3] or ""
+    assert out[3][1], out                      # the siren rings
+    assert "Рожни" not in said, out            # ...on somewhere it is going
+    assert "Балістика" in said, out            # ...and on the class that was named
+
+
+def test_a_from_place_is_still_named_when_it_is_the_only_one():
+    """The guard: in 172 of those 9 533 every name in the message is a
+    from-place, and naming where it came from beats naming nowhere."""
+    from tools.nlp.gazetteer import from_places
+
+    assert from_places("Київщина: 🅿️1х реактив від Рожни на Бровари.") == {"Рожни"}
+    out = _play([
+        (0, "war_monitor", "🅿️2х реактиви з Броварів."),
+        (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+    ])
+    assert "Бровари" in (out[1][3] or ""), out
+
+
+def test_a_partial_all_clear_rings_once_per_class():
+    """His report on the morning of 2026-09-08: "Відбої по балістикам всі
+    дзвонили і не дедупались". Six bells that night, in two waves of three --
+    00:38:41, 00:38:51, 00:40:39, then 00:51:07, 00:51:49, 00:52:07 -- each from
+    a different channel saying the same sentence.
+
+    The full all-clear has had a dedup since `Tracker.said_clear_at`; the partial
+    one never had any. `ep.cleared` already holds the answer, and it is already
+    discarded when a class is named as flying again -- so the rule needs no new
+    bookkeeping and no threshold.
+
+    The second wave is not a repeat and must still ring: "Загроза балістики з
+    Брянська" climbed the rung again between them."""
+    out = _play([
+        (0, "mon1tor_ua", "⚠️2 реактивні шахеди на Київ/Бровари."),
+        (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (200, "mon1tor_ua", "❗️❗Загроза пуску балістичних ракет Іскандер-М."),
+        # the first wave: three channels, one fact
+        (400, "nebo_raketa", "🟢По балістиці відбій"),
+        (410, "mon1tor_ua", "⚪️Відбій загрози балістики з Курська."),
+        (520, "war_monitor", "⚪️ Відбій загрози балістики."),
+        # ...the rung climbs again
+        (580, "rocketskyiv", "Загроза балістики з Брянська."),
+        # ...so the next lift is news, and the two after it are not
+        (1000, "war_monitor", "⚪️ Відбій загрози балістики."),
+        (1040, "kievinform_ua1", "Відбій по балістиці ✈️"),
+        (1060, "nebo_raketa", "🟢По балістиці відбій"),
+    ])
+    assert out[3][1], out                      # first lift rings
+    assert not out[4][1], out                  # ...the other two do not
+    assert not out[5][1], out
+    assert out[7][1], out                      # after the climb, it rings again
+    assert not out[8][1], out
+    assert not out[9][1], out
+
+
 def test_a_hypothetical_strike_says_nothing_about_ballistics():
     """His report at 21:16 on 2026-09-07, in the middle of a running alert:
 
@@ -2450,6 +2527,38 @@ def test_a_scouting_line_leaves_the_screen_but_not_the_dedup():
     assert stale["recon"] == [], stale["recon"]
     # Gone from the screen, still remembered as said.
     assert "ballistic" in who.tracker.episode.rechecked
+
+
+def test_a_lifted_class_leaves_the_screen_eventually():
+    """His report on the morning of 2026-09-08: "текст «Знято: балістика» не
+    зникає або зникає дуже довго".
+
+    It did not, and `cleared` is the same shape `rechecked` was before
+    `recon_at`: a set with no age, answering "was this lifted in this episode",
+    read by a screen that claims to describe now. Measured over the corpus, an
+    entry sits there a median of 50.6 minutes, 41% of 131 stay past an hour, and
+    the longest stood for 11.9 hours.
+
+    The distinction it carries -- called off, as opposed to merely not heard
+    about -- is real, which is why he asked for it, and it decays: after a while
+    the absence of the class from `top` says the same thing. So the screen ages
+    it and the logic does not."""
+    from tools.policy.status import CLEARED_FRESH_S
+
+    script = [
+        (0, "🛑 Повітряна тривога в м. Київ", "alarm_kyiv"),
+        (60, "❗️❗Загроза пуску балістичних ракет Іскандер-М."),
+        (120, "⚪️По балістиці відбій"),
+    ]
+    fresh, who = _screen(script, at=120 + CLEARED_FRESH_S - 1)
+    assert [x["class"] for x in fresh["cleared"]] == ["ballistic"], fresh["cleared"]
+
+    stale, who = _screen(script, at=120 + CLEARED_FRESH_S + 1)
+    assert stale["cleared"] == [], stale["cleared"]
+    # Gone from the screen, still remembered -- the dedup and the airborne set
+    # both read it, and neither may forget.
+    assert "ballistic" in who.tracker.episode.cleared
+    assert stale["top"] is None, stale["top"]
 
 
 def test_the_screen_carries_the_word_for_every_class_it_can_name():

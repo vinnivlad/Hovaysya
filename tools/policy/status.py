@@ -73,6 +73,19 @@ ENDED_SHOWN_S = 60 * 60
 # own memory uses: where the channels speak before a siren, ten covers 77%.
 RECON_FRESH_S = 10 * 60
 
+# How recently a class must have been lifted to still be shown as lifted. Same
+# split as `recon`, and his report of 2026-09-08: "текст «Знято: балістика» не
+# зникає або зникає дуже довго". It did not -- measured over the corpus, an
+# entry sits in `Episode.cleared` a median of 50.6 minutes, 41% of 131 past an
+# hour, and the longest stood for 11.9 hours.
+#
+# Longer than `recon` because a lift is a more durable fact than a scout, and
+# shorter than `ENDED_SHOWN_S` because that is the end of everything rather than
+# of one class. What it is really bounded by is when "called off" stops being
+# different from "not heard about lately" -- after that the class's absence from
+# `top` already says it. Thirty minutes drops 59% of the entries measured.
+CLEARED_FRESH_S = 30 * 60
+
 
 def _named(classes) -> list[dict]:
     """Classes worst first, each with the word the announcer would use."""
@@ -162,6 +175,10 @@ def snapshot(recipient, said=(), now: int | None = None) -> dict:
              if at - when <= RECON_FRESH_S}
     recon = (set(ep.rechecked) & fresh) - cleared - airborne
     top = _named(airborne)
+    # Aged for the screen only: `cleared` above still suppresses `airborne`, so
+    # a class called off does not come back as a threat when its line expires.
+    shown_cleared = {c for c in cleared
+                     if at - ep.cleared_at.get(c, 0) <= CLEARED_FRESH_S}
 
     return {
         "at": at,
@@ -173,7 +190,7 @@ def snapshot(recipient, said=(), now: int | None = None) -> dict:
         "top": top[0] if top else None,
         "threat": _named([ep.threat])[0] if ep.threat else None,
         "recon": _named(recon),
-        "cleared": _named(cleared),
+        "cleared": _named(shown_cleared),
         "launched": _named(ep.launched),
         # The rung reached since the siren. A partial all-clear moves it down by
         # one, which is the only thing that lowers it -- his exception.

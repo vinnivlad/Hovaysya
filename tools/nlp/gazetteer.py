@@ -647,6 +647,35 @@ def find_places(text: str) -> list[Place]:
     return list(resolved.values())
 
 
+# The prepositions that put a place at the *start* of a route rather than its
+# end. `origin` on `Place` is a different thing entirely -- a static property of
+# Russian launch sites -- and it does not help here, because these are Ukrainian
+# names doing the job syntactically.
+#
+# His night of 2026-09-07: 33 seconds before the siren, `war_monitor` said
+# "Київщина: 🅿️1х реактив від Рожни на Бровари." and the siren came out as
+# "Тривога. Крилаті ракети. Рожни." -- the far-place memory took the last name it
+# had seen, and that was where the drone started, in the oblast, not where it was
+# going.
+_FROM_PREPOSITION = re.compile(r"(?:\bвід|\bзі?\b|\bіз\b|\bповз|\bпоза)\s*$",
+                               re.IGNORECASE)
+
+
+def from_places(text: str) -> frozenset[str]:
+    """Names this message puts at the start of a route, not at the end.
+
+    Measured over the corpus: of 9 533 messages that reach the announcer's
+    far-place memory, skipping these changes the chosen name in 242 and leaves
+    9 119 alone -- "1 шахед з Подолу на Лук'янівку" stops offering Поділ, and
+    "Ще один шахед від ДВРЗ на Троєщину" stops offering ДВРЗ. In 172 every name
+    in the message is one of these, and there the caller keeps what it had:
+    naming where it came from beats naming nowhere.
+    """
+    flat = _flatten(text)
+    return frozenset(place.name for start, _end, place in place_spans(text)
+                     if _FROM_PREPOSITION.search(flat[:start]))
+
+
 def place_spans(text: str) -> list[tuple[int, int, Place]]:
     """Resolved, non-overlapping (start, end, place) spans in flattened text.
 

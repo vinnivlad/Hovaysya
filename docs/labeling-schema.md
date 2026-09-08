@@ -912,6 +912,27 @@ makes a sound. Only after the siren has been declared; a fall does not lower the
 ladder, so the same climb cannot ring twice; and one exception — a partial
 all-clear for ballistic or cruise moves it down, and a fresh climb rings again.
 
+That exception is also the dedup. From his report of 2026-09-08: "відбої по
+балістикам всі дзвонили і не дедупались" — six bells that night, in two waves of
+three, every one saying "Відбій по балістиці." and each from a different channel.
+The full all-clear had been deduped since `Tracker.said_clear_at`; the partial
+one never had any. `Episode.cleared` was already the answer, because it is
+already discarded the moment a class is named as flying again — so a repeat is
+silent and the second wave still rings, "Загроза балістики з Брянська" having
+climbed the rung again between them. Correctly deduped, that night gives two
+bells rather than six or one.
+
+`cleared` also feeds the first screen, and there it needed the same split
+`rechecked` got when `recon_at` was added: a set with no age answers "was this
+lifted in this episode", which the dedup and the airborne set both need, while a
+screen claims to describe now. Measured over the corpus, an entry sits in it a
+median of **50.6 minutes**, 41% of 131 past an hour, and the longest stood for
+11.9 hours — his "«Знято: балістика» не зникає або зникає дуже довго". The screen
+now ages it at thirty minutes and the logic does not, so a class called off never
+returns as a threat when its line expires. What bounds the number is when "called
+off" stops differing from "not heard about lately"; after that, the class's
+absence from `top` already says it.
+
 It replaced a rule this schema used to state, that a new sound belongs only to a
 confirmed event. A warning about a class more urgent than the one already
 announced is now a sound in its own right, because that is a different situation

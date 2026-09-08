@@ -240,6 +240,13 @@ class Episode:
     # know "що нема загрози балістики чи мігів", and the persistent status
     # notification is where that lives — so the state has to be kept.
     cleared: set[str] = field(default_factory=set)
+    # ...and *when*, for the same reason `recon_at` sits beside `rechecked`. The
+    # set answers "was this lifted in this episode", which stays true and is
+    # what the dedup and the airborne set both need. A screen claims to describe
+    # now, and measured over the corpus an entry sits in `cleared` a median 50.6
+    # minutes, 41% of 131 past an hour, the longest 11.9 hours -- so "Знято:
+    # балістика" was still on his screen most of the night. See `policy.status`.
+    cleared_at: dict[str, int] = field(default_factory=dict)
     last_live: int = 0
 
     @property
@@ -819,6 +826,7 @@ class Tracker:
                                      THREAT_LEVEL.get(ep.threat or "", 0))
         if obs.cleared_class:
             ep.cleared.add(obs.cleared_class)
+            ep.cleared_at[obs.cleared_class] = obs.ts
             # "Тоді знижуємо поточний рівень і в разі підняття знову
             # застосовуємо правило." A lift of the ballistic threat puts the
             # ladder back at cruise, and a fresh ballistic warning rings again.
@@ -861,6 +869,7 @@ class Tracker:
             ep.threat_at = obs.ts
             # Named again as flying: whatever was lifted is back.
             ep.cleared.discard(ep.threat)
+            ep.cleared_at.pop(ep.threat, None)
         if obs.says_new:
             ep.last_launch = obs.ts
         if (level is not None and level != "info" and obs.says_launch

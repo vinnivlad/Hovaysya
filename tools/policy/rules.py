@@ -168,6 +168,22 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     #    МіГ-31К" twenty minutes later is a real partial all-clear.
     if (obs.alert_state == "clear" and obs.partial_clear
             and ep is not None and ep.notified):
+        # Once per class, and `ep.cleared` is the whole bookkeeping: the class is
+        # already recorded when a lift is seen, and already discarded the moment
+        # it is named as flying again. So a repeat is silent and a genuine
+        # second lift after a fresh climb still rings, which is the same
+        # exception the ladder carries.
+        #
+        # His report on the morning of 2026-09-08: "Відбої по балістикам всі
+        # дзвонили і не дедупались". Six bells that night, in two waves of three
+        # -- 00:38:41, 00:38:51, 00:40:39, then 00:51:07, 00:51:49, 00:52:07 --
+        # every one saying "Відбій по балістиці." and each from a different
+        # channel. The full all-clear has been deduped since `said_clear_at`;
+        # this rule never had any. Correctly deduped the night gives two bells,
+        # not one: "Загроза балістики з Брянська" climbed the rung again at
+        # 00:41:35, between the waves.
+        if obs.cleared_class and obs.cleared_class in ep.cleared:
+            return _silent("already-notified: this class was already lifted")
         # Audible, with the all-clear tone. I had made this a silent status
         # update; the user labelled "⚪️ Відбій загрози МіГ-31К" as a wake-up
         # ("відбій по мігам") and asked outright to be told when a class is

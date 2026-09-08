@@ -259,14 +259,23 @@ class Announcer:
                                    if n != place]
             self.pending_places.append((place, obs.ts))
         if not obs.ring_places and not obs.official and obs.scope in ("city", "oblast"):
-            from ..nlp.gazetteer import find_places
+            from ..nlp.gazetteer import find_places, from_places
 
-            for pl in find_places(obs.text):
-                if (not pl.origin and pl.tier in ("city", "oblast")
-                        and pl.name != "Київ"):
-                    self.pending_far = [(n, t) for n, t in self.pending_far
-                                        if n != pl.name]
-                    self.pending_far.append((pl.name, obs.ts))
+            # Where it is going, not where it started. The memory is read as
+            # `pending_far[-1:]`, so the last name appended is the one a siren
+            # will borrow -- and "від Рожни на Бровари" appended Рожни last.
+            #
+            # Only when something is left: in 172 of 9 533 messages every name
+            # is a from-place, and there naming the origin beats naming nowhere.
+            named = [pl for pl in find_places(obs.text)
+                     if (not pl.origin and pl.tier in ("city", "oblast")
+                         and pl.name != "Київ")]
+            came_from = from_places(obs.text)
+            heading_to = [pl for pl in named if pl.name not in came_from]
+            for pl in (heading_to or named):
+                self.pending_far = [(n, t) for n, t in self.pending_far
+                                    if n != pl.name]
+                self.pending_far.append((pl.name, obs.ts))
 
     def _forget_if_stale(self, ts: int) -> None:
         """Drop every remembered fact older than the horizon, one by one.
