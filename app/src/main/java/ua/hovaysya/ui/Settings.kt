@@ -73,6 +73,7 @@ fun Settings(
     var radius by remember { mutableStateOf(6f) }
     var volume by remember { mutableStateOf(store.volume) }
     var sound by remember { mutableStateOf(store.sound) }
+    var sheltering by remember { mutableStateOf(store.sheltering) }
     var saved by remember { mutableStateOf<String?>(null) }
     var problem by remember { mutableStateOf<String?>(null) }
 
@@ -288,6 +289,40 @@ fun Settings(
                             "укриття все одно розбудить."
                     else -> "Звук завжди, коли є що сказати."
                 },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        // --- in the shelter ---------------------------------------------------
+        // Its own section rather than a fourth stop on the sound axis, because
+        // it is not a volume: the sound setting says how loudly to speak, and
+        // this says what is worth speaking about at all. Folding them into one
+        // control would have made "ніколи" and "в укритті" look like neighbours
+        // when one is about the ear and the other about the night.
+        Spacer(Modifier.height(16.dp))
+        Card {
+            Text("В укритті", style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(6.dp))
+            Row(Modifier.fillMaxWidth()) {
+                Choice("вимкнено", !sheltering, Modifier.weight(1f)) {
+                    sheltering = false; store.sheltering = false
+                }
+                Spacer(Modifier.width(6.dp))
+                Choice("я в укритті", sheltering, Modifier.weight(1f)) {
+                    sheltering = true; store.sheltering = true
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (sheltering)
+                    "Лишається тільки тривога і відбій. Дорозвідка, часткові " +
+                        "відбої й цілі поруч не приходять зовсім — вони будуть " +
+                        "у фіді. Режим не вимикається сам; поки він увімкнений, " +
+                        "про це написано в постійному сповіщенні."
+                else
+                    "Коли ти вже в укритті й намагаєшся поспати. Лишає звук і " +
+                        "вібрацію тільки на загальну тривогу і загальний відбій.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

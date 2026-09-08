@@ -53,6 +53,18 @@ data class Line(
     val isPartial: Boolean get() = alarm == "clear-partial"
 
     val isLoud: Boolean get() = level == "alert" && !isClear && !isPartial
+
+    /**
+     * The two lines that still reach him in the shelter: the raid beginning and
+     * the raid ending. His words for the mode -- "залишає тільки звуки і
+     * вібрації про загальну тривогу і загальний відбій".
+     *
+     * A partial all-clear is deliberately not one of them, and that follows from
+     * the same sentence: `загальний` is the word he used, and "Відбій по
+     * балістиці" while drones are still up is not the end of anything. Read from
+     * `alarm` and never from the text, for the reason above.
+     */
+    val isGeneral: Boolean get() = alarm == "alert" || isClear
 }
 
 /**

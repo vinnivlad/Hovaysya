@@ -22,6 +22,31 @@ class LineTest {
              text = "текст")
 
     @Test
+    fun `only the beginning and the end of a raid reach the shelter`() {
+        // His mode, in his words: "залишає тільки звуки і вібрації про загальну
+        // тривогу і загальний відбій".
+        assertTrue(line("alert", "alert").isGeneral)
+        assertTrue(line("alert", "clear").isGeneral)
+    }
+
+    @Test
+    fun `a partial all-clear does not reach the shelter`() {
+        // `загальний` was the word, and this is not it: "Відбій по балістиці"
+        // while drones are still up ends nothing. The same reason it does not
+        // share the full all-clear's tone.
+        assertFalse(line("alert", "clear-partial").isGeneral)
+    }
+
+    @Test
+    fun `a threat over his own street does not reach the shelter either`() {
+        // Deliberate, and the sharp edge of the mode: in the shelter he is
+        // already where that notification would send him.
+        assertFalse(line("alert", "ballistic").isGeneral)
+        assertFalse(line("alert", "near").isGeneral)
+        assertFalse(line("info", null).isGeneral)
+    }
+
+    @Test
     fun `a full all-clear is loud but is not danger`() {
         val clear = line("alert", "clear")
         assertTrue(clear.isClear)

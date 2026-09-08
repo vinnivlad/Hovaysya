@@ -99,6 +99,23 @@ class Store(context: Context) {
     private fun migratedSound(): String =
         if (prefs.getBoolean(KEY_QUIET_HOURS, false)) OUTSIDE_QUIET else ALWAYS
 
+    /**
+     * "Я в укритті" -- he is already where the app would send him, and trying to
+     * sleep there.
+     *
+     * Not called `shelter`: that name is taken by the notification channel for
+     * the ballistic tone, which means the opposite thing -- *go* to shelter.
+     * Two states one word apart, in one app, would be a bug waiting to be
+     * written.
+     *
+     * Off by default and it never expires on its own. A mode that quietly
+     * restores itself while somebody sleeps is the worst of both, and there is
+     * no need: while it is on the permanent notification says so.
+     */
+    var sheltering: Boolean
+        get() = prefs.getBoolean(KEY_SHELTERING, false)
+        set(value) = prefs.edit().putBoolean(KEY_SHELTERING, value).apply()
+
     /** The volume to use right now, which the setting above can zero. */
     fun volumeNow(): Float = when (sound) {
         NEVER -> 0f
@@ -135,6 +152,7 @@ class Store(context: Context) {
         private const val KEY_VOLUME = "volume"
         private const val KEY_QUIET_HOURS = "quietHours"
         private const val KEY_SOUND = "sound"
+        private const val KEY_SHELTERING = "sheltering"
 
         /** Sound whenever there is something to say. */
         const val ALWAYS = "always"

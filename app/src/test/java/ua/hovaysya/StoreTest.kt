@@ -168,4 +168,13 @@ class StoreTest {
         assertEquals(0.3f, store.volume, 0.001f)
         assertEquals(Store.NEVER, store.sound)
     }
+
+    @Test
+    fun `the shelter mode is off until it is asked for`() {
+        // A mode that silences everything but the siren must never be the state
+        // a phone wakes up in -- not after an install, not after a reboot.
+        assertFalse(store.sheltering)
+        store.sheltering = true
+        assertTrue(Store(context()).sheltering)
+    }
 }

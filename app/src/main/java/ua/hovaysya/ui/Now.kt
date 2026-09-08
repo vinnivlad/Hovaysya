@@ -17,6 +17,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +76,12 @@ fun Now(store: Store, onSettings: () -> Unit) {
     val accent = headlineColour(state)
     val alerting = state == Screen.ALERT
 
+    // Read through `remember` and not `Held`, unlike everything above: those are
+    // answers from the network that must survive a tab switch, and this one is
+    // in `SharedPreferences`, where re-reading it costs nothing and can never be
+    // stale.
+    var sheltering by remember { mutableStateOf(store.sheltering) }
+
     Column(
         Modifier
             .fillMaxSize()
@@ -115,6 +125,30 @@ fun Now(store: Store, onSettings: () -> Unit) {
                 )
                 Spacer(Modifier.height(8.dp))
                 Status(health, problem)
+            }
+            // "Я в укритті", one tap from the screen he is already looking at
+            // -- the point of the mode is to be turned on in the dark, on the
+            // way down the stairs, and a setting three taps deep would not be.
+            //
+            // A glyph for the same reason the gear is one, and the moon rather
+            // than a shield: a shield is what the app does for him, and this
+            // button is about him trying to sleep.
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .clickable {
+                        sheltering = !sheltering
+                        store.sheltering = sheltering
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "\u263E",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (sheltering) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Box(
                 Modifier

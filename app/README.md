@@ -178,6 +178,39 @@ none of the others do, and that division is not this app's to make twice: the
 server has already decided whether this person should be woken, and all that is
 left here is what it feels like.
 
+## В укритті
+
+A mode for the case the rest of the app is not written for: he is already where
+a notification would send him, lying on a concrete floor, trying to sleep. His
+ask -- "залишає тільки звуки і вібрації про загальну тривогу і загальний
+відбій".
+
+While it is on, a line reaches the phone only if `alarm` is `alert` or `clear`.
+Everything else is **dropped, not silenced**: no push at all, not even a quiet
+one, because a silent notification still lights the screen and still fills the
+shade by morning. Nothing is lost -- the feed keeps every message, and the
+permanent line keeps its picture current.
+
+Three decisions worth disagreeing with if they are wrong, each one line:
+
+- **A partial all-clear does not speak.** `загальний` was the word he used, and
+  "Відбій по балістиці" while drones are still up ends nothing.
+- **Nor does a threat over his own street** -- the strictest rule the server has.
+  In the shelter, that notification has nowhere left to send him.
+- **It never expires.** A mode that quietly restores itself while somebody sleeps
+  is the worst of both. Instead the permanent notification carries `В укритті` in
+  its header for as long as it is on, which is the only reminder that works when
+  the whole point is that the phone has gone quiet.
+
+The toggle is a moon glyph beside the gear on the first screen, because the mode
+has to be reachable in the dark on the way down the stairs; Settings has the same
+switch with the sentence explaining it. It is a section of its own rather than a
+fourth stop on the sound axis: that axis says how loudly to speak, and this says
+what is worth speaking about at all.
+
+`Store.sheltering`, and deliberately not `shelter` -- that name is the
+notification channel for the ballistic tone, which means the opposite thing.
+
 ## The trap worth knowing about
 
 A notification channel is **immutable once created**. Importance, vibration

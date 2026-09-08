@@ -152,6 +152,13 @@ class AlertService : Service() {
         val fresh = screen.said.filter { seen == null || it.at > seen }
         for (line in fresh) {
             if (line.level == "alert") {
+                // In the shelter, everything but the beginning and the end of
+                // the raid is dropped outright rather than silenced. His call --
+                // a silent notification still lights the screen and still fills
+                // the shade by morning, and neither helps somebody trying to
+                // sleep on a concrete floor. Nothing is lost: the feed has it
+                // all, and the permanent line below keeps its picture current.
+                if (store.sheltering && !line.isGeneral) continue
                 bell.ring(this, bell.channelFor(line.level, line.alarm),
                     title(screen), line.text)
             }
@@ -220,6 +227,12 @@ class AlertService : Service() {
             .setContentIntent(open)
             .setDeleteIntent(hush)
             .setOngoing(true)
+            // The mode has to be visible from wherever he is, because nothing
+            // else will remind him: it does not expire, and the whole point is
+            // that the phone has gone quiet. The header line is where a mode
+            // belongs -- the title and the body are already saying what the sky
+            // is doing.
+            .also { if (store.sheltering) it.setSubText("В укритті") }
             .setShowWhen(false)
             .setOnlyAlertOnce(true)
             // `setColorized` paints the whole notification and is honoured for
