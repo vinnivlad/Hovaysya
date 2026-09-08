@@ -331,6 +331,84 @@ class Observation:
 # The channels that declare rather than report.
 OFFICIAL_CHANNELS = frozenset({"alarm_kyiv"})
 
+# ---------------------------------------------------------------------------
+# WORKAROUND, 2026-09-08. Delete this constant and the single condition in
+# `Tracker.official_is_live` that reads it, once the official source is an API
+# key rather than a relay bot.
+#
+# `alarm_kyiv` declared "🟡 м. Київ Повітряна тривога" at 06:40:18 and then
+# published nothing at all. The city all-clear went out around 10:08 and it
+# never relayed it, so the episode could not close: at 10:33 the screen still
+# read `alert`, four and a half hours after the raid had ended, and every
+# "дорозвідка" in between was being dropped as "recheck: no alert running".
+#
+# A second relay does not fix this, and that was checked before writing this
+# rather than assumed. `kyivalarm` carries the same city transitions to the
+# second -- 00:23:49, 05:40:53, 06:40:18 against alarm_kyiv's 00:23:50,
+# 05:40:53, 06:40:18 -- and it missed the same all-clear, while posting four
+# oblast districts at 10:08:11-10:08:28. Both relay the same bot, so their
+# failures are correlated rather than independent. The measurement that made the
+# API token look unnecessary -- `docs/next-steps.md`, "checked against the
+# official app to the second" -- measured accuracy while the channel was
+# talking, which is a different question from whether it always talks.
+#
+# Not a one-off, which is why this exists rather than a shrug: replayed over
+# eleven days of live logs, `alarm_kyiv` declared an alert and then never
+# published its all-clear three times -- 2026-08-31 14:36, 2026-09-01 07:08,
+# 2026-09-08 10:09.
+#
+# What this costs the other 113 times the condition holds: nothing. The official
+# channel says it too, median gap 0 s and 96 of them inside two minutes, and
+# `said_clear_at` already keeps that to one announcement.
+#
+# Thirty minutes, and the number does not carry the safety here -- it should not
+# be tuned as though it did. What keeps this honest is that a chat channel has
+# to actually say the all-clear, and that "очікує на відбій" and "буде відбій"
+# are already refused by `AWAITING_TERMS`. Replayed over every live log we have,
+# nothing closes early.
+OFFICIAL_STALE_S = 30 * 60
+
+
+def stale_official_fallback(tracker, obs) -> bool:
+    """Whether a chat all-clear may stand in for the official one.
+
+    Deliberately NOT folded into `official_is_live`, which answers a different
+    question and is asked in places this must not reach. Two call sites, one
+    name: `grep stale_official_fallback` finds the whole workaround.
+
+    Three conditions, and the two beyond staleness were put there by
+    measurement, not caution. Replaying every live log with staleness alone,
+    the chats closed episodes they had no business closing:
+
+      scope=oblast   "🟢 Білоцерківський район - відбій повітряної тривоги!
+                      🔴 Вишгородський" -- one district lifted, another still on
+      scope=oblast   "🟢 ВІДБІЙ ТРИВОГИ в Київській області"
+      not canonical  "У столиці вже давно пора було дати відбій 🫣"
+      not canonical  "Область чиста, можна давати відбій 🫶"
+      not canonical  "Микоська, можна дати відбій, якщо хочеш 💚"
+
+    The last three are the shape this file already knows about -- "Ех, був би я
+    біля кнопки — давно б уже дав відбій 😄" once wiped the pending memory --
+    and `alert_state == "clear"` is too weak to tell them from a declaration.
+    `CANONICAL_SIREN` is what tells them apart, and it is already the test
+    `alert_state` uses to overrule a forecast.
+
+    With all three, the only thing that closes on his night is
+    `kievinform_ua1`'s "🟢 ВІДБІЙ ТРИВОГИ" at 10:09:27 -- which is the message
+    that was right.
+    """
+    if not tracker.official_source or tracker.official_seen is None:
+        return False
+    if obs.ts - tracker.official_seen <= OFFICIAL_STALE_S:
+        return False
+    if obs.alert_state != "clear" or obs.partial_clear:
+        return False
+    # Somebody else's district is not his all-clear, stale official or not.
+    if obs.scope in ("oblast", "elsewhere"):
+        return False
+    return hints._hits(obs.text, hints.CANONICAL_SIREN)
+# ---------------------------------------------------------------------------
+
 
 def silent_signature(obs: "Observation", reason: str) -> tuple:
     """What makes two silent lines the same line: rule, class, and where."""
@@ -714,7 +792,8 @@ class Tracker:
         # When no official source is in the stream the chat channels still close
         # what they still declare -- which is what the labelled nights are.
         if (obs.alert_state == "clear" and not obs.partial_clear
-                and (obs.official or not self.official_is_live(obs.ts))):
+                and (obs.official or not self.official_is_live(obs.ts)
+                     or stale_official_fallback(self, obs))):
             # No marker on the way out. It used to set `cleared = True` here --
             # a bool into what a second declaration below had already made a
             # `set[str]`, so `ep.cleared.add()` would have raised on the next

@@ -763,7 +763,8 @@ candidate, does it ever *lead* the five already in place, or only ever follow.
 
 | Item | Deferred until |
 | --- | --- |
-| ~~Alert API token~~ | **Not needed.** He found the official app's Telegram bot, and `alarm_kyiv` relays it: two forms, city only, `🚨 м. Київ / Повітряна тривога` and `🟢 м. Київ / Відбій`. Читається через `t.me/s/` без жодних облікових даних, історія з 2024-01-08. Checked against the official app to the second. |
+| Alert API token | **Wanted, as of 2026-09-08** — his call, and it reverses the row below. A relay bot is a single point of failure in the one place it is most expensive, and it has now failed three times in eleven days of live logs: `alarm_kyiv` declared the alert and never published the all-clear on 2026-08-31 14:36, 2026-09-01 07:08 and 2026-09-08 10:09. The last of those left the screen reading `alert` for four and a half hours after the raid ended. A second relay does not fix it: `kyivalarm` carries the same city transitions to the second and missed the same all-clear, because both relay the same bot. `episodes.stale_official_fallback` is the cheap stand-in until a token exists, and is written to be deleted. |
+| ~~Alert API token: why it looked unnecessary~~ | **Superseded, kept for the reasoning.** He found the official app's Telegram bot, and `alarm_kyiv` relays it: two forms, city only, `🚨 м. Київ / Повітряна тривога` and `🟢 м. Київ / Відбій`. Читається через `t.me/s/` без жодних облікових даних, історія з 2024-01-08. Checked against the official app to the second — which is true, and was the wrong question: it measured accuracy while the channel was talking, never whether it always talks. |
 | ~~Oracle Cloud account~~ | **Done 2026-08-29.** Running there; `data/runbook.md` has everything. |
 | Phone number + MTProto | **Deferred on the measurement, 2026-08-29**, and see below |
 | Android client | after stage 7 shows the decisions are worth pushing |

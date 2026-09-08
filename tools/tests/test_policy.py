@@ -1151,6 +1151,53 @@ def test_a_warning_for_the_night_ahead_does_not_climb_either():
     assert out[2][2] != "threat level rose", out
 
 
+def test_a_silent_official_channel_stops_owning_the_all_clear():
+    """WORKAROUND, and the test is here to be deleted with it.
+
+    On 2026-09-08 `alarm_kyiv` declared "🟡 м. Київ Повітряна тривога" at
+    06:40:18 and then published nothing at all. The city all-clear went out
+    around 10:08 -- `kyivalarm`, an independent relay of the same bot, posted
+    four oblast districts at 10:08:11-10:08:28 and no city line either, so both
+    relays missed it together. `kievinform_ua1` said "🟢 ВІДБІЙ ТРИВОГИ" at
+    10:09:27 and it was discarded, because `official_is_live` answers "is the
+    official channel being watched", not "has it said anything lately".
+
+    So the episode could not close: at 10:33 the screen still read `alert`, four
+    and a half hours after the raid ended. His call was a cheap workaround until
+    an API key for the official source lands.
+
+    One condition, in the one function both the announcement and the episode
+    close already ask."""
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import OFFICIAL_STALE_S
+
+    tr = Tracker()
+    tr.official_source = True
+    for off, text, channel in [
+        (0, "🚨 м. Київ" + chr(10) + "Повітряна тривога", "alarm_kyiv"),
+        (60, "⚠️2 реактивні шахеди на Київ/Бровари.", "mon1tor_ua"),
+    ]:
+        o = observe(T0 + off, text, False, channel)
+        tr.before(o)
+        tr.record(o, "alert" if channel == "alarm_kyiv" else None,
+                  "alert" if channel == "alarm_kyiv" else None)
+    assert tr.episode is not None
+
+    # While the official channel is fresh, a chat all-clear closes nothing.
+    early = observe(T0 + OFFICIAL_STALE_S - 60, "🟢 ВІДБІЙ ТРИВОГИ", False,
+                    "kievinform_ua1")
+    tr.before(early)
+    tr.record(early, None, None)
+    assert tr.episode is not None, "a fresh official channel still owns the close"
+
+    # Once it has been silent past the horizon, the chats are all there is.
+    late = observe(T0 + OFFICIAL_STALE_S + 60, "🟢 ВІДБІЙ ТРИВОГИ", False,
+                   "kievinform_ua1")
+    tr.before(late)
+    tr.record(late, None, None)
+    assert tr.episode is None, "a silent official channel cannot hold the alert open"
+
+
 def test_a_siren_does_not_borrow_the_place_a_drone_came_from():
     """The other half of his 00:23 line on 2026-09-07. It read
 

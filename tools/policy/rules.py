@@ -17,7 +17,8 @@ from dataclasses import dataclass
 
 from ..nlp import hints
 from .episodes import (GEO_STEP, REFRACTORY_NEAR_S, SILENT_DEDUP_S,
-                       THREAT_LEVEL, Observation, recheck_key, Tracker, silent_signature)
+                       THREAT_LEVEL, Observation, recheck_key, Tracker,
+                       silent_signature, stale_official_fallback)
 
 LEVELS = ("info", "alert")
 
@@ -211,6 +212,16 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             return _silent("already-notified: all-clear already announced")
         return (_notify("alert", "clear", "official all-clear") if cfg.ring_all_clear
                 else _notify("info", "none", "official all-clear"))
+    # WORKAROUND, 2026-09-08: see `episodes.stale_official_fallback`. Above the
+    # rule below on purpose -- while the official channel is talking it still
+    # owns the all-clear outright, and this only applies once it has stopped.
+    if (obs.alert_state == "clear"
+            and stale_official_fallback(tracker, obs)):
+        if tracker.said_clear_at is not None:
+            return _silent("already-notified: all-clear already announced")
+        return (_notify("alert", "clear", "all-clear: official channel silent")
+                if cfg.ring_all_clear
+                else _notify("info", "none", "all-clear: official channel silent"))
     if obs.alert_state == "clear" and tracker.official_is_live(obs.ts):
         # Whether or not this episode saw an official declaration: while the
         # authoritative source is in the stream, a chat all-clear is a report
