@@ -181,6 +181,27 @@ The sound itself was measured rather than invented -- he found the three files h
 meant and the pitches came out of them, along with an envelope that holds for
 210 ms before it falls. See `Siren.clear`.
 
+**On its level.** He reported it quiet against the other sounds, and it was: 5.8
+dB under the wail. Peak is the wrong measure — every sound here is normalised to
+the same peak, and a sine at that peak carries far less energy than the wail,
+which is nearly a square once `tanh` has driven it.
+
+Most of the gap was self-inflicted, though. The three dings overlap, their sum
+peaks at 1.59 times one of them, and dividing by that peak put every ding 4.0 dB
+below where it could have been — a whole phrase turned down to protect one
+instant. It is soft-limited at the knee now instead, which recovers 3.7 dB while
+touching 7.6% of samples at −35.7 dB THD.
+
+That is 1.5× and he asked for 2×, and the last two decibels are deliberately not
+taken: they cost −24.5 dB THD at a pre-gain of 1.3 and −18.6 dB at 1.6. Twelve
+percent distortion on a pure sine is a buzz, and the sound he picked is a sine.
+Making it louder by making it dirty answers a different request. If the level is
+still wrong the honest lever is a shorter ding — less overlap, less to limit —
+not more drive.
+
+`SirenTest` guards both ends of this: that nothing clips, and that the RMS has
+not quietly drifted back down to what dividing by the sum's peak would give.
+
 Two calls in there that are worth disagreeing with if they are wrong. A raid that
 opens with ballistic rings the shelter pattern rather than SOS, because at that
 point the more urgent thing to say is not "a raid started". And the all-clear

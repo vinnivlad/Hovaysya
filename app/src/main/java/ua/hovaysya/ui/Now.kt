@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,6 +36,7 @@ import ua.hovaysya.clock
 import ua.hovaysya.saidPlainly
 import ua.hovaysya.spell
 import ua.hovaysya.Screen
+import ua.hovaysya.AlertService
 import ua.hovaysya.Store
 
 /**
@@ -81,6 +83,7 @@ fun Now(store: Store, onSettings: () -> Unit) {
     // in `SharedPreferences`, where re-reading it costs nothing and can never be
     // stale.
     var sheltering by remember { mutableStateOf(store.sheltering) }
+    val context = LocalContext.current
 
     Column(
         Modifier
@@ -140,6 +143,8 @@ fun Now(store: Store, onSettings: () -> Unit) {
                     .clickable {
                         sheltering = !sheltering
                         store.sheltering = sheltering
+                        // Or the badge below arrives up to thirty seconds late.
+                        AlertService.refresh(context)
                     },
                 contentAlignment = Alignment.Center,
             ) {

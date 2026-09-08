@@ -79,6 +79,20 @@ class AlertService : Service() {
             show(status(latest, latestProblem))
             return START_STICKY
         }
+        if (intent?.action == ACTION_REFRESH) {
+            // A setting changed and the permanent line is showing the old one.
+            //
+            // The same half-minute hole `ACTION_HUSH` was given for: the line is
+            // redrawn only when `/state` answers, and that request is held open
+            // for `wait=30`. He turned "В укритті" on and the badge did not
+            // appear until he swiped -- which fired `ACTION_HUSH` and redrew it,
+            // making the gesture look like the thing that turned it on.
+            //
+            // Deliberately not `ACTION_HUSH`: that one also stops the siren, and
+            // reaching for a setting must never do that.
+            show(status(latest, latestProblem))
+            return START_STICKY
+        }
         if (worker == null) {
             worker = scope.launch { watch() }
         }
@@ -281,6 +295,22 @@ class AlertService : Service() {
 
         /** Swiping the permanent line away: stop the siren, put the line back. */
         const val ACTION_HUSH = "ua.hovaysya.HUSH"
+
+        /** A setting changed: redraw the permanent line now, not in 30 s. */
+        const val ACTION_REFRESH = "ua.hovaysya.REFRESH"
+
+        /**
+         * Ask for that redraw. Safe from a tap, which is the only place it is
+         * called from -- the app is in the foreground and the service is already
+         * running, so this is a message to something alive rather than a start.
+         */
+        fun refresh(context: Context) {
+            runCatching {
+                context.startService(
+                    Intent(context, AlertService::class.java)
+                        .setAction(ACTION_REFRESH))
+            }
+        }
 
         /** Start it, from anywhere that is allowed to. */
         fun start(context: Context) {

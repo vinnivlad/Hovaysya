@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import ua.hovaysya.AlertService
 import ua.hovaysya.Bell
 import ua.hovaysya.BuildConfig
 import ua.hovaysya.Gazetteer
@@ -307,10 +308,12 @@ fun Settings(
             Row(Modifier.fillMaxWidth()) {
                 Choice("вимкнено", !sheltering, Modifier.weight(1f)) {
                     sheltering = false; store.sheltering = false
+                    AlertService.refresh(context)
                 }
                 Spacer(Modifier.width(6.dp))
                 Choice("я в укритті", sheltering, Modifier.weight(1f)) {
                     sheltering = true; store.sheltering = true
+                    AlertService.refresh(context)
                 }
             }
             Spacer(Modifier.height(6.dp))
