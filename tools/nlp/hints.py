@@ -1083,6 +1083,12 @@ def _launch_origins() -> frozenset[str]:
     return launch_origins() | {"російські аеродроми", "Крим"}
 
 
+# Not in `STRONG_SHAPES`: a hedge about noise is weak evidence, the same call
+# `emoji-with-place` gets. Enough to put on the screen, never enough to ring the
+# shelter tone -- "може бути гучно" is not "падає".
+_LOUD = re.compile(r"гучн", re.IGNORECASE)
+
+
 def live_shapes(text: str) -> list[str]:
     """Which structural live-threat templates the text matches, if any."""
     found = [name for name, rx in _LIVE if rx.search(text or "")]
@@ -1112,6 +1118,23 @@ def live_shapes(text: str) -> list[str]:
     # prepositional shapes above wanted `на` or `над` and these have neither.
     if _THREAT_BESIDE_PLACE.search(text or "") and place_spans(text):
         found.append("threat-with-place")
+    # A place about to be loud. "Чабани/Жуляни, може бути гучно" named his own
+    # street on 2026-09-08 and came out `non-threat` -- nothing vetoed it, it
+    # simply fell off the end of `modality_hint`, where the default is that
+    # nothing is flying. Four in the corpus read as nothing at all, while every
+    # one carrying a marker emoji was already live on `emoji-with-place`, which
+    # is what says the shape was missing and not the meaning.
+    #
+    # Asks the gazetteer like the two shapes above, so a bare "Гучно 💥💥" is
+    # left to the impact question it belongs to.
+    #
+    # `гримить` is deliberately absent: it is thunder, `_WEATHER` does not list
+    # it, and "⚡Київ – трошки гримить, не лякайтесь" reads as non-threat only
+    # because nothing else claims it. The weather messages that do say `гучно`
+    # are safe -- "Гучно через негоду" carries `негод` and `_WEATHER` answers
+    # first.
+    if _LOUD.search(text or "") and place_spans(text):
+        found.append("loud-over-place")
     return found
 
 

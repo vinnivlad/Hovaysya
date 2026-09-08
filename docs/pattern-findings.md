@@ -465,7 +465,26 @@ nothing else** — `🚨 м. Київ / Повітряна тривога` and `
 `t.me/s/` with no credentials at all. Its 08:04:15 matches the official app to
 the second.
 
-So the alert API token is off the deferred list without ever being requested.
+**Two forms is no longer true, as of 2026-09-06.** Kyiv introduced differentiated
+alert levels, and the channel now relays those too:
+
+    🟡 м. Київ Повітряна тривога (жовтий рівень) Дронова загроза
+    🔴 м. Київ Повітряна тривога (червоний рівень) Ракетна загроза <район>
+    🔴 м. Київ Рівень тривоги підвищено до червоного Ракетна загроза <район>
+
+`Ракетна загроза` is a level and not a class, and reading it as one put "Тривога.
+Крилаті ракети." on a ballistic episode — see `_OFFICIAL_LEVEL` in
+`tools/nlp/hints.py`. **A raise of the level gets no special reaction**, which is
+his ruling: "у них немає чітких критеріїв підвищення рівня загрози. Покладатися
+неможливо." The third form above therefore stays what it already was, an
+`already-notified` repeat of a siren that has been declared.
+
+**And the API token is back on the list, as of 2026-09-08.** Not because of the
+levels but because the relay went silent mid-alert three times in eleven days of
+live logs, leaving the screen reading `alert` for four and a half hours after one
+raid ended — see `docs/next-steps.md` and `episodes.stale_official_fallback`. The
+measurement above holds and was the wrong question: it asked whether the channel
+is accurate while it talks, not whether it always talks.
 
 The policy splits accordingly, which is his phrasing: **the official channel
 declares, the chat channels explain why.** A chat siren still declares when

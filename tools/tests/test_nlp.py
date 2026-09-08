@@ -422,6 +422,49 @@ def test_a_real_siren_still_declares_one():
         "Оголошено повітряну тривогу. Не ігноруйте сигнали тривоги.") == "alert"
 
 
+def test_a_warning_that_a_place_will_be_loud_is_live():
+    """His report of 2026-09-08, and it named his own street:
+
+        Чабани/Жуляни, може бути гучно
+
+    came out `non-threat`. Nothing vetoed it -- it fell off the end of
+    `modality_hint`, because no live shape matched and no class was named, and
+    the default is "nothing is flying". His ruling: "треба якось обробляти,
+    точно не not_a_threat".
+
+    Four such messages in the corpus read as nothing at all -- "Вишгород, може
+    бути гучно", "🛵 Бровари, зараз знову буде гучно.", "Гучно район Бровари" --
+    while the ones carrying an emoji were already live, which is the giveaway
+    that the shape was missing rather than the meaning absent."""
+    for t in ("Чабани/Жуляни, може бути гучно", "Вишгород, може бути гучно",
+              "🛵 Бровари, зараз знову буде гучно.", "Гучно район Бровари"):
+        assert hints.modality_hint(t) == "live-threat", t
+        assert "loud-over-place" in hints.live_shapes(t), t
+
+    # A hedge about noise is weak evidence, like a marker emoji beside a place:
+    # enough to show, never enough for the shelter tone.
+    assert hints.live_strength("Чабани/Жуляни, може бути гучно") == "weak"
+
+
+def test_loudness_with_no_place_is_left_alone():
+    """The shape asks the gazetteer, the same way `emoji-with-place` and
+    `threat-with-place` do. A bare "Гучно 💥💥" is an explosion report with no
+    location and a different question -- not this one."""
+    assert "loud-over-place" not in hints.live_shapes("Гучно 💥💥")
+
+
+def test_thunder_is_still_thunder():
+    """The guard, and the reason `гримить` is deliberately not in the pattern:
+    `_WEATHER` does not list it, so "⚡Київ – трошки гримить, не лякайтесь"
+    reads as non-threat only because nothing else claims it. Claiming it here
+    would turn a "do not be frightened" into a threat over Kyiv."""
+    assert hints.modality_hint("⚡Київ – трошки гримить, не лякайтесь.") == "non-threat"
+    assert hints.modality_hint(
+        "⚡️ Вибухи, які ви чуєте — це розкати грому! Гучно через негоду буде "
+        "до самого ранку у Києві.") == "non-threat"
+    assert hints.modality_hint("Гучні звуки це грім⚡️") == "non-threat"
+
+
 def test_the_official_level_wording_names_no_class():
     """His report on the night of 2026-09-07: at 00:23 the threat was ballistic
     and the siren line said "Крилаті ракети".
@@ -724,9 +767,13 @@ def test_text_evidence_is_strong():
 
 def test_emoji_alone_is_only_weak():
     """⚠️ is on 26% of all messages and 93% of those already match another
-    shape, so on its own it must not carry a full-volume notification."""
+    shape, so on its own it must not carry a full-volume notification.
+
+    This message now matches `loud-over-place` as well, which is the same
+    judgement twice rather than a stronger one: both shapes are weak, and the
+    point of the test is that neither reaches `strong`."""
     t = "🔴Київ — найближчі 3 хвилини будуть дуже гучні."
-    assert hints.live_shapes(t) == ["emoji-with-place"]
+    assert set(hints.live_shapes(t)) == {"emoji-with-place", "loud-over-place"}
     assert hints.live_strength(t) == "weak"
 
 

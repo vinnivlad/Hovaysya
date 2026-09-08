@@ -458,6 +458,27 @@ Note the boundary that measurement established: `вибух` and `влучанн
 88% of `вибух` messages land within ten minutes of a live threat. An explosion
 report usually means the wave is still in progress.
 
+#### ...and the messages nothing claims at all
+
+`modality_hint` ends with `return "non-threat"`, so a message no shape and no
+class recognises is read as "nothing is flying". That default swallowed his own
+street on 2026-09-08: **"Чабани/Жуляни, може бути гучно"** came out `non-threat`
+— nothing vetoed it, it simply fell off the end. His ruling: "треба якось
+обробляти, точно не not_a_threat."
+
+Four such messages in the corpus read as nothing at all ("Вишгород, може бути
+гучно", "🛵 Бровари, зараз знову буде гучно.", "Гучно район Бровари"), while
+every one carrying a marker emoji was already live on `emoji-with-place` — which
+is what says the shape was missing rather than the meaning absent. So
+`loud-over-place` joins the shapes that ask the gazetteer, and it is **weak**
+evidence like the emoji one: a hedge about noise goes on the screen and never
+rings. Measured over the corpus, audible decisions are unchanged at 3 570.
+
+`гримить` is deliberately not in it. That is thunder, `_WEATHER` does not list
+it, and "⚡Київ – трошки гримить, не лякайтесь" reads as non-threat only because
+nothing else claims it — claiming it here would turn a "do not be frightened"
+into a threat over Kyiv.
+
 #### Messages that carry every word of a report and mean the opposite
 
 `_WEATHER` and `_OURS` were the first two of these — thunder mistaken for
