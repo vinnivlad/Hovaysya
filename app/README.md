@@ -140,7 +140,7 @@ is spent in exactly one place: the state.
     початок тривоги   ··· ▬▬▬ ···       SOS, as Тривога rings it
     балістика         ············      a dense stutter: the roof is not enough
     летить сюди       ·· ··             knock-knock, knock-knock
-    відбій            ▬                 one long note, no rhythm at all
+    відбій            ▬                 one long buzz, no rhythm at all
     тихо              (nothing)
 
 One glyph per pulse, `·` short and `▬` long, and that convention exists so a
@@ -162,9 +162,24 @@ list. `channelFor` now tests the all-clear before the level, and that order is
 the whole correction.
 
 Four things to tell apart half asleep, so each differs in *rhythm* rather than
-in length: nine structured pulses, twelve rapid ones, two quick ones, one note.
+in length: nine structured pulses, twelve rapid ones, two quick ones, one buzz.
 The all-clear is a single pulse on purpose -- nothing else in the set is, so it
 cannot read as a warning at the moment of waking.
+
+The table is the **vibration**, and since 2026-09-08 the all-clear's sound no
+longer matches it one for one: the hand feels one long buzz while the ear hears
+three dings, E4 - C4 - F4, a quarter of a second apart. That is deliberate and it
+is the one place the two senses say different things -- the buzz says "one event,
+and it is over", the dings say which event.
+
+What keeps it unmistakable is no longer the count, because `NEAR` is two pulses
+and this is three. It is the **pitch**: nothing else in the set has one. Every
+other sound here is the siren's own voice, chopped; this is three sine tones. If
+that ever stops being true, this rule needs rewriting before the sound does.
+
+The sound itself was measured rather than invented -- he found the three files he
+meant and the pitches came out of them, along with an envelope that holds for
+210 ms before it falls. See `Siren.clear`.
 
 Two calls in there that are worth disagreeing with if they are wrong. A raid that
 opens with ballistic rings the shelter pattern rather than SOS, because at that

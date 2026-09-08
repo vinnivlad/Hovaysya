@@ -5,6 +5,7 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.os.Handler
 import android.os.Looper
+import kotlin.math.abs
 import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.sin
@@ -102,19 +103,39 @@ object Siren {
         play(chop(pattern), volume)
 
     /**
-     * A single struck note that dies away. It is over.
+     * Three sine dings, E4 - C4 - F4. It is over.
      *
-     * His description of the official app's, and it is a better sound than the
-     * steady tone I wrote first: "відбій там як одинарний пілік, схожий на звук
-     * старого касового апарату". A till's ding is a bell being hit -- an attack
-     * and a decay -- not a note being held.
+     * It was a till pip before, on his description of the official app's
+     * all-clear -- "схожий на звук старого касового апарату" -- and he asked for
+     * something else twice. First a bell, which came out sounding like a church
+     * one; then this, and he brought the sound he meant: three files from
+     * floraphonic's "short punchy sine wave ding" pack, in that order.
      *
-     * Which also makes it right for what it means. Every other sound here is
-     * sustained because the thing it announces is still going on; this one is
-     * over the moment it starts, and a sound that stops by itself says that
-     * without a word.
+     * Measured off those files rather than guessed from their names. They are
+     * `1-c`, `5-e` and `6-f`, and the pitches are exactly C4, E4 and F4 -- 261.5,
+     * 329.7 and 349.3 Hz, within a cent. The harmonics sit 42-52 dB down, so
+     * "sine wave" is meant literally and a single sine reproduces them.
+     *
+     * The envelope is where the punch is, and it is not a decay:
+     *
+     *     0-20 ms     attack to peak
+     *     20-230 ms   holds, drifting only -2 dB
+     *     230-580 ms  falls away, steepening
+     *
+     * The note stands before it drops. An `exp(-t)` from the first sample --
+     * which is what [pip] did -- is softer and rounder, and loses the whole
+     * character.
+     *
+     * Still right for what it means, for the reason the pip was: every other
+     * sound here is sustained because the thing it announces is still going on.
+     * This one ends by itself.
+     *
+     * It is also now the only sound in the set with a *pitch*, which is what
+     * keeps it from being mistaken for a warning at the moment of waking -- the
+     * count no longer does that on its own, since `NEAR` is two pulses and this
+     * is three.
      */
-    fun clear(volume: Float) = play(pip(), volume)
+    fun clear(volume: Float) = play(dings(), volume)
 
     // --- the samples ---------------------------------------------------------
 
@@ -177,17 +198,47 @@ object Siren {
         (tanh(sin(phase) * DRIVE) / tanh(DRIVE) * Short.MAX_VALUE * PEAK)
             .toInt().toShort()
 
-    private fun pip(): ShortArray {
-        val out = ShortArray((RATE * 0.35).toInt())
-        for (i in out.indices) {
-            val t = i.toDouble() / RATE
-            // A struck bell rather than a held note: mostly gone in 70 ms.
-            val envelope = exp(-t * 14)
-            val wave = sin(2 * PI * 988.0 * t) + 0.35 * sin(2 * PI * 1976.0 * t)
-            // 1.35 is the sum of the two partials at their worst, so dividing
-            // by it is what lets the rest of the line be the peak we want.
-            out[i] = (wave / 1.35 * envelope * Short.MAX_VALUE * PEAK)
-                .toInt().toShort()
+    // E4, C4, F4 -- his order, and the pack's own numbering says which is which:
+    // `ding-5-e`, then `ding-1-c`, then `ding-6-f`.
+    private val DINGS = doubleArrayOf(329.63, 261.63, 349.23)
+
+    // 0.24 s, his choice out of four spacings between 0.16 and 0.45. They
+    // overlap, which is why the sum below is scaled rather than trusted.
+    private const val DING_GAP = 0.24
+    private const val DING_LEN = 0.62
+    private const val DING_ATTACK = 0.015
+    private const val DING_HOLD = 0.21
+    // Per second, fitted to the measured fall: -3.4 dB at 240 ms, -42 at 580.
+    private const val DING_RELEASE = 12.0
+
+    private fun dingEnvelope(t: Double): Double = when {
+        t < DING_ATTACK -> t / DING_ATTACK
+        // The slight droop the originals have while they hold.
+        t < DING_ATTACK + DING_HOLD ->
+            1.0 - 0.10 * (t - DING_ATTACK) / DING_HOLD
+        else -> 0.90 * exp(-(t - DING_ATTACK - DING_HOLD) * DING_RELEASE)
+    }
+
+    private fun dings(): ShortArray {
+        val total = (RATE * (DING_GAP * (DINGS.size - 1) + DING_LEN)).toInt()
+        val mixed = DoubleArray(total)
+        for ((k, freq) in DINGS.withIndex()) {
+            val start = (RATE * DING_GAP * k).toInt()
+            val length = (RATE * DING_LEN).toInt()
+            for (i in 0 until length) {
+                val at = start + i
+                if (at >= total) break
+                val t = i.toDouble() / RATE
+                mixed[at] += sin(2 * PI * freq * t) * dingEnvelope(t)
+            }
+        }
+        // Scaled by what it actually reached rather than by a constant: the
+        // three overlap, and where they do depends on the gap above. `pip`
+        // could divide by a number worked out by hand because it had one voice.
+        val loudest = mixed.maxOf { abs(it) }.coerceAtLeast(1e-9)
+        val out = ShortArray(total)
+        for (i in 0 until total) {
+            out[i] = (mixed[i] / loudest * Short.MAX_VALUE * PEAK).toInt().toShort()
         }
         return fade(out)
     }

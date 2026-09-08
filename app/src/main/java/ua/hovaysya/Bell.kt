@@ -171,7 +171,8 @@ class Bell(private val store: Store) {
                 // wrong call it is one setting to change -- but the default has
                 // to be one of the two, and this is the direction where being
                 // wrong costs sleep rather than safety.
-                description = "Тривога скінчилась. Один довгий сигнал."
+                description = "Тривога скінчилась. Три дзвоники, одна довга " +
+                    "вібрація."
                 enableVibration(true)
                 vibrationPattern = CLEAR
                 // Silent as a channel. The sound is played by `Siren` at a
