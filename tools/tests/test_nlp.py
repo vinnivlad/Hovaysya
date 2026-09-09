@@ -422,6 +422,57 @@ def test_a_real_siren_still_declares_one():
         "Оголошено повітряну тривогу. Не ігноруйте сигнали тривоги.") == "alert"
 
 
+AIR_QUALITY = (
+    "‼️ На Київщині погіршилася якість повітря" + chr(10) +
+    "У Вишневому, Обухові та Броварах підвищені концентрації дрібнодисперсного "
+    "пилу." + chr(10) +
+    "Фахівці радять зачинити вікна, обмежити тривале перебування на вулиці, "
+    "пити достатньо води та за можливості використовувати очищувач повітря; в "
+    "інших населених пунктах Київщини перевищень не виявили."
+)
+
+
+def test_prose_with_a_marker_emoji_is_not_a_report():
+    """His false positive at 10:56 on 2026-09-09: "Загроза: шахед. Вишневе." on
+    a news item about dust.
+
+    Its only evidence of life was `emoji-with-place` -- the `‼️` and a name in
+    his ring -- and with no class stated it inherited `shahed` from drones that
+    were then over Slavutych, forty kilometres away.
+
+    The shape has to stay: 453 messages in the corpus rest on it alone and
+    almost all are real, including the drone's own distance count-down --
+    "⚠️27 км від Києва.", "⚠️1 км від Києва." What separates them is length.
+    Those have a median of 35 characters; the 36 messages past 150 are civic
+    news, advertisements and politics, and not one of them is a report."""
+    assert hints.live_shapes(AIR_QUALITY) == []
+    assert hints.modality_hint(AIR_QUALITY) == "non-threat"
+
+
+def test_the_terse_reports_that_rest_on_that_shape_alone_survive():
+    """The guard, and it matters more than the fix: this is what the shape is
+    for. A drone counting down its distance to Kyiv states no class, names one
+    place and carries one emoji -- and it is the most urgent thing the channels
+    write."""
+    for t in ("⚠️27 км від Києва.", "⚠️1 км від Києва.",
+              "⚠️Перший над ТЕЦ-6/Троєщина.",
+              "❗️Змінив курс на Оболонський район Києва.",
+              "🔴Бровари, над містом!"):
+        assert hints.live_shapes(t) == ["emoji-with-place"], t
+        assert hints.modality_hint(t) == "live-threat", t
+
+
+def test_a_long_list_of_districts_at_risk_is_still_a_report():
+    """The margin. The longest real messages of this shape are lists -- of
+    districts at risk, or of places just hit -- and they run to about 130
+    characters, which is why the cut is at 150 and not at 120."""
+    for t in ("❗️Увага! Підвищений ризик для таких районів Києва: • Дарниця "
+              "• Березняки • Солом'янка / Жуляни • Видубичі • Борщагівка",
+              "❗️Атаковано: 💥Лівий берег столиці 💥Правий берег столиці "
+              "💥Бровари 💥Вишневе 💥Біла Церква/околиці"):
+        assert hints.modality_hint(t) == "live-threat", len(t)
+
+
 def test_a_warning_that_a_place_will_be_loud_is_live():
     """His report of 2026-09-08, and it named his own street:
 

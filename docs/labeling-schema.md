@@ -474,6 +474,25 @@ is what says the shape was missing rather than the meaning absent. So
 evidence like the emoji one: a hedge about noise goes on the screen and never
 rings. Measured over the corpus, audible decisions are unchanged at 3 570.
 
+**Prose is not a report, however many exclamation marks it opens with.** His
+false positive at 10:56 on 2026-09-09 was "Загроза: шахед. Вишневе." on a news
+item about dust: `‼️` plus a name in his ring is `emoji-with-place`, that was its
+only evidence of life, and with no class stated it inherited `shahed` from drones
+then over Slavutych.
+
+The shape stays — 453 messages rest on it alone and almost all are real,
+including the drone's own count-down, "⚠️27 км від Києва." Length separates them:
+those have a median of 35 characters and a p90 of 114, while the 36 past 150 are
+civic news, advertisements and politics. 150 rather than 120 because the longest
+real ones are lists — districts at risk, places just hit — and run to about 130.
+
+Measured over the corpus it removes four notifications of 7 602. Three are
+phantoms, and one of those had been putting a borrowed place on a siren
+("Тривога. Поділ." from a promo). The fourth is a real loss and worth knowing
+about: a genuine advance warning listing districts under potential threat now
+produces nothing instead of a quiet line. One message in four and a half months,
+and a forecast rather than a report.
+
 `гримить` is deliberately not in it. That is thunder, `_WEATHER` does not list
 it, and "⚡Київ – трошки гримить, не лякайтесь" reads as non-threat only because
 nothing else claims it — claiming it here would turn a "do not be frightened"

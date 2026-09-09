@@ -1083,6 +1083,16 @@ def _launch_origins() -> frozenset[str]:
     return launch_origins() | {"російські аеродроми", "Крим"}
 
 
+# Where a message stops being a report and starts being an article. See the
+# filter at the end of `live_shapes` for how this number was arrived at.
+PROSE_CHARS = 150
+
+
+def _squeezed(text: str) -> str:
+    """Length as a reader sees it, with runs of whitespace collapsed."""
+    return " ".join((text or "").split())
+
+
 # Not in `STRONG_SHAPES`: a hedge about noise is weak evidence, the same call
 # `emoji-with-place` gets. Enough to put on the screen, never enough to ring the
 # shelter tone -- "може бути гучно" is not "падає".
@@ -1135,6 +1145,29 @@ def live_shapes(text: str) -> list[str]:
     # first.
     if _LOUD.search(text or "") and place_spans(text):
         found.append("loud-over-place")
+    # Prose is not a report, however many exclamation marks it opens with.
+    #
+    # His false positive at 10:56 on 2026-09-09 -- "Загроза: шахед. Вишневе." on
+    # a news item about dust. Its only evidence of life was `emoji-with-place`,
+    # the `‼️` and a name in his ring, and with no class stated it inherited
+    # `shahed` from drones then over Slavutych.
+    #
+    # The shape stays, because 453 messages in the corpus rest on it alone and
+    # almost all are real -- including the drone's own count-down, "⚠️27 км від
+    # Києва.", "⚠️1 км від Києва.", which states no class, names one place and
+    # carries one emoji. Length is what separates them: those have a median of
+    # 35 characters and a p90 of 114.
+    #
+    # 150 and not 120, and the margin is measured rather than chosen: the
+    # longest real messages of this shape are lists -- districts at risk, or
+    # places just hit -- and they run to about 130. Past 150 there are 36, every
+    # one civic news, an advertisement or politics: heating bills, tram fares, a
+    # travel agency, a channel promo.
+    #
+    # Only when it is the *only* evidence. A long message that also counts, or
+    # moves, or names a phase is a report that happens to be wordy.
+    if found == ["emoji-with-place"] and len(_squeezed(text)) > PROSE_CHARS:
+        found.remove("emoji-with-place")
     return found
 
 
