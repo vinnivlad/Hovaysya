@@ -593,9 +593,37 @@ def forecast_eta(text: str) -> str | None:
     return f"{m.group(1)} хв" if m else None
 
 
+# A conditional clause, from its opener to the end of its sentence. The
+# newline is one of the enders because these posts often do not punctuate, and
+# without it the clause swallows everything after it.
+_CONDITIONAL = re.compile(
+    r"\b(?:якщо|якби|у\s+разі|в\s+разі|коли\s+б)\b[^.!?\n]*", re.IGNORECASE)
+
+
 def threat_hint(text: str) -> str:
-    """Best guess at what is flying. `none` when nothing suggests a threat."""
-    return stated_class(without_denials(text))
+    """Best guess at what is flying. `none` when nothing suggests a threat.
+
+    A class named inside a conditional clause loses to one named outside it,
+    and that is a tie-breaker rather than a veto.
+
+    His 05:11 on 2026-09-12: "🚀 Попередньо були пуски «Калібрів»! Слідкуйте за
+    їхнім напрямком. Якщо підуть у наш бік — паралельно можуть ще й балістикою
+    гатити." What was launched is Kalibr, which is cruise; "балістикою" is
+    inside the conditional and describes something nobody has seen. `ballistic`
+    sits above `cruise` in the ordered list, so first match won -- and it rang,
+    where cruise with no direction says nothing at all.
+
+    A veto would have been wrong and the corpus says so plainly. Masking the
+    clause outright changes 27 classes and 25 of them become nothing, because
+    the conditional is frequently the whole message: "🛵 Якщо долетять, ще два
+    БпЛА можуть зайти з боку Чернігівщини." Letting it lose only to a class
+    stated elsewhere changes exactly two in 35839, and both are corrections --
+    this one, and a think-piece about reactive UAVs that had been reading as
+    ballistic.
+    """
+    plain = without_denials(text)
+    outside = stated_class(_CONDITIONAL.sub(" ", plain))
+    return outside if outside != "none" else stated_class(plain)
 
 
 def cleared_class(text: str) -> str | None:
@@ -1087,6 +1115,13 @@ def _launch_origins() -> frozenset[str]:
 # filter at the end of `live_shapes` for how this number was arrived at.
 PROSE_CHARS = 150
 
+# The two shapes weak enough to be produced by prose that is about the war
+# rather than reporting it: one marker emoji beside a place name, and one word
+# out of the phase vocabulary. Everything else in `STRONG_SHAPES` states a
+# count, a movement or a threat beside a place, and no amount of length makes
+# that accidental.
+PROSE_ALONE = frozenset({"emoji-with-place", "phase-word"})
+
 
 def _squeezed(text: str) -> str:
     """Length as a reader sees it, with runs of whitespace collapsed."""
@@ -1164,10 +1199,27 @@ def live_shapes(text: str) -> list[str]:
     # one civic news, an advertisement or politics: heating bills, tram fares, a
     # travel agency, a channel promo.
     #
-    # Only when it is the *only* evidence. A long message that also counts, or
-    # moves, or names a phase is a report that happens to be wordy.
-    if found == ["emoji-with-place"] and len(_squeezed(text)) > PROSE_CHARS:
-        found.remove("emoji-with-place")
+    # Only when it is the *only* evidence. A long message that also counts or
+    # moves is a report that happens to be wordy.
+    #
+    # `phase-word` joined `emoji-with-place` here after his false positive at
+    # 23:23 on 2026-09-11: "Щодо балістики — попередження актуальне. Але тут,
+    # як завжди, лотерея ... залишайтесь уважні та не ігноруйте тривогу", read
+    # as a confirmed live ballistic report. The only word it matched was
+    # `уважн`, and half the posts in these channels end that way.
+    #
+    # Same shape of evidence and so the same treatment, and the numbers came
+    # out the same too. 2732 messages rest on `phase-word` alone, median 35
+    # characters and p90 56 -- "Курсом на Київ.", "Пуск!", "Швидкісна ціль." --
+    # so the shape is carrying the terse reports it was written for. Past 150
+    # there are 78, of which 31 are live on that word alone, and reading all 31
+    # there is not one report among them: metro timetables during an alert,
+    # which petrol stations to avoid, donation appeals, the admin explaining
+    # why there were few posts today, and digests of all-clears for other
+    # districts.
+    if (len(found) == 1 and found[0] in PROSE_ALONE
+            and len(_squeezed(text)) > PROSE_CHARS):
+        found.clear()
     return found
 
 

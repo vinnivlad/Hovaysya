@@ -1275,6 +1275,53 @@ def test_a_partial_all_clear_rings_once_per_class():
     assert not out[9][1], out
 
 
+def test_a_warning_restated_as_prose_says_nothing():
+    """His report at 23:23 on 2026-09-11, four hours into a running alert:
+
+        ❕Щодо балістики — попередження актуальне. Але тут, як
+        завжди, лотерея: точно сказати, коли саме може бути удар,
+        неможливо. Тому просто залишайтесь уважні та не ігноруйте тривогу.
+
+    It rang: "Загроза: балістика.", on the reason `confirmed ballistic`. His
+    own reading -- "1ше - це попередження про балістику" -- is exactly right and
+    is the whole problem: a warning restated is not an event.
+
+    Sibling of the 21:16 case below, and the same emptiness underneath: no
+    count, no place, no movement. What made this one live was a single word of
+    boilerplate, `уважн`, inside 178 characters of prose."""
+    out = _play([
+        (0, "mon1tor_ua", "⚠️2 реактивні шахеди на Київ/Бровари."),
+        (60, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (5000, "nebo_raketa",
+         "❕Щодо балістики — попередження актуальне. Але тут, як завжди, "
+         "лотерея: точно сказати, коли саме може бути удар, неможливо. Тому "
+         "просто залишайтесь уважні та не ігноруйте тривогу."),
+    ])
+    assert not out[2][1], out
+    assert out[2][3] is None, out
+
+
+def test_a_cruise_launch_named_in_full_does_not_ring_as_ballistics():
+    """His 05:11 on 2026-09-12:
+
+        🚀 Попередньо були пуски «Калібрів»! Слідкуйте за їхнім
+        напрямком. Якщо підуть у наш бік — паралельно можуть ще й
+        балістикою гатити.
+
+    It rang "Загроза: балістика." on `threat level rose`, and his question was
+    the right one: would it ring if the class were right? It would not, and
+    that is the point of the test. Kalibr is cruise, a cruise launch with no
+    direction is `too-far: not near me`, and this whole event is one word in
+    the wrong ordered list away from being silent."""
+    out = _play([
+        (0, "alarm_kyiv", "🟡 Київ Повітряна тривога · жовтий рівень Дронова загроза"),
+        (400, "nebo_raketa",
+         "🚀 Попередньо були пуски «Калібрів»! Слідкуйте за їхнім напрямком. "
+         "Якщо підуть у наш бік — паралельно можуть ще й балістикою гатити."),
+    ])
+    assert not out[1][1], out
+
+
 def test_a_hypothetical_strike_says_nothing_about_ballistics():
     """His report at 21:16 on 2026-09-07, in the middle of a running alert:
 

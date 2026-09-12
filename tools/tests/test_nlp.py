@@ -422,6 +422,81 @@ def test_a_real_siren_still_declares_one():
         "Оголошено повітряну тривогу. Не ігноруйте сигнали тривоги.") == "alert"
 
 
+LOTTERY = (
+    "❕Щодо балістики — попередження актуальне. Але тут, як завжди, "
+    "лотерея: точно сказати, коли саме може бути удар, неможливо. Тому просто "
+    "залишайтесь уважні та не ігноруйте тривогу."
+)
+
+KALIBRY = (
+    "🚀 Попередньо були пуски «Калібрів»! Слідкуйте за їхнім "
+    "напрямком. Якщо підуть у наш бік — паралельно можуть ще й "
+    "балістикою гатити."
+)
+
+
+def test_a_warning_that_stays_a_warning_is_not_a_live_report():
+    """His false positive at 23:23 on 2026-09-11, and his own reading of it:
+    "1ше - це попередження про балістику."
+
+    So the class is right and the liveness is not. The only shape it matched
+    was `phase-word`, and the only word it matched on was `уважн` -- from
+    "залишайтесь уважні", which is how half the posts in these channels end.
+
+    Measured: 2732 messages rest on `phase-word` alone, median 35 characters
+    and p90 56. Past 150 there are 78, of which 31 were live on that word
+    alone, and not one of the 31 is a report -- they are metro timetables,
+    petrol-station advice, donation appeals, channel meta-commentary and
+    all-clear digests for other districts."""
+    assert hints.live_shapes(LOTTERY) == []
+    # Not `non-threat`, and that is the design rather than a shortfall: naming
+    # a class at all keeps a message live, because "Збито" and "чисто" have to
+    # stay live too. What the shapes decide is the *strength* of the evidence,
+    # and with none of them left there is nothing here to act on -- which is
+    # the same verdict the 21:16 commentary got on 2026-09-07.
+    assert hints.live_strength(LOTTERY) == "none"
+    # The subject is still ballistic. Nothing about this message is unclear;
+    # it simply is not news.
+    assert hints.threat_hint(LOTTERY) == "ballistic"
+
+
+def test_the_terse_phase_reports_survive_that():
+    """The guard, and it matters more than the fix. These are what the shape
+    is for, and every one of them is short."""
+    for t in ("Курсом на Київ.", "Пуск!", "Швидкісна ціль.",
+              "Уважно, на підльоті.", "Терміново в укриття!"):
+        assert hints.modality_hint(t) == "live-threat", t
+
+
+def test_a_conditional_clause_does_not_choose_the_class():
+    """His 05:11 on 2026-09-12, and his reading: "2ге - інформація про
+    пуски КР."
+
+    What was launched is Kalibr, which is cruise. "балістикою" lives
+    entirely inside "Якщо підуть у наш бік" and describes something
+    nobody has seen -- but `ballistic` sits above `cruise` in the ordered
+    class list, so first match won and the wrong one did.
+
+    It matters beyond the wording: as cruise this message says nothing at all
+    ("too-far: not near me"), because a cruise launch with no direction is not
+    something to wake anybody for. As ballistic it rang."""
+    assert hints.threat_hint(KALIBRY) == "cruise"
+
+
+def test_a_conditional_clause_still_speaks_when_nothing_else_does():
+    """The tie-breaker, and why it is one rather than a veto.
+
+    A conditional clause is often the whole message -- "🛵 Якщо долетять,
+    ще два БпЛА можуть зайти з боку Чернігівщини." -- and cutting it
+    would leave the message with no class at all. Measured over the corpus:
+    masking outright changes 27 classes, 25 of them to nothing; as a
+    tie-breaker it changes exactly 2, and both are corrections."""
+    both_ways = "🛵 Якщо долетять, ще два БпЛА можуть зайти з боку Чернігівщини."
+    assert hints.threat_hint(both_ways) == "shahed"
+    # And a plain report with no conditional in it is untouched.
+    assert hints.threat_hint("Балістика на Київ!") == "ballistic"
+
+
 AIR_QUALITY = (
     "‼️ На Київщині погіршилася якість повітря" + chr(10) +
     "У Вишневому, Обухові та Броварах підвищені концентрації дрібнодисперсного "

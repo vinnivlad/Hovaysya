@@ -498,6 +498,51 @@ it, and "⚡Київ – трошки гримить, не лякайтесь" r
 nothing else claims it — claiming it here would turn a "do not be frightened"
 into a threat over Kyiv.
 
+**`phase-word` joined it on 2026-09-11**, on the same reasoning and with the
+same numbers. His false positive at 23:23 was a commentary post — "Щодо
+балістики — попередження актуальне. Але тут, як завжди, лотерея … залишайтесь
+уважні та не ігноруйте тривогу" — which rang "Загроза: балістика." on the reason
+`confirmed ballistic`. Its only shape was `phase-word` and the only word it
+matched was `уважн`, which is how half the posts in these channels sign off. His
+own reading: *"1ше - це попередження про балістику"* — a warning restated, not an
+event.
+
+2 732 messages rest on `phase-word` alone, median 35 characters and p90 56: the
+shape is carrying "Курсом на Київ.", "Пуск!", "Швидкісна ціль." Past 150 there
+are 78, of which 31 are live on that word alone, and reading all 31 there is not
+one report among them — metro timetables during an alert, which petrol stations
+to avoid, donation appeals, the admin explaining a quiet day, and digests of
+all-clears for other districts.
+
+Note what does *not* change: the message is still `live-threat` and still
+`ballistic`, because naming a class keeps a message live — "Збито" and "чисто"
+need that. What the shapes decide is the **strength** of the evidence, and with
+none left this reaches `strength = "none"`, which is what the ballistic block is
+already guarded by. That makes the fix independent of episode state, which
+matters here: the same message replays as a quiet line rather than a bell,
+because the server's tracker had a longer history than any local replay has.
+
+**A conditional clause does not choose the class.** His 05:11 on 2026-09-12: "🚀
+Попередньо були пуски «Калібрів»! … Якщо підуть у наш бік — паралельно можуть ще
+й балістикою гатити." Kalibr is cruise; `балістикою` lives entirely inside the
+conditional, and `ballistic` sits above `cruise` in the ordered class list, so
+first match won. His reading again: *"2ге - інформація про пуски КР"*.
+
+It is worth more than the wording. As cruise the message is `too-far: not near
+me` and says nothing at all — a cruise launch with no direction is not something
+to wake anybody for, which was his own guess. As ballistic it rang.
+
+A **tie-breaker rather than a veto**, and the corpus is emphatic about why.
+Masking the clause outright changes 27 classes and 25 of them become nothing,
+because the conditional is frequently the whole message: "🛵 Якщо долетять, ще
+два БпЛА можуть зайти з боку Чернігівщини." Letting it lose only to a class
+stated outside it changes exactly two messages in 35 839, and both are
+corrections — this one, and a think-piece about reactive UAVs that had been
+reading as ballistic.
+
+Neither change moves the eval: false wake-ups, misses and hits are identical
+across the three labelled nights.
+
 #### Messages that carry every word of a report and mean the opposite
 
 `_WEATHER` and `_OURS` were the first two of these — thunder mistaken for
