@@ -96,6 +96,7 @@ What is covered, and why each earned it rather than being reached for:
 | `LineTest` | Read the field, never the sentence -- an all-clear is `level="alert"` with `alarm="clear"`, so colouring by level alone drew the end of a raid in the same red as the raid. |
 | `HeldTest` | That forgetting the device leaves nothing of the previous person on the screens, with a count of the fields as a tripwire so a new one cannot be quietly left out. |
 | `WordsTest` | The wordings that are rulings of his: "БЕЗ ТРИВОГ" for watching, "НЕ ЗНАЮ" for not knowing, never calm by default. |
+| `DrawnTest` | That an unchanged line is not posted again. Re-posting cancels a swipe in progress, and this app answered a long poll every thirty seconds: 814167 re-posts across 742 replayed nights, 99.4% of them identical. "Раз при тривозі пуш не свайпався і я не міг припинити звук." |
 
 The vibration alphabet is **not** tested here. It is already guarded from the
 Python side, which parses this source for the patterns and checks the pulse

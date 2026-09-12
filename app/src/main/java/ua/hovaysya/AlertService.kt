@@ -58,7 +58,9 @@ class AlertService : Service() {
         store = Store(this)
         bell = Bell(store)
         bell.create(this)
-        startForeground(NOTIFICATION_ID, status(null, null))
+        val first = drawnOf(null, null, store.sheltering)
+        posted = first
+        startForeground(NOTIFICATION_ID, status(first))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -76,7 +78,11 @@ class AlertService : Service() {
             // part could be missing for half a minute at a time, which looks
             // exactly like a watcher that has died.
             Siren.stop()
-            show(status(latest, latestProblem))
+            // The system has just taken the row away, so what `show` last
+            // handed over is no longer on the screen and skipping an identical
+            // one would leave the shade empty until the sky changed.
+            posted = null
+            show(latest, latestProblem)
             return START_STICKY
         }
         if (intent?.action == ACTION_REFRESH) {
@@ -90,7 +96,7 @@ class AlertService : Service() {
             //
             // Deliberately not `ACTION_HUSH`: that one also stops the siren, and
             // reaching for a setting must never do that.
-            show(status(latest, latestProblem))
+            show(latest, latestProblem)
             return START_STICKY
         }
         if (worker == null) {
@@ -139,14 +145,14 @@ class AlertService : Service() {
                 latest = screen
                 latestProblem = null
                 ringFor(screen)
-                show(status(screen, null))
+                show(screen, null)
             }.onFailure { problem ->
                 failures += 1
                 val began = failingSince ?: System.currentTimeMillis()
                 failingSince = began
                 latest = null
                 latestProblem = trouble(problem, began)
-                show(status(null, latestProblem))
+                show(null, latestProblem)
                 // Backing off, but never past a minute. A phone that has been
                 // offline for an hour still has to notice the moment it is not.
                 delay(minOf(60_000L, 2_000L * failures))
@@ -195,16 +201,27 @@ class AlertService : Service() {
         return if (minutes < 1) said else "$said · $minutes хв"
     }
 
-    private fun show(notification: Notification) {
-        getSystemService(NotificationManager::class.java)
-            ?.notify(NOTIFICATION_ID, notification)
-    }
+    // The line as it was last handed to the system, so an identical one is not
+    // handed over again. See `Drawn`.
+    private var posted: Drawn? = null
 
-    private fun title(screen: Screen?): String = when {
-        screen == null -> "Ховайся"
-        !screen.known -> "Ховайся: не знаю"
-        screen.state == Screen.ALERT -> "ТРИВОГА"
-        else -> "Без тривог"
+    /**
+     * Put the line in the shade, unless it is already exactly there.
+     *
+     * The skipping is the point, and it is not about battery. Re-posting a
+     * notification cancels a swipe that is in progress, and this posted one
+     * every thirty seconds whether or not anything had happened -- so the
+     * gesture that stops the siren had a coin toss under it. "Раз при тривозі
+     * пуш не свайпався і я не міг припинити звук."
+     */
+    private fun show(screen: Screen?, problem: String?) {
+        val next = drawnOf(screen, problem, store.sheltering)
+        if (next == posted) {
+            return
+        }
+        posted = next
+        getSystemService(NotificationManager::class.java)
+            ?.notify(NOTIFICATION_ID, status(next))
     }
 
     /**
@@ -212,7 +229,7 @@ class AlertService : Service() {
      * app, so it says the two things worth knowing at a glance: whether an alert
      * is on, and whether this is still working.
      */
-    private fun status(screen: Screen?, problem: String?): Notification {
+    private fun status(drawn: Drawn): Notification {
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -223,21 +240,11 @@ class AlertService : Service() {
             this, 1, Intent(this, AlertService::class.java).setAction(ACTION_HUSH),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
-        val body = when {
-            problem != null -> problem
-            screen == null -> "стежу"
-            // Same family, same reason: not "спостерігач ще не писав".
-            !screen.known -> "ще немає даних"
-            screen.state == Screen.ALERT ->
-                screen.top?.word?.replaceFirstChar { it.uppercase() } ?: "тривога"
-            else -> screen.said.lastOrNull()?.text ?: "тихо"
-        }
-
-        val accent = getColor(colourOf(screen, problem))
+        val accent = getColor(drawn.colour)
         val line = Notification.Builder(this, bell.status)
             .setSmallIcon(R.drawable.ic_bell)
-            .setContentTitle(title(screen))
-            .setContentText(body)
+            .setContentTitle(drawn.title)
+            .setContentText(drawn.body)
             .setContentIntent(open)
             .setDeleteIntent(hush)
             .setOngoing(true)
@@ -246,7 +253,7 @@ class AlertService : Service() {
             // that the phone has gone quiet. The header line is where a mode
             // belongs -- the title and the body are already saying what the sky
             // is doing.
-            .also { if (store.sheltering) it.setSubText("В укритті") }
+            .also { if (drawn.sheltering) it.setSubText("В укритті") }
             .setShowWhen(false)
             .setOnlyAlertOnce(true)
             // `setColorized` paints the whole notification and is honoured for
@@ -280,18 +287,60 @@ class AlertService : Service() {
         return line.build()
     }
 
-    /** Red for an alert, green for none, muted for not knowing. */
-    private fun colourOf(screen: Screen?, problem: String?): Int = when {
-        problem != null -> R.color.muted
-        screen == null || !screen.known -> R.color.muted
-        screen.state == Screen.ALERT -> R.color.danger
-        else -> R.color.calm
-    }
-
-
     companion object {
         private const val NOTIFICATION_ID = 1
         private const val WAIT_S = 30
+
+        /**
+         * Everything the permanent line puts on the screen, and nothing else.
+         *
+         * It exists to be compared. A `Screen` carries the whole picture --
+         * the feed, what is only being scouted, how high the raid has reached
+         * -- and four of those fields reach the shade. Comparing screens would
+         * mean redrawing for news the shade cannot show; comparing this means
+         * redrawing exactly when the line differs.
+         *
+         * The colour is the resource id rather than the resolved colour, so
+         * this stays free of a Context and a plain JUnit test can build one.
+         */
+        internal data class Drawn(
+            val title: String,
+            val body: String,
+            val sheltering: Boolean,
+            val colour: Int,
+        )
+
+        /** Red for an alert, green for none, muted for not knowing. */
+        private fun colourOf(screen: Screen?, problem: String?): Int = when {
+            problem != null -> R.color.muted
+            screen == null || !screen.known -> R.color.muted
+            screen.state == Screen.ALERT -> R.color.danger
+            else -> R.color.calm
+        }
+
+        /** Also the title of every bell, so the two never disagree. */
+        fun title(screen: Screen?): String = when {
+            screen == null -> "Ховайся"
+            !screen.known -> "Ховайся: не знаю"
+            screen.state == Screen.ALERT -> "ТРИВОГА"
+            else -> "Без тривог"
+        }
+
+        internal fun drawnOf(screen: Screen?, problem: String?,
+                             sheltering: Boolean): Drawn = Drawn(
+            title = title(screen),
+            body = when {
+                problem != null -> problem
+                screen == null -> "стежу"
+                // Same family, same reason: not "спостерігач ще не писав".
+                !screen.known -> "ще немає даних"
+                screen.state == Screen.ALERT ->
+                    screen.top?.word?.replaceFirstChar { it.uppercase() }
+                        ?: "тривога"
+                else -> screen.said.lastOrNull()?.text ?: "тихо"
+            },
+            sheltering = sheltering,
+            colour = colourOf(screen, problem))
 
         /** Swiping the permanent line away: stop the siren, put the line back. */
         const val ACTION_HUSH = "ua.hovaysya.HUSH"
