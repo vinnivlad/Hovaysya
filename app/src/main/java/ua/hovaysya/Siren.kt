@@ -42,12 +42,21 @@ object Siren {
     private var release: Runnable? = null
 
     /**
-     * The siren's range, and it is deliberately low: "можна тон сирени нижче?
-     * Не схоже на те як в застосунку Тривога". A mechanical siren is a big slow
-     * thing and it sounds like one; 440 to 880 was a smoke detector.
+     * The **pulses'** range, and it is deliberately low: "можна тон сирени
+     * нижче? Не схоже на те як в застосунку Тривога". A mechanical siren is a
+     * big slow thing and it sounds like one; 440 to 880 was a smoke detector.
+     *
+     * It is no longer the wail's range, and the split is measured rather than
+     * merely cautious. The wail went lower still on his ask; these did not
+     * follow, because a 180 ms pulse in the wail's band comes back **2.9 dB
+     * quieter** through a phone speaker -- a small driver gives almost nothing
+     * under 200 Hz, and a pulse that short has no time to make up for it in
+     * duration. These are the sounds that say "this one is about you, now", so
+     * the trade the wail can afford is the one they cannot. Shown the number,
+     * his ruling was "імпульси залиш незмінними ... відокрем, якщо потрібно".
      */
-    private const val LOW = 250.0
-    private const val HIGH = 500.0
+    private const val PULSE_LOW = 250.0
+    private const val PULSE_HIGH = 500.0
 
     /**
      * How hard the sine is driven into saturation, and how close to full scale
@@ -65,21 +74,62 @@ object Siren {
      * Which is also the honest waveform. A siren is chopped airflow, not a tuning
      * fork; the grit is the instrument rather than distortion of it.
      */
-    private const val DRIVE = 2.6
+    private const val PULSE_DRIVE = 2.6
     private const val PEAK = 0.95
 
     /**
-     * The wail, five times up and down: ten seconds. A raid has begun.
+     * The wail, and every number in it is his.
      *
-     * Long on purpose, and his: "хочу додати сценарій, що звук початку тривоги
-     * довший, нехай 10с". Four seconds was a notification chime -- it can end
-     * while somebody is still working out what woke them. Ten is long enough to
-     * be crossed a room for, which is the only length that matters at night.
+     * "Зараз вона надто різка. Треба емулювати більше як звучить стандартна
+     * сирена. Спочатку звук наростає з нуля, частота значно менша, [н]а одну
+     * амплітуду секунд 10 ... низ амплітуди не тиша, мабуть починай сирену з
+     * низу і на старті змінюй гучність з 0 до заданої десь за 5 секунд."
+     *
+     * Which is a real siren described from the outside, and it is four changes
+     * at once:
+     *
+     *     140-330 Hz    an octave and a bit below where it was
+     *     10 s          one climb and fall, against the old two-second flutter
+     *     5 s           rising from silence, because a motor takes that long
+     *     0.60          the swell's floor: the bottom is quiet, never silent
+     *
+     * The swell is the part that was missing and the part that makes it read as
+     * a siren. Amplitude follows the sweep, so the top is loud *by contrast*
+     * rather than by level -- there is no headroom left to be louder by level,
+     * the peak already sits at [PEAK].
+     *
+     * The drive follows the sweep too, and that is the only one of these that
+     * adds real loudness rather than the impression of it. At the bottom it is
+     * nearly a pure sine; at the top it saturates, and the harmonics saturation
+     * grows land where a phone speaker is efficient and a 140 Hz fundamental is
+     * not. Measured against the flat version he started from, it puts 0.8 dB
+     * back at the peak.
+     *
+     * Chosen by ear from seven, after seven more: "давай зупинимось поки на d".
+     */
+    private const val WAIL_LOW = 140.0
+    private const val WAIL_HIGH = 330.0
+    private const val WAIL_SECONDS = 30.0
+    private const val WAIL_PERIOD = 10.0
+    private const val WAIL_RISE = 5.0
+    private const val WAIL_FLOOR = 0.60
+    private const val WAIL_DRIVE_LOW = 1.0
+    private const val WAIL_DRIVE_HIGH = 2.2
+
+    /**
+     * The wail: three climbs and falls over thirty seconds. A raid has begun.
+     *
+     * Long on purpose, and his, twice over -- "хочу додати сценарій, що
+     * звук початку тривоги довший, нехай 10с", then "підніми довжину
+     * сирена до 30с також". Four seconds was a notification chime -- it can
+     * end while somebody is still working out what woke them. And the rise now
+     * spends the first five on its own, so the part at full volume has to be
+     * paid for out of a longer whole.
      *
      * Long enough to need a way out, too, which is why `stop` exists and why
      * dismissing the permanent notification calls it.
      */
-    fun alert(volume: Float) = play(wail(cycles = 5, seconds = 2.0), volume)
+    fun alert(volume: Float) = play(wail(), volume)
 
     /**
      * The siren's voice, chopped to a vibration pattern. A threat, right here.
@@ -139,24 +189,36 @@ object Siren {
 
     // --- the samples ---------------------------------------------------------
 
-    private fun wail(cycles: Int, seconds: Double): ShortArray {
-        val total = (RATE * seconds * cycles).toInt()
+    /** Exposed for a test: the waveform, with no Android in the way. */
+    internal fun wail(): ShortArray {
+        val total = (RATE * WAIL_SECONDS).toInt()
         val out = ShortArray(total)
         // Phase is accumulated rather than computed from `sin(2π f t)`, because
         // the frequency changes: evaluating the closed form at a moving `f`
         // makes the waveform jump every sample and the result is a rasp instead
         // of a wail.
         var phase = 0.0
-        val period = RATE * seconds
+        val period = RATE * WAIL_PERIOD
         for (i in 0 until total) {
             val within = (i % period) / period
-            // Up for the first half of a cycle, down for the second.
+            // Up for the first half of a cycle, down for the second, so it
+            // starts at the bottom: "починай сирену з низу".
             val sweep = if (within < 0.5) within * 2 else (1 - within) * 2
-            phase += 2 * PI * (LOW + (HIGH - LOW) * sweep) / RATE
-            out[i] = voice(phase)
+            phase += 2 * PI * (WAIL_LOW + (WAIL_HIGH - WAIL_LOW) * sweep) / RATE
+            val drive = WAIL_DRIVE_LOW + (WAIL_DRIVE_HIGH - WAIL_DRIVE_LOW) * sweep
+            val swell = WAIL_FLOOR + (1.0 - WAIL_FLOOR) * sweep
+            // Squared, so it climbs the way a motor spins up rather than the
+            // way a fader moves: a straight ramp is already half-loud at 2.5 s,
+            // which reads as the sound having been turned down, not as a siren
+            // starting.
+            val rise = minOf(1.0, i / RATE.toDouble() / WAIL_RISE)
+            out[i] = voice(phase, drive, swell * rise * rise)
         }
         return fade(out)
     }
+
+    /** Exposed for a test: a rhythm rendered as sound. */
+    internal fun pulses(pattern: LongArray): ShortArray = chop(pattern)
 
     /**
      * A vibration pattern read as sound: index 0 is the wait before the first
@@ -175,16 +237,17 @@ object Siren {
      * One short pulse of the siren winding up: 440 to 880 across the pulse,
      * however long the pulse happens to be.
      *
-     * The same voice and the same span as the long wail, so four of these read
-     * as the siren being interrupted rather than as a different instrument.
+     * The same voice as the long wail, so four of these read as the siren being
+     * interrupted rather than as a different instrument -- but no longer the
+     * same span. See [PULSE_LOW] for why they stayed up where they were.
      */
     private fun burst(millis: Long): ShortArray {
         val out = ShortArray((RATE * millis / 1000).toInt())
         var phase = 0.0
         for (i in out.indices) {
             val through = i.toDouble() / out.size
-            phase += 2 * PI * (LOW + (HIGH - LOW) * through) / RATE
-            out[i] = voice(phase)
+            phase += 2 * PI * (PULSE_LOW + (PULSE_HIGH - PULSE_LOW) * through) / RATE
+            out[i] = voice(phase, PULSE_DRIVE)
         }
         return fade(out)
     }
@@ -194,8 +257,8 @@ object Siren {
      * the peak so the result still reaches full scale rather than being both
      * driven and quieter.
      */
-    private fun voice(phase: Double): Short =
-        (tanh(sin(phase) * DRIVE) / tanh(DRIVE) * Short.MAX_VALUE * PEAK)
+    private fun voice(phase: Double, drive: Double, gain: Double = 1.0): Short =
+        (tanh(sin(phase) * drive) / tanh(drive) * gain * Short.MAX_VALUE * PEAK)
             .toInt().toShort()
 
     // E4, C4, F4 -- his order, and the pack's own numbering says which is which:
