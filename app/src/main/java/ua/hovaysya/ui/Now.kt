@@ -1,7 +1,6 @@
 package ua.hovaysya.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +23,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,7 +34,6 @@ import ua.hovaysya.clock
 import ua.hovaysya.saidPlainly
 import ua.hovaysya.spell
 import ua.hovaysya.Screen
-import ua.hovaysya.AlertService
 import ua.hovaysya.Store
 
 /**
@@ -78,12 +75,6 @@ fun Now(store: Store, onSettings: () -> Unit) {
     val accent = headlineColour(state)
     val alerting = state == Screen.ALERT
 
-    // Read through `remember` and not `Held`, unlike everything above: those are
-    // answers from the network that must survive a tab switch, and this one is
-    // in `SharedPreferences`, where re-reading it costs nothing and can never be
-    // stale.
-    var sheltering by remember { mutableStateOf(store.sheltering) }
-    val context = LocalContext.current
 
     Column(
         Modifier
@@ -100,78 +91,31 @@ fun Now(store: Store, onSettings: () -> Unit) {
         // nobody could read making a claim the app has to earn anyway; he asked
         // for it gone and for the rest a little larger. The headline below is
         // still the only thing here anybody needs at a glance.
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Ховайся",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                // ...over where, which the screen never said. Every number
-                // below is decided from one place and it was nowhere on the
-                // screen -- his: "зразу не зрозуміло, де слухає тривогу".
-                //
-                // Nominative and set off with a dot rather than folded into the
-                // sentence: "над Жулянами" is an instrumental, and the app has
-                // no morphology for arbitrary names -- the gazetteer's stems
-                // recognise them, they do not decline them. A wrong case on the
-                // one line that says where somebody lives is worse than a plain
-                // one.
-                Text(
-                    "Стежить за небом" +
-                        (screen?.home?.let { " · $it" } ?: "."),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                Status(health, problem)
-            }
-            // "Я в укритті", one tap from the screen he is already looking at
-            // -- the point of the mode is to be turned on in the dark, on the
-            // way down the stairs, and a setting three taps deep would not be.
-            //
-            // A glyph for the same reason the gear is one, and the moon rather
-            // than a shield: a shield is what the app does for him, and this
-            // button is about him trying to sleep.
-            Box(
-                Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .clickable {
-                        sheltering = !sheltering
-                        store.sheltering = sheltering
-                        // Or the badge below arrives up to thirty seconds late.
-                        AlertService.refresh(context)
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "\u263E",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = if (sheltering) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Box(
-                Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onSettings),
-                contentAlignment = Alignment.Center,
-            ) {
-                // A glyph and not an icon resource: `material-icons` is a
-                // dependency this app does not have, and a gear is read the same
-                // in every language.
-                Text(
-                    "⚙",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        // The name and the two controls, shared with every screen now -- see
+        // `ScreenHeader`. What stays here is the line under the name: every
+        // number on this screen is decided from one place and the screen never
+        // said which, his "зразу не зрозуміло, де слухає тривогу".
+        //
+        // Nominative and set off with a dot rather than folded into the
+        // sentence: "над Жулянами" is an instrumental, and the app has no
+        // morphology for arbitrary names -- the gazetteer's stems recognise
+        // them, they do not decline them. A wrong case on the one line that
+        // says where somebody lives is worse than a plain one.
+        ScreenHeader(store, "Ховайся", onSettings) {
+            Text(
+                "Стежить за небом" +
+                    (screen?.home?.let { " · $it" } ?: "."),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+        // Below the name rather than inside it, which is his ruling: "на
+        // головному екрані «спостереження працює» не включати в хедер, це
+        // частина самого екрану." The header says what the app is; whether the
+        // watch is alive is something this screen reports, like everything
+        // else on it.
+        Spacer(Modifier.height(8.dp))
+        Status(health, problem)
 
         Column(
             Modifier.fillMaxWidth().weight(1f),

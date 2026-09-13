@@ -79,7 +79,7 @@ import ua.hovaysya.Verdict
 
 /** What Ховайся said, and the reason it gives itself. */
 @Composable
-fun HovaysyaFeed(store: Store) {
+fun HovaysyaFeed(store: Store, onSettings: () -> Unit) {
     // Kept above the tabs -- see `Held`. An empty feed and a forgotten one look
     // identical on screen, and one of them is a lie.
     val rows = Held.said
@@ -104,8 +104,10 @@ fun HovaysyaFeed(store: Store) {
     val keyOf = { row: Verdict -> row.cursor }
 
     Feed(
+        store = store,
+        onSettings = onSettings,
         title = "Ховайся",
-        subtitle = "що казав Ховайся · найновіші внизу",
+        subtitle = "що казав Ховайся",
         empty = "За останні дні Ховайся нічого не казав.",
         problem = problem,
         keys = rows.map(keyOf),
@@ -226,7 +228,7 @@ private fun isPartial(alarm: String?): Boolean = alarm == "clear-partial"
 
 /** Every channel, merged into one stream. */
 @Composable
-fun ChannelFeed(store: Store) {
+fun ChannelFeed(store: Store, onSettings: () -> Unit) {
     val rows = Held.posts
     val problem = Held.postsProblem
 
@@ -244,8 +246,10 @@ fun ChannelFeed(store: Store) {
     val keyOf = { post: Post -> "${post.channel}/${post.id}" }
 
     Feed(
+        store = store,
+        onSettings = onSettings,
         title = "Канали",
-        subtitle = "усі канали, останні 30 хв · найновіші внизу",
+        subtitle = "усі канали, останні 30 хв",
         empty = "За останні 30 хвилин тихо.",
         problem = problem,
         keys = rows.map(keyOf),
@@ -429,6 +433,8 @@ private fun LazyListState.atNewest(): Boolean = with(layoutInfo) {
 
 @Composable
 internal fun Feed(
+    store: Store,
+    onSettings: () -> Unit,
     title: String,
     subtitle: String,
     empty: String,
@@ -496,13 +502,14 @@ internal fun Feed(
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(24.dp, 20.dp, 24.dp, 10.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            Text(
-                problem ?: subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (problem != null) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            ScreenHeader(store, title, onSettings) {
+                Text(
+                    problem ?: subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (problem != null) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         if (keys.isEmpty() && problem == null) {
             Box(

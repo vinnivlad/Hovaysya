@@ -106,14 +106,20 @@ fun Settings(
         // Its own way out, since it is no longer a tab somebody can leave by
         // tapping another one.
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // Bigger than the other glyphs, on his ask, and it is not
+            // decoration: this is the only way out of this screen, it is
+            // reached with a thumb on a phone held in one hand, and
+            // `titleLarge` drew an arrow the same weight as the word beside
+            // it. `displaySmall` in a wider box makes the target the size of
+            // the gesture rather than the size of the character.
             Box(
                 Modifier
-                    .size(40.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .clickable(onClick = onBack),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("←", style = MaterialTheme.typography.titleLarge)
+                Text("←", style = MaterialTheme.typography.displaySmall)
             }
             Spacer(Modifier.width(4.dp))
             Text("Налаштування", style = MaterialTheme.typography.titleLarge)
@@ -169,8 +175,7 @@ fun Settings(
             Spacer(Modifier.height(6.dp))
             Text(
                 "Чотири сигнали, які варто почути й відчути зараз — бо " +
-                    "вночі розрізняти доведеться не дивлячись. Пʼятий не " +
-                    "відчувається взагалі, і в цьому вся його робота.",
+                    "вночі розрізняти доведеться не дивлячись.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -210,16 +215,6 @@ fun Settings(
                         "Відбій тривоги.")
                 },
             )
-            Bells(
-                "Тихо", "—", "не будить, не вібрує",
-                // Still worth pressing: it puts the line in the shade, which is
-                // where this class is meant to be found rather than felt.
-                verb = "Показати",
-                onRing = {
-                    bell.ring(context, bell.quiet, "Тихо",
-                        "Дорозвідка по балістиці.")
-                },
-            )
         }
 
         // --- how loud -------------------------------------------------------
@@ -228,9 +223,7 @@ fun Settings(
             Text("Звук", style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Сирена, коли оголошують тривогу. Та сама, але коротко, тим " +
-                    "самим ритмом 2+2 — коли летить у твоє коло. Короткий " +
-                    "пілік на відбій. Вібрація працює завжди, навіть на нулі.",
+                "Гучність сповіщень. Вібрація працює завжди, навіть на нулі.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -96,6 +96,7 @@ What is covered, and why each earned it rather than being reached for:
 | `LineTest` | Read the field, never the sentence -- an all-clear is `level="alert"` with `alarm="clear"`, so colouring by level alone drew the end of a raid in the same red as the raid. |
 | `HeldTest` | That forgetting the device leaves nothing of the previous person on the screens, with a count of the fields as a tripwire so a new one cannot be quietly left out. |
 | `WordsTest` | The wordings that are rulings of his: "БЕЗ ТРИВОГ" for watching, "НЕ ЗНАЮ" for not knowing, never calm by default. |
+| `HeaderTest` | That both controls are in the header and that the shelter button writes to `Store` rather than only colouring itself. The failure this guards is silent and per screen: one of the three stops using `ScreenHeader`, nothing warns, and it is noticed the night the button is wanted. |
 | `DrawnTest` | That an unchanged line is not posted again. Re-posting cancels a swipe in progress, and this app answered a long poll every thirty seconds: 814167 re-posts across 742 replayed nights, 99.4% of them identical. "Раз при тривозі пуш не свайпався і я не міг припинити звук." |
 
 The vibration alphabet is **not** tested here. It is already guarded from the
@@ -256,11 +257,21 @@ Three decisions worth disagreeing with if they are wrong, each one line:
   its header for as long as it is on, which is the only reminder that works when
   the whole point is that the phone has gone quiet.
 
-The toggle is a moon glyph beside the gear on the first screen, because the mode
-has to be reachable in the dark on the way down the stairs; Settings has the same
-switch with the sentence explaining it. It is a section of its own rather than a
-fourth stop on the sound axis: that axis says how loudly to speak, and this says
-what is worth speaking about at all.
+The toggle sits beside the gear in the header of **every** screen, because the
+mode has to be reachable in the dark on the way down the stairs and the right
+tab is not something to go looking for then; Settings has the same switch with
+the sentence explaining it. It is a section of its own rather than a fourth stop
+on the sound axis: that axis says how loudly to speak, and this says what is
+worth speaking about at all.
+
+The icon is `ic_shelter`, a bunker, from his own drawing. Redrawn as a vector
+rather than shipped as the PNG -- this repository has never carried a binary and
+does not need five density buckets of five arcs and a rectangle -- and redrawn
+rather than traced, because the drawing is line art over exact geometry and a
+trace would have carried its rough raster edge and none of its structure. Every
+radius in that file was measured off the original; see the comment there. Being
+a stroked vector is also what lets it tint, which is how one shape says both
+states: amber when the mode is on, grey when it is not.
 
 `Store.sheltering`, and deliberately not `shelter` -- that name is the
 notification channel for the ballistic tone, which means the opposite thing.

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "В укритті": a bunker, from his own drawing (`bunker.png`).
+
+  Redrawn rather than traced, and that is the point. The drawing is line art
+  over pure geometry — two concentric arches on one spring line, a door arch on
+  the same one, three bolts, a slot — so tracing its slightly rough raster edge
+  would have carried the roughness and none of the structure into a path with
+  hundreds of points. Every number below was measured off that file instead:
+
+      centre x           71.5        spring line y   80.5     floor y   112.5
+      outer arch         R 64.0      inner arch      R 38.5   door      R 30.0
+      stroke             3.0
+      bolts              r 7.5 at (21.5, 91.5), (71.5, 29.5), (123, 91.5)
+
+  The bolts are the detail worth keeping: all three sit on the mid-line of the
+  arch band — 51.0, 51.2 and 52.7 from the spring centre — so they are one
+  decision rather than three placements, and moving the arch has to move them.
+
+  Redrawn at 144 and fitted back against the original by overlap: 67%, which is
+  the ceiling for a 3px stroke where one pixel of edge offset costs a third of
+  the score.
+
+  A vector and not the PNG, because this repository has never carried a binary
+  and does not need to start: five density buckets of a shape that is five arcs
+  and a rectangle. It is also why the thing tints — `strokeColor` is replaced
+  wholesale by whatever colour the button is in, amber when the mode is on and
+  grey when it is not.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="144"
+    android:viewportHeight="144">
+
+    <!-- The arch itself: outer wall up and over, inner wall back down, closed
+         across the feet so each leg reads as one thing. -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M7.5,112.5 L7.5,80.5 A64,64 0 0 1 135.5,80.5 L135.5,112.5 L110,112.5 L110,80.5 A38.5,38.5 0 0 0 33,80.5 L33,112.5 Z" />
+
+    <!-- The door, on the same spring line and standing on the same floor. -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M41.5,112.5 L41.5,80.5 A30,30 0 0 1 101.5,80.5 L101.5,112.5 Z" />
+
+    <!-- Three bolts on the band's mid-line. -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3"
+        android:pathData="M14,91.5 a7.5,7.5 0 1,0 15,0 a7.5,7.5 0 1,0 -15,0 Z" />
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3"
+        android:pathData="M64,29.5 a7.5,7.5 0 1,0 15,0 a7.5,7.5 0 1,0 -15,0 Z" />
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3"
+        android:pathData="M115.5,91.5 a7.5,7.5 0 1,0 15,0 a7.5,7.5 0 1,0 -15,0 Z" />
+
+    <!-- The slot in the door. -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M84,84.5 L93.5,84.5 A2.5,2.5 0 0 1 93.5,89.5 L84,89.5 A2.5,2.5 0 0 1 84,84.5 Z" />
+</vector>

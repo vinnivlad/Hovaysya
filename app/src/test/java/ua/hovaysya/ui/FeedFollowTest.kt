@@ -16,11 +16,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import ua.hovaysya.Store
 
 /**
  * The fault this file exists for, in one sentence: **the number of rows is not
@@ -61,6 +63,8 @@ class FeedFollowTest {
             HovaysyaTheme {
                 if (onScreen) {
                     Feed(
+                        store = Store(ApplicationProvider.getApplicationContext()),
+                        onSettings = {},
                         title = "Ховайся",
                         subtitle = "тест",
                         empty = "нічого",

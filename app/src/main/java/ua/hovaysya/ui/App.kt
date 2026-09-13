@@ -84,8 +84,8 @@ fun App(store: Store, bell: Bell) {
         Box(Modifier.fillMaxSize().padding(insets)) {
             when (tab) {
                 0 -> Now(store) { settings = true }
-                1 -> HovaysyaFeed(store)
-                else -> ChannelFeed(store)
+                1 -> HovaysyaFeed(store) { settings = true }
+                else -> ChannelFeed(store) { settings = true }
             }
         }
     }
