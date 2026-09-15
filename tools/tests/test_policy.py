@@ -1275,6 +1275,73 @@ def test_a_partial_all_clear_rings_once_per_class():
     assert not out[9][1], out
 
 
+def test_a_carrier_takes_off_rather_than_launching():
+    """His 19:44 on 2026-09-15: "\U0001f6eb \u0417\u043b\u0456\u0442 \u041c\u0456\u0413-31\u041a \u0412\u041f\u0421 \u0440\u0444" was announced as
+    "\u041f\u0443\u0441\u043a: \u041c\u0456\u0413-31." -- "\u0437\u0430\u0433\u0440\u043e\u0437\u0430 \u043f\u0440\u0430\u0432\u0438\u043b\u044c\u043d\u043e \u0437\u0430\u0434\u0437\u0432\u043e\u043d\u0438\u043b\u0430, \u0430\u043b\u0435 \u043f\u043e\u043a\u0430\u0437\u0430\u043b\u0430 \u00ab\u041f\u0443\u0441\u043a\u00bb,
+    \u0445\u043e\u0447\u0430 \u0442\u043e \u0431\u0443\u0432 \u0437\u043b\u0456\u0442".
+
+    The launch shape is right and the word is not: a MiG-31K is the carrier, and
+    what leaves the ground is the aeroplane. The missile under its wing may
+    never be fired at all, which is the whole reason a takeoff is worth an hour
+    of warning rather than four minutes of one.
+
+    Seven in the corpus, all of them this same template, against 49 genuine
+    ballistic launches that keep the word."""
+    out = _play([
+        (0, "war_monitor",
+         "\U0001f6eb \u0417\u043b\u0456\u0442 \u041c\u0456\u0413-31\u041a \u0412\u041f\u0421 \u0440\u0444. \u041c\u0456\u0413-31\u041a \u2014 \u043d\u043e\u0441\u0456\u0439 \u0433\u0456\u043f\u0435\u0440\u0437\u0432\u0443\u043a\u043e\u0432\u043e\u0457 "
+         "\u0430\u0435\u0440\u043e\u0431\u0430\u043b\u0456\u0441\u0442\u0438\u0447\u043d\u043e\u0457 \u0440\u0430\u043a\u0435\u0442\u0438 \u0425-47\u043c2 \u043a\u043e\u043c\u043f\u043b\u0435\u043a\u0441\u0443 \u00ab\u041a\u0438\u043d\u0436\u0430\u043b\u00bb."),
+    ])
+    said = out[0][3] or ""
+    assert "\u0417\u043b\u0456\u0442" in said, out
+    assert "\u041f\u0443\u0441\u043a" not in said, out
+
+
+def test_a_real_launch_keeps_the_word():
+    """The guard, and it is 49 messages wide: a missile leaving its launcher is
+    a launch, and that word is the difference between an hour of warning and
+    four minutes of it."""
+    out = _play([
+        (0, "war_monitor", "\u0412\u0438\u0445\u0456\u0434 \u0431\u0430\u043b\u0456\u0441\u0442\u0438\u043a\u0438 \u0437 \u0411\u0440\u044f\u043d\u0449\u0438\u043d\u0438 \u043d\u0430 \u041a\u0438\u0457\u0432."),
+    ])
+    assert "\u041f\u0443\u0441\u043a" in (out[0][3] or ""), out
+
+
+def test_the_city_alone_does_not_wake_anybody_without_a_siren():
+    """His decision on 2026-09-15, after a news item about cruise missiles the
+    enemy will have "\u043f\u0440\u0438\u0431\u043b\u0438\u0437\u043d\u043e \u0447\u0435\u0440\u0435\u0437 \u043f\u0456\u0432 \u0440\u043e\u043a\u0443" rang at 17:39: "\u0434\u0430\u0432\u0430\u0439
+    \u043f\u0440\u0438\u0432\u044f\u0437\u0443\u0454\u043c\u043e\u0441\u044f \u0434\u043e \u0442\u0440\u0438\u0432\u043e\u0433\u0438".
+
+    City scope is the weakest evidence that still rang: no place from his ring,
+    no count near him, only a class and the word \u041a\u0438\u0457\u0432. Measured over eleven
+    months it fired 19 times, **none of them while a siren was running**, and
+    14 of the 19 were news -- damage reports, officials being quoted, weapons
+    that do not exist yet.
+
+    The five real ones were all followed by the official siren anyway, at 35
+    seconds, 3, 6, 11 and 75 minutes. So the rule never caught anything that
+    would otherwise have been missed; it bought a head start. And his own
+    correction killed the largest of those: the 75-minute case was four
+    Bandarols, which this app classes as `drone-rocket` and which city scope
+    already refuses -- it only rang because that message said a bare
+    "\u0440\u0430\u043a\u0435\u0442\u0438" and fell through to cruise."""
+    out = _play([
+        (0, "mon1tor_ua", "\u2757\ufe0f\u041a\u0440\u0438\u043b\u0430\u0442\u0430 \u0440\u0430\u043a\u0435\u0442\u0430 \u043d\u0430 \u041a\u0438\u0457\u0432/\u0411\u0440\u043e\u0432\u0430\u0440\u0438."),
+    ])
+    assert not out[0][1], out
+
+
+def test_a_threat_in_the_ring_still_wakes_him_with_no_siren():
+    """The guard that matters more than the fix. Tying the *city* to the siren
+    must not tie his own street to it -- the whole design is that the ring
+    speaks before the official channel does, and three all-clears went missing
+    in eleven days of live logs."""
+    out = _play([
+        (0, "mon1tor_ua", "\u26a0\ufe0f\u0411\u0430\u043b\u0456\u0441\u0442\u0438\u043a\u0430 \u043d\u0430 \u0416\u0443\u043b\u044f\u043d\u0438."),
+    ])
+    assert out[0][1], out
+
+
 def test_a_warning_restated_as_prose_says_nothing():
     """His report at 23:23 on 2026-09-11, four hours into a running alert:
 

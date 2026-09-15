@@ -72,6 +72,10 @@ CLASS_WORD = {
     "mixed": "комбінований удар",
 }
 
+# The classes that are aircraft rather than munitions. What leaves the ground
+# is the aeroplane, and the thing under its wing may never be fired.
+CARRIERS = frozenset({"mig", "aviation"})
+
 # The genitive, for "тривога по <class>" and "відбій по <class>".
 CLASS_BY = {
     "ballistic": "балістиці",
@@ -467,7 +471,20 @@ class Announcer:
             # lost the word "пуск" from "Вихід балістики з Брянська на Київ".
             if launching:
                 said['launches'].add(threat)
-                parts.append(f"Пуск: {CLASS_WORD.get(threat, threat)}")
+                # An aeroplane takes off; a missile is launched. His 19:44 on
+                # 2026-09-15: "\U0001f6eb Зліт МіГ-31К ВПС рф" was announced as
+                # "Пуск: МіГ-31." -- "загроза правильно задзвонила, але показала
+                # «Пуск», хоча то був зліт".
+                #
+                # The distinction is not pedantry, it is the clock. A MiG-31K
+                # leaving the ground is an hour of warning and may never fire
+                # at all; a Kinzhal leaving the MiG is four minutes. Saying
+                # "пуск" for the first spends the word that means the second.
+                #
+                # Seven in the corpus, every one the same template, against 49
+                # genuine launches that keep the word.
+                verb = "Зліт" if threat in CARRIERS else "Пуск"
+                parts.append(f"{verb}: {CLASS_WORD.get(threat, threat)}")
 
             # Over his own area, name the place. It is the one fact that changes
             # what he does rather than what he knows.

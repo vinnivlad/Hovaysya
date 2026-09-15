@@ -435,6 +435,39 @@ KALIBRY = (
 )
 
 
+def test_the_official_level_lifted_is_not_a_class_lifted():
+    """His 20:06 on 2026-09-15: "\u2705\u0412\u0456\u0434\u0431\u0456\u0439 \u0440\u0430\u043a\u0435\u0442\u043d\u043e\u0457 \u043d\u0435\u0431\u0435\u0437\u043f\u0435\u043a\u0438." came out as
+    "\u0412\u0456\u0434\u0431\u0456\u0439 \u043f\u043e \u043a\u0440\u0438\u043b\u0430\u0442\u0438\u0445 \u0440\u0430\u043a\u0435\u0442\u0430\u0445" -- and his question was the right one, "\u0437\u0432\u0456\u0434\u043a\u0438??",
+    because nobody had said a word about cruise missiles all evening.
+
+    "\u0420\u0430\u043a\u0435\u0442\u043d\u0430 \u043d\u0435\u0431\u0435\u0437\u043f\u0435\u043a\u0430" is the official app's **red level**, the same thing
+    `_OFFICIAL_LEVEL` already masks on the way in -- it covers ballistic and
+    cruise alike, and the bare `\u0440\u0430\u043a\u0435\u0442` fallback resolves it to cruise. The mask
+    missed this for two reasons at once: it only knew the word \u0437\u0430\u0433\u0440\u043e\u0437\u0430, and
+    `cleared_class` never applied it at all.
+
+    Measured over the corpus: 39 messages name the level, and masking it
+    changes the lifted class on exactly four -- every one of them this same
+    sentence, every one of them cruise where nothing was cruise."""
+    assert hints.cleared_class("\u26aa\ufe0f \u0412\u0456\u0434\u0431\u0456\u0439 \u0440\u0430\u043a\u0435\u0442\u043d\u043e\u0457 \u043d\u0435\u0431\u0435\u0437\u043f\u0435\u043a\u0438.") is None
+    # And not an all-clear at all, which is the sharper half. Masking the level
+    # for the class alone left `partial_clear` with nothing named, and a clear
+    # that is not partial is a **full** one -- so the first version of this fix
+    # announced that the raid was over while it was still running.
+    assert hints.alert_state("\u26aa\ufe0f \u0412\u0456\u0434\u0431\u0456\u0439 \u0440\u0430\u043a\u0435\u0442\u043d\u043e\u0457 \u043d\u0435\u0431\u0435\u0437\u043f\u0435\u043a\u0438.") is None
+    # The real all-clear, which must keep working: it carries the canonical
+    # formula and never reaches the guard.
+    assert hints.alert_state("\U0001f7e2 \u041a\u0438\u0457\u0432 \u0412\u0456\u0434\u0431\u0456\u0439 \u043f\u043e\u0432\u0456\u0442\u0440\u044f\u043d\u043e\u0457 \u0442\u0440\u0438\u0432\u043e\u0433\u0438") == "clear"
+
+
+def test_a_class_named_beside_the_level_still_lifts():
+    """The guard. Masking a level must not swallow a real partial all-clear
+    that happens to sit next to one -- "\u0412\u0456\u0434\u0431\u0456\u0439 \u0437\u0430\u0433\u0440\u043e\u0437\u0438 \u041c\u0456\u0413-31\u041a" is the
+    commonest partial clear there is, and it names its class outright."""
+    assert hints.cleared_class("\u26aa\ufe0f \u0412\u0456\u0434\u0431\u0456\u0439 \u0437\u0430\u0433\u0440\u043e\u0437\u0438 \u041c\u0456\u0413-31\u041a.") == "mig"
+    assert hints.cleared_class("\u041f\u043e \u0431\u0430\u043b\u0456\u0441\u0442\u0438\u0446\u0456 \u0432\u0456\u0434\u0431\u0456\u0439") == "ballistic"
+
+
 def test_a_warning_that_stays_a_warning_is_not_a_live_report():
     """His false positive at 23:23 on 2026-09-11, and his own reading of it:
     "1ше - це попередження про балістику."

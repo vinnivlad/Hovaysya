@@ -479,6 +479,45 @@ his ruling: "у них немає чітких критеріїв підвище
 неможливо." The third form above therefore stays what it already was, an
 `already-notified` repeat of a siren that has been declared.
 
+**And the same ruling applies coming down, as of 2026-09-15.** "✅Відбій
+ракетної небезпеки" arrived at 20:06 while the alert was still running — the
+official all-clear came four minutes later — and was announced as "Відбій по
+крилатих ракетах" on nothing at all. His question was the right one: "звідки??"
+
+`_OFFICIAL_LEVEL` had masked this on the way in since the night it put "Тривога.
+Крилаті ракети." on a ballistic siren, but it only knew the word `загроза`, and
+`cleared_class` never applied the mask at all. Both are fixed, and the second
+half of the fix is the part worth remembering: masking the level for the *class*
+alone turned the message into a **full** all-clear, because `partial_clear` asks
+whether a class was named and now none was. Announcing that a raid is over while
+it is running is the worst sentence this app can say, so the level is answered in
+`alert_state` instead — a lifted level is not a siren event, exactly as a raised
+one is not. 39 messages in the corpus name the level; the class it was wrongly
+lifting changed on exactly four, every one of them this same sentence.
+
+## City scope needs a siren behind it (2026-09-15)
+
+"Загроза над містом" was the weakest evidence that still rang: no place from his
+ring, no count near him, only a class and the word `Київ`. Over eleven months it
+fired **19 times, not one of them while a siren was running**, and 14 of the 19
+were news — damage reports, officials being quoted, a weapon the enemy would have
+"приблизно через пів року", which is the one that prompted this.
+
+The five real ones were each followed by the official siren anyway, at 35
+seconds, 3, 6, 11 and 75 minutes. So the rule never caught anything that would
+otherwise have been missed; it bought a head start. His correction removed the
+largest of those: the 75-minute case was four Bandarols, which this app classes
+as `drone-rocket` and which city scope already refuses — it rang only because
+that message said a bare "ракети" and fell through to `cruise`.
+
+His decision: "давай привязуємося до тривоги." Measured after the change, 19
+messages go silent and none reaches the bell.
+
+A length cut was the alternative and was rejected on his reasoning rather than
+mine. The real reports run 18–84 characters and the shortest news item is 92, so
+a cut at 90 would have kept all five head starts and dropped all fourteen — but
+eight characters is not a margin, and the rule it replaces is one sentence.
+
 **And the API token is back on the list, as of 2026-09-08.** Not because of the
 levels but because the relay went silent mid-alert three times in eleven days of
 live logs, leaving the screen reading `alert` for four and a half hours after one

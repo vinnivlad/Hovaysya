@@ -465,7 +465,19 @@ def without_denials(text: str) -> str:
 # Masked rather than vetoed, so a class named beside the level still wins:
 # "Ракетна загроза: балістика з Курська" is ballistic. The yellow level is left
 # alone on purpose -- "Дронова загроза" names drones and means drones.
-_OFFICIAL_LEVEL = re.compile(r"ракетн\w*\s+загроз\w*", re.IGNORECASE)
+_OFFICIAL_LEVEL = re.compile(
+    r"ракетн\w*\s+(?:загроз\w*|небезпек\w*)", re.IGNORECASE)
+
+
+def _without_the_level(text: str) -> str:
+    """The same text with the official level blanked, offsets intact.
+
+    Equal-length spaces rather than a single one, because
+    [cleared_class] reads *positions* -- which class word sits nearest
+    the all-clear -- and collapsing the match would slide every offset
+    after it.
+    """
+    return _OFFICIAL_LEVEL.sub(lambda m: " " * len(m.group(0)), text or "")
 
 
 def stated_class(text: str) -> str:
@@ -640,6 +652,16 @@ def cleared_class(text: str) -> str | None:
     """
     if not partial_clear(text):
         return None
+    # The red level lifted is not a class lifted. His 20:06 on 2026-09-15:
+    # "✅Відбій ракетної небезпеки." came out as "Відбій по крилатих ракетах" --
+    # "звідки??", and he was right, nobody had mentioned a cruise missile all
+    # evening. `_OFFICIAL_LEVEL` had masked this on the way in since the night
+    # it put "Тривога. Крилаті ракети." on a ballistic siren, but the mask
+    # never reached here, and it only knew the word загроза.
+    #
+    # Measured: 39 messages name the level, and the mask changes the lifted
+    # class on exactly four -- every one of them this same sentence.
+    text = _without_the_level(text)
     low = _low(text)
     clear_at = min(
         (low.find(t) for t in ALERT_CLEAR_TERMS if t in low), default=-1
@@ -1048,6 +1070,26 @@ def alert_state(text: str) -> str | None:
     # same reason: a real "🚨 м. Київ / Повітряна тривога" that also tells him
     # not to ignore the signals is still a declaration.
     if _SIREN_AS_ADVICE.search(text or "") and not _hits(text, CANONICAL_SIREN):
+        return None
+    # The red level being lifted is not the raid being lifted. His 20:06 on
+    # 2026-09-15: "✅Відбій ракетної небезпеки." arrived while the alert was still
+    # running -- the official all-clear came four minutes later -- and it came
+    # out as "Відбій по крилатих ракетах", on nothing: "звідки??"
+    #
+    # Ракетна небезпека is a *level*, covering ballistic and cruise alike,
+    # and this is the same ruling he already made about the level going up --
+    # "ніяк по особливому не реагуємо, у них немає чітких критеріїв підвищення
+    # рівня загрози. Покладатися неможливо" -- applied to it coming down.
+    #
+    # It has to be answered *here* rather than in `cleared_class`, and that is
+    # the trap this cost: masking the level for the class alone turned the
+    # message into a **full** all-clear, because `partial_clear` asks whether a
+    # class was named and now none was. Announcing that a raid is over while it
+    # is running is the worst sentence this app can say.
+    if (_OFFICIAL_LEVEL.search(text or "")
+            and any(t in low for t in ALERT_CLEAR_TERMS)
+            and stated_class(_without_the_level(text)) == "none"
+            and not _hits(text, CANONICAL_SIREN)):
         return None
     # The mirror case, and it woke the user for nothing: "У Києві у найближчі
     # хвилини можуть оголосити повітряну тривогу" is a forecast of a siren, and

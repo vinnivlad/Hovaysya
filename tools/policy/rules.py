@@ -790,6 +790,28 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             return _silent("insufficient: city-wide is not enough for a drone")
         if ep is not None and ep.notified:
             return _silent("already-notified: city-level, already awake")
+        # ...and with no siren behind it, city scope is not enough for anything.
+        #
+        # His decision on 2026-09-15, after a news item about cruise missiles
+        # the enemy will have "приблизно через пів року" rang at 17:39: "давай
+        # привязуємося до тривоги."
+        #
+        # This is the weakest evidence that still rang: no place from his ring,
+        # no count near him, only a class and the word Київ. Over eleven months
+        # it fired 19 times, **not one of them while a siren was running**, and
+        # 14 of the 19 were news -- damage reports, officials quoted, weapons
+        # that do not exist yet.
+        #
+        # The five real ones were each followed by the official siren anyway,
+        # at 35 seconds, 3, 6, 11 and 75 minutes, so the rule never caught
+        # anything that would otherwise have been missed -- it bought a head
+        # start. His own correction removed the largest of those: the
+        # 75-minute case was four Bandarols, which this app classes as
+        # `drone-rocket` and which the branch above already refuses. It rang
+        # only because that message said a bare "ракети" and fell through to
+        # cruise.
+        if ep is None or not ep.alert_announced:
+            return _silent("insufficient: city-wide with no siren")
         return _notify("alert", alarm, "threat over the city")
 
     if obs.live and obs.scope == "oblast":
