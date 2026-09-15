@@ -309,9 +309,13 @@ def test_the_drawn_rhythm_matches_the_pattern_it_names():
     plain = re.sub(r"//.*", "", settings)
     drawn = re.findall(r'Bells\(\s*"[^"]+",\s*"([·▬ —]*)"', plain)
     counts = [sum(1 for c in row if c in "·▬") for row in drawn]
-    # Settings lists them in the order of the alphabet, the silent one last.
+    # Settings lists them in the order of the alphabet. The silent one used to
+    # be here too, drawn with no pulses at all, and it is gone on his ask --
+    # "можеш ще прибрати «Тихо» в «Як це відчувається»". A row that does
+    # nothing when pressed reads as a row that is broken, and the channel it
+    # stood for still exists.
     expected = [pulses["SOS"], pulses["SHELTER"], pulses["NEAR"],
-                pulses["CLEAR"], 0]
+                pulses["CLEAR"]]
     assert counts == expected, (drawn, counts, expected)
 
 # Nothing is exempt any more. `SHELTER` used to be: twelve pulses at 100 ms,
