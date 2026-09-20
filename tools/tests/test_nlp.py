@@ -1534,6 +1534,39 @@ def test_a_forecast_of_an_attack_is_not_an_attack():
         assert hints.suggest(text)["modality"] == "summary-news", text
 
 
+def test_where_to_watch_during_a_strike_is_advice_and_not_a_strike():
+    """It rang the shelter tone at 21:15 on 2026-09-20, over Жуляни, with
+    nothing in the air: "❗️Під час балістичного удару особлива увага таким
+    напрямкам: Васильків + Боярка + Вишневе / Святошин + Відрадний / Голосіїв +
+    Жуляни." His words: "то було інформаційне повідомлення про можливі місця
+    ударів в наступному обстрілі".
+
+    The shape is a standing advisory — which directions to watch *if* a strike
+    comes — and it read as a live ballistic position report, because an emoji
+    beside a place name and a threat word beside a place name are both evidence
+    of flight. Seven places named, so `strength` came out `strong`, and the
+    ladder rang before the anticipation rule could ask.
+
+    Keyed on "особлива увага" and measured: it matches 3 of 41397 corpus
+    messages and reclassifies all three, each one an advisory of exactly this
+    family — this one, the same channel's "Особлива увага до тривог у зазначених
+    районах: Центр, Поділ, Виноградар..." and "Особлива увага АЗС на трасі
+    Київ-Житомир... ворог атакуватиме АЗС на цих ділянках протягом дня". The
+    wider reading, "під час ... удару/атаки", reclassifies 29 and reaches
+    retrospective attack maps that other rules already hold.
+    """
+    for text in ("❗️Під час балістичного удару особлива увага таким напрямкам:\n"
+                 "Васильків + Боярка + Вишневе\nСвятошин + Відрадний\n"
+                 "Голосіїв + Жуляни.",
+                 "❗️Під час повітряної тривоги та обстрілів уникайте перебування "
+                 "поблизу великих торгових центрів.\n\nОсоблива увага до тривог "
+                 "у зазначених районах: Центр, Поділ, Виноградар, Нивки.",
+                 "🔴Особлива увага АЗС на трасі Київ-Житомир та Житомир-Рівне.\n\n"
+                 "За отриманими даними, ворог атакуватиме АЗС на цих ділянках "
+                 "протягом дня."):
+        assert hints.suggest(text)["modality"] == "summary-news", text
+
+
 def test_a_live_report_with_a_forecast_clause_is_still_live():
     """The narrowness is the point: several real reports trail a forecast, and
     those drones are already flying."""

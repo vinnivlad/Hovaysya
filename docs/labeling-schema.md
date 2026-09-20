@@ -990,6 +990,33 @@ so in words `live_strength` shrugs at — "Калібри ймовірно на 
 Обухів/Українку" carries no count and no phase word and is still the most useful
 sentence of the night.
 
+**Where to watch is not what is flying.** Both guards above are guards on
+`strength`, and they hold only while the message is thin. His false positive at
+21:15 on 2026-09-20 was the opposite shape — "❗️Під час балістичного удару
+особлива увага таким напрямкам: Васильків + Боярка + Вишневе / Святошин +
+Відрадний / Голосіїв + Жуляни." Seven place names beside a threat word is
+`strong` evidence by every measure the shapes have, and `certainty` came out
+`confirmed` rather than `probable`, so the anticipation rule was never reached:
+the ladder rang first, on a climb from `shahed-jet` to `ballistic`, under a
+drone alert that had been running half an hour. His reading: "то було
+інформаційне повідомлення про можливі місця ударів в наступному обстрілі."
+
+The conditional machinery does not help here and it is worth saying why. "Під
+час" is the same hypothetical as "якщо", but a conditional only *loses* to a
+class stated outside it, and outside this clause there is no class at all — so
+`ballistic` comes back through the fallback. What separates the message from a
+report is not its grammar but that it is advice: it says where to look, not what
+is in the air.
+
+So the advisory opener joins the forecast set. Keyed on "особлива увага" rather
+than on "під час ... удару": the wider reading matches 64 messages and
+reclassifies 29, most of them retrospective attack maps that `aftermath` and the
+date-stamp rule already hold, while this one matches 3 of 41 397 and reclassifies
+all three — this message, "Особлива увага до тривог у зазначених районах: Центр,
+Поділ, Виноградар…", and "Особлива увага АЗС на трасі Київ-Житомир… ворог
+атакуватиме АЗС на цих ділянках протягом дня". Not one is a report of anything
+in the air. The eval does not move: 2 false wake-ups, 47 hits, 4 misses.
+
 ## The threat level ladder
 
 His rule: **дрон (будь-який) → крилата ракета → балістика**, and every climb

@@ -1397,6 +1397,24 @@ _FORECAST = re.compile(
     r"під атакою.{0,40}\bбуде\b|"
     r"\bатака буде\b|"
     r"ймовірні мікрорайони|"
+    # Where to watch *if* a strike comes is advice, not a strike. "❗️Під час
+    # балістичного удару особлива увага таким напрямкам: Васильків + Боярка +
+    # Вишневе / Святошин + Відрадний / Голосіїв + Жуляни." rang the shelter tone
+    # at 21:15 on 2026-09-20 with nothing in the air — seven place names beside a
+    # threat word read as a position report, and `strong` evidence took it up the
+    # ladder before the anticipation rule could ask. His words: "то було
+    # інформаційне повідомлення про можливі місця ударів в наступному обстрілі".
+    #
+    # Keyed on the advisory opener rather than on "під час ... удару", which was
+    # measured: the wider reading matches 64 messages and reclassifies 29, reaching
+    # retrospective attack maps that other rules already hold. This one matches 3
+    # of 41397 and reclassifies all three, each an advisory of the same family --
+    # this one, "Особлива увага до тривог у зазначених районах: Центр, Поділ,
+    # Виноградар...", and "Особлива увага АЗС на трасі Київ-Житомир... ворог
+    # атакуватиме АЗС на цих ділянках протягом дня". None of the three is a report
+    # of anything in the air, and the eval is unchanged: 2 false wake-ups, 47 hits,
+    # 4 misses.
+    r"особлива увага|"
     r"ворог (планує|готує|може завдати)|"
     r"попередження про (ймовірн|можлив)|"
     # A standing risk level is a state, not an event. `mon1tor_ua` publishes one
