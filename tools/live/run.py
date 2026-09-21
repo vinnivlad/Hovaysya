@@ -91,6 +91,13 @@ OFFICIAL_INTERVAL_S = 10.0
 # Costs about 4% more requests a day than the siren-only version.
 WATCH_INTERVAL_S = 20.0
 
+# Waiting out a reader that has the log open, which only Windows makes us do.
+# Three tries over a fifth of a second: a reader holds it for one `read_text`,
+# and a cycle is six seconds even under an alert, so there is room to wait and
+# nothing is gained by giving up sooner.
+RENAME_TRIES = 3
+RENAME_WAIT_S = 0.1
+
 # After a fetch error, wait longer each time rather than hammering a channel that
 # is rate-limiting us. The exporter learned this the hard way.
 BACKOFF_START_S = 5.0
@@ -838,10 +845,50 @@ def write_state(session: Session, directory: Path, now: float) -> None:
 
 
 def write_log(session: Session, path: Path) -> None:
+    """The whole session, rewritten -- but never in place.
+
+    `/decisions` reads this file directly while it is being written, and the
+    obvious `open(path, "w")` truncates it first: for as long as the rewrite
+    takes, a reader gets a prefix. It does not get an error -- the endpoint
+    skips lines it cannot parse -- so the app was handed sixty perfectly valid
+    rows ending at a random earlier moment, which is what he reported on
+    2026-09-21: "зовсім старі повідомлення... не завжди ті самі... наче
+    рандом", and mostly during a raid, because an alert tightens the cycle from
+    45 s to 6 and the window comes round seven times as often. Measured on a
+    real 11 370-row log at that cadence: 7 of 177 reads short, five different
+    wrong dates, 83 ms of truncation per cycle on a desktop and more on the
+    server's own ARM.
+
+    So it is written beside and renamed over. `Path.replace` is atomic, so a
+    reader holds either the previous log or this one and never half of either.
+    The temporary name deliberately ends in `.tmp`: every reader here globs
+    `*.jsonl`, and a half-written file that matched would be read as a log of
+    its own.
+
+    Rewriting the whole session each cycle is still O(all rows) and worth
+    replacing with an append, which `session.log` allows -- it is only ever
+    appended to. That is a separate change; this one is about what a reader
+    sees.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="\n") as fh:
+    tmp = path.with_name(path.name + ".tmp")
+    with tmp.open("w", encoding="utf-8", newline="\n") as fh:
         for row in session.log:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    # Windows refuses to rename over a file somebody has open, and the watcher
+    # runs on this laptop as well as on the server. The refusal lasts exactly as
+    # long as one reader's `read_text`, so it is waited out -- and on Linux,
+    # where the rename is allowed over an open file, this loop never runs twice.
+    # Left unhandled it would raise into the main loop, which has no guard, and
+    # a watcher that dies is worse than the stale read this whole change is about.
+    for attempt in range(RENAME_TRIES):
+        try:
+            tmp.replace(path)
+            return
+        except PermissionError:
+            if attempt == RENAME_TRIES - 1:
+                raise
+            time.sleep(RENAME_WAIT_S)
 
 
 def summarise(session: Session, started: float) -> None:

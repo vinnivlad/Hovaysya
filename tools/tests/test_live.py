@@ -682,3 +682,80 @@ def test_the_warm_pass_still_sends_nothing():
     assert chat.sent == 0, chat.messages
     # ...but the tracker knows an alert is running.
     assert mine.tracker.episode is not None
+
+
+def test_a_reader_never_sees_a_half_written_log(tmp_path, monkeypatch):
+    """His report of 2026-09-21: the Ховайся feed showing "зовсім старі
+    повідомлення... не завжди ті самі... наче рандом", and mostly during a raid.
+
+    `write_log` opened the log on `"w"`, which truncates it, and then spent
+    83 ms rewriting 11 370 rows. `/decisions` reads that same file directly and
+    skips lines it cannot parse, so a request landing inside that window got a
+    prefix of the log -- sixty perfectly valid rows ending at a random earlier
+    moment, which is why it read as a feed frozen on some other day rather than
+    as an error. Under an alert the watcher's cycle tightens to six seconds, so
+    the window comes round seven times more often: measured against a real log
+    at that cadence, 7 of 177 reads were short, with five different wrong
+    dates.
+
+    The reader here runs inside the write, one peek per row serialised, which
+    is the same interleaving without a thread to make it flaky.
+    """
+    import tools.live.run as run
+
+    path = tmp_path / "night.jsonl"
+    write_log(_run(["⚠️❗️КИЇВ - ТРИВОГА. В укриття!"]), path)
+    before = path.read_text(encoding="utf-8")
+
+    later = _run(["⚠️❗️КИЇВ - ТРИВОГА. В укриття!", "💥 Вибухи Київ.",
+                  "🅿️ Київ / 1х Жуляни"])
+    seen = []
+    real = run.json.dumps
+    monkeypatch.setattr(
+        run.json, "dumps",
+        lambda *a, **kw: (seen.append(path.read_text(encoding="utf-8")),
+                          real(*a, **kw))[1])
+    write_log(later, path)
+    monkeypatch.undo()
+
+    after = path.read_text(encoding="utf-8")
+    assert len(seen) == 3, seen
+    for glimpse in seen:
+        # Either the log as it was or the log as it will be -- never a prefix
+        # of one of them, and never nothing at all.
+        assert glimpse in (before, after), (
+            f"a reader saw {len(glimpse.splitlines())} of "
+            f"{len(after.splitlines())} rows mid-write")
+
+
+def test_the_rename_waits_out_a_reader_holding_the_file(tmp_path, monkeypatch):
+    """Windows refuses to rename over a file somebody has open, and the watcher
+    runs here as well as on the server -- where Linux allows it and this never
+    fires. Unhandled, the refusal leaves `write_log` raising into the main loop,
+    which has no guard: a watcher that dies is worse than one that serves a
+    stale read, so the fix for the truncation must not cost that.
+
+    Transient by nature -- the reader holds the file for the length of one
+    `read_text` -- so it is waited out rather than reported.
+    """
+    from pathlib import Path as _Path
+
+    path = tmp_path / "night.jsonl"
+    session = _run(["⚠️❗️КИЇВ - ТРИВОГА. В укриття!", "💥 Вибухи Київ."])
+
+    real = _Path.replace
+    refusals = {"left": 2}
+
+    def stubborn(self, target):
+        if refusals["left"] > 0:
+            refusals["left"] -= 1
+            raise PermissionError(5, "Отказано в доступе")
+        return real(self, target)
+
+    monkeypatch.setattr(_Path, "replace", stubborn)
+    write_log(session, path)
+    monkeypatch.undo()
+
+    assert refusals["left"] == 0, "the rename was not retried"
+    assert len(path.read_text(encoding="utf-8").splitlines()) == 2
+    assert not list(tmp_path.glob("*.tmp")), "the temporary file was left behind"
