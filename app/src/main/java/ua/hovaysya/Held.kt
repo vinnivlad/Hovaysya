@@ -3,6 +3,8 @@ package ua.hovaysya
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * What the app already knows, kept above the tabs.
@@ -38,6 +40,35 @@ object Held {
     var screen by mutableStateOf<Screen?>(null)
     var health by mutableStateOf<Health?>(null)
     var problem by mutableStateOf<String?>(null)
+
+    // --- the doorbell ---------------------------------------------------------
+    /**
+     * Bumped whenever the server's answer has actually changed.
+     *
+     * `AlertService` holds one long poll open against `/state?wait=30` and hears
+     * within a second; the feeds used to sit on private timers of fifteen and
+     * twenty seconds and never be told. His words: "в мене враження що сервер
+     * оновлюється швидше ніж в додатку" -- and he had started flicking between
+     * tabs to force a refresh, which only bought extra requests.
+     *
+     * A counter rather than a flag, so a screen that was not listening at the
+     * moment it rang can still see that the number is not the one it remembers.
+     *
+     * A `StateFlow` and not snapshot state, which the tests settled: a waiter
+     * parked on `snapshotFlow` wakes only when apply notifications are
+     * dispatched, and with the feed's own shell composed around it that did not
+     * happen at all. The doorbell is an event, not something the screen draws,
+     * so it has no business depending on when Compose next draws a frame.
+     */
+    private val rings = MutableStateFlow(0)
+
+    /** The count to wait on. Read it before a request, wait on it after. */
+    val pulse: StateFlow<Int> get() = rings
+
+    /** Something changed up there; whoever is showing a feed should ask again. */
+    fun ring() {
+        rings.value += 1
+    }
 
     // --- what Ховайся said ----------------------------------------------------
     var said by mutableStateOf<List<Verdict>>(emptyList())

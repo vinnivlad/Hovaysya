@@ -55,7 +55,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 import ua.hovaysya.Held
 import ua.hovaysya.Post
@@ -77,9 +78,41 @@ import ua.hovaysya.Verdict
  * самого каналу теж завжди виводиться, що дасть додатковий контекст."
  */
 
+/**
+ * How long a feed waits when nothing rings the doorbell.
+ *
+ * The floor rather than the cadence: `Held.pulse` normally arrives first, within
+ * a second of the watcher writing a new answer. These are the intervals the
+ * feeds had before the doorbell existed, kept exactly as they were so a service
+ * that has died or a long poll that is failing cannot make a feed slower than
+ * the version this replaced.
+ */
+internal const val SAID_EVERY_MS = 15_000L
+internal const val POSTS_EVERY_MS = 20_000L
+
+/**
+ * Wait until the doorbell has rung since [since], or for [every] milliseconds.
+ *
+ * The count is taken **before** the request goes out, not after it comes back,
+ * and that is the whole of a bug the tests caught: a request takes a moment,
+ * the watcher rings during exactly that moment when a raid is on -- it is the
+ * busiest it ever gets -- and a count read afterwards has already absorbed the
+ * ring. The feed would then sit out the full interval waiting for a second one,
+ * which is the failure it was built to remove.
+ *
+ * A count rather than a flag, so nobody has to clear it and nobody races
+ * whoever would.
+ */
+private suspend fun awaitRing(since: Int, every: Long) {
+    withTimeoutOrNull(every) {
+        Held.pulse.first { it != since }
+    }
+}
+
 /** What Ховайся said, and the reason it gives itself. */
 @Composable
-fun HovaysyaFeed(store: Store, onSettings: () -> Unit) {
+fun HovaysyaFeed(store: Store, every: Long = SAID_EVERY_MS,
+                 onSettings: () -> Unit) {
     // Kept above the tabs -- see `Held`. An empty feed and a forgotten one look
     // identical on screen, and one of them is a lie.
     val rows = Held.said
@@ -87,6 +120,7 @@ fun HovaysyaFeed(store: Store, onSettings: () -> Unit) {
 
     LaunchedEffect(Unit) {
         while (true) {
+            val was = Held.pulse.value
             runCatching { store.api().verdicts() }
                 // The server filters now, and it has to: filtering after a
                 // limit is not a filter. The check stays as a belt, since a
@@ -94,7 +128,7 @@ fun HovaysyaFeed(store: Store, onSettings: () -> Unit) {
                 .onSuccess { Held.said = it.filter { row -> row.said != null }
                              Held.saidProblem = null }
                 .onFailure { Held.saidProblem = saidPlainly(it) }
-            delay(15_000)
+            awaitRing(was, every)
         }
     }
 
@@ -228,18 +262,20 @@ private fun isPartial(alarm: String?): Boolean = alarm == "clear-partial"
 
 /** Every channel, merged into one stream. */
 @Composable
-fun ChannelFeed(store: Store, onSettings: () -> Unit) {
+fun ChannelFeed(store: Store, every: Long = POSTS_EVERY_MS,
+                onSettings: () -> Unit) {
     val rows = Held.posts
     val problem = Held.postsProblem
 
     LaunchedEffect(Unit) {
         while (true) {
+            val was = Held.pulse.value
             // Thirty minutes, which is his number: "коли я відкриваю скрін, я
             // хочу бачити останні повідомлення за 30хв".
             runCatching { store.api().posts(minutes = 30) }
                 .onSuccess { Held.posts = it; Held.postsProblem = null }
                 .onFailure { Held.postsProblem = saidPlainly(it) }
-            delay(20_000)
+            awaitRing(was, every)
         }
     }
 

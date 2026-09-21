@@ -141,9 +141,27 @@ class AlertService : Service() {
             result.onSuccess { screen ->
                 failures = 0
                 failingSince = null
+                // Before `version` is moved on: a long poll that timed out
+                // answers with the same version and nothing has happened, so
+                // ringing on it would be a doorbell pressed twice a minute all
+                // night.
+                val changed = screen.version != version
                 version = screen.version
                 latest = screen
                 latestProblem = null
+                // The screens get what this already holds, for free. This is
+                // the one place in the app that learns of a change within a
+                // second -- it is what draws the shade and sounds the bell --
+                // and until now it kept the answer to itself while three
+                // screens re-asked for it on timers of their own. His words:
+                // "в мене враження що сервер оновлюється швидше ніж в додатку".
+                //
+                // Only ever good news: a failure here is left to the screens'
+                // own requests to report, so the service can make them fresher
+                // and never noisier.
+                Held.screen = screen
+                Held.problem = null
+                if (changed) Held.ring()
                 ringFor(screen)
                 show(screen, null)
             }.onFailure { problem ->
