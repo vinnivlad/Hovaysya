@@ -745,6 +745,49 @@ def test_an_arsenal_ready_to_fire_is_not_a_launch():
     assert hints.modality_hint(t) == "summary-news"
 
 
+def test_an_arsenal_counted_is_not_an_arsenal_fired():
+    """Same family as the test above, and the shape the corpus actually uses:
+    the launchers are counted where they stand. "❗️За попередніми даними, у
+    прикордонних з Україною областях рф ... у готовності перебувають 18
+    розрахунків ОТРК «Іскандер-М», оснащених 40 балістичними ракетами." rang the
+    ballistic tone at 15:08 on 2026-09-22 with nothing in the air -- a threat
+    word beside three place names read as a position report. `готові до
+    застосування` was too narrow: the channels write "у готовності перебувають",
+    "в готовності понад 40 ракет", "в готовності до застосування перебувають"."""
+    for t in ("❗️За попередніми даними, у прикордонних з Україною областях рф "
+              "(Брянська, Курська та Бєлгородська) у готовності перебувають 18 "
+              "розрахунків ОТРК «Іскандер-М», оснащених 40 балістичними ракетами.",
+              "Увага, у Брянську область доставлено нові балістичні ракети "
+              "Іскандер-М. Загалом в готовності до застосування перебувають 35 "
+              "балістичних ракет Іскандер-М.",
+              "Отже: у ворога в готовності понад 40 ракет Х-101, 30+ балістичних "
+              "ракет, 15 калібрів та велика кількість БпЛА"):
+        assert hints.modality_hint(t) == "summary-news", t
+
+
+def test_the_admins_own_guess_is_not_a_report():
+    """The first-person marker was the right idea and the wrong person. The
+    channel writes its guesses in the third person about itself, and one such
+    guess -- an hour named, two place names, and the sentence saying the enemy
+    may strike earlier, later, or never -- rang the ballistic tone at 01:37 on
+    2026-09-22. The place names beside the threat word are what made it read
+    live."""
+    for t in ("""По думці адміна, о 2:40 ворог може нанести балістичний удар по Києву, Боярці/Васильків.
+Це тільки думка адміна, якщо комусь було це цікаво — то ось написав, варто пам'ятати що ворог може нанести удар раніше, пізніше або взагалі не нанести, слідкуємо.
+Дуже раджу вам піти в укриття.""",
+              """Якщо казати простими словами, то на думку адміна буде так: ❗️Крилаті ракети атакують Житомир; ⚠️Реактивні шахеди будуть тягнути тривогу у столиці."""):
+        assert hints.modality_hint(t) == "summary-news", t
+
+
+def test_a_launch_the_same_night_still_rings():
+    """The guard for the two tests above, taken from the same night: between the
+    admin's guess and the arsenal count sat a real one, and it must keep its
+    tone."""
+    t = "Вихід Цирконів з Курщини."
+    assert hints.modality_hint(t) == "live-threat"
+    assert hints.suggest(t)["alarm"] == "ballistic"
+
+
 def test_a_real_launch_is_still_a_launch():
     """The guard against fixing too much: 92 of the 121 audible launch decisions
     in the corpus are genuine and must stay that way."""

@@ -1446,6 +1446,15 @@ _FORECAST = re.compile(
     # jet-drone tactics, and "Особисто моя думка: на цьому по балістиці все на
     # цю ніч". The channels never write this way when something is flying.
     r"на мою думку|моя думка|думок з приводу|як на мене|"
+    # The same voice in the third person, which is how the channel refers to
+    # itself: "По думці адміна, о 2:40 ворог може нанести балістичний удар по
+    # Києву, Боярці/Васильків ... варто пам'ятати що ворог може нанести удар
+    # раніше, пізніше або взагалі не нанести" rang the ballistic tone at 01:37 on
+    # 2026-09-22 with nothing in the air -- the hour and the two place names read
+    # as a position report. Three messages in 43228 say "думка/думці адміна" and
+    # two of them are guesses of exactly this shape; the third already reads as a
+    # summary.
+    r"дум(к|ц)\w*\s+адмін|"
     # More of the same voice, found by replaying every night in the corpus:
     # "Опишу коротко загальну обстановку з балістикою", "⚠️Стосовно загрози від
     # бомбардувальників", "Ніч на 20 червня пройшла тихо".
@@ -1464,6 +1473,14 @@ _FORECAST = re.compile(
     # An arsenal counted is not an arsenal fired, and the message says so
     # itself: "Коли саме буде пуск — сьогодні вночі чи наступної ночі — ніхто не
     # знає."
+    # Wider than "готові до застосування", which caught one wording of the same
+    # sentence. The channels count the arsenal where it stands -- "у готовності
+    # перебувають 18 розрахунків ОТРК «Іскандер-М», оснащених 40 балістичними
+    # ракетами" rang at 15:08 on 2026-09-22, and "В готовності у ворога близько
+    # 60+ крилатих ракет", "у ворога в готовності понад 40 ракет" are the same
+    # message on other nights. 13 of 43228 match and 9 change; every one of the
+    # nine is an inventory, and none of them reports anything in the air.
+    r"[ву]\s+готовності|"
     r"готові до застосування",
     re.IGNORECASE,
 )
