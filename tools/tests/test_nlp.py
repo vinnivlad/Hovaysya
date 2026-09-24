@@ -369,6 +369,24 @@ def test_aftermath_is_detected():
     assert hints.modality_hint(t) == "aftermath"
 
 
+def test_clearing_the_wreckage_is_not_the_strike():
+    """«Сапери вже дістали «Іскандер» та вивезли його з місця падіння» rang the
+    ballistic tone at 11:19 on 2026-09-24, hours after the missile in question
+    had landed. Nothing in it is a warning -- the work described only happens
+    once something is on the ground -- but the class is named and a place with
+    it, which is the shape of a position report."""
+    for t in ("Сапери вже дістали «Іскандер» та вивезли його з місця падіння 🫡",
+              "Дим видно на місці падіння рБПЛА"):
+        assert hints.modality_hint(t) == "aftermath", t
+
+
+def test_a_sapper_field_is_a_place_and_not_a_sapper():
+    """The guard, and the reason the term is «сапери» and not «сапер»: the
+    gazetteer has a Kyiv landmark called саперне поле, and a drone over it is a
+    live report like any other."""
+    assert hints.modality_hint("Київ:" + chr(10) + "🅿️ 1х Олімпійський, саперне поле") == "live-threat"
+
+
 def test_impact_report_is_live_not_aftermath():
     """The measured boundary: 88% of "вибух" messages land within ten minutes
     of a live threat, so demoting them would silence the app at peak danger."""

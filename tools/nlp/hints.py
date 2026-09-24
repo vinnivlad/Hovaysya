@@ -248,6 +248,15 @@ AFTERMATH_TERMS = (
     # "❗️Понівечено ударом балістики і житловий будинок" rang the shelter tone
     # on a ballistic night: damage already done, read as a threat in the air.
     "понівеч", "зазнав удару", "після удару", "місце влучанн",
+    # Clearing up after it. «Сапери вже дістали «Іскандер» та вивезли його з
+    # місця падіння» rang the ballistic tone at 11:19 on 2026-09-24, hours
+    # after that missile came down: the class is named and a place with it,
+    # which is the shape of a position report. The work these words describe
+    # only happens once something is on the ground.
+    #
+    # "сапери" and not "сапер": the gazetteer has a Kyiv landmark called
+    # саперне поле, and "1х Олімпійський, саперне поле" is a live drone report.
+    "сапери", "місці падіння", "місця падіння",
 )
 
 # Coming down, right now. Narrow on purpose: only this one word, and only over
