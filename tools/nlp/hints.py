@@ -1056,7 +1056,25 @@ AWAITING_TERMS = (
 # a declaration. 68 are this bulletin; the other three are commentary --
 # "тому реагуємо на всі сигнали тривоги!", "через постійні сигнали тривоги
 # особовий склад змучений", "надіятися на сигнали тривоги вже немає сенсу".
-_SIREN_AS_ADVICE = re.compile(r"сигнал\w*\s+тривог", re.IGNORECASE)
+#
+# Widened 2026-09-24, after replaying the corpus and reading every audible
+# decision: a siren named as the *circumstance* of something else is the
+# commonest way this reads a declaration out of a message that makes none.
+# «Під час повітряної тривоги не перебувайте поруч з АЗС», «Київські ТРЦ
+# працюватимуть під час жовтої тривоги», «КМДА заперечила чутки про ненадання
+# допомоги під час повітряних тривог» -- 25 messages in 45975 put the siren in
+# that position and 24 of them were declaring a raid. Not one is a declaration:
+# they are advice, city news and channel promos.
+#
+# «уважно до тривог» is the same shape from the other side -- 9 messages, all
+# nine declaring, all nine a warning for the night ahead rather than a siren.
+_SIREN_AS_ADVICE = re.compile(
+    r"сигнал\w*\s+тривог|"
+    r"під час[^.!?]{0,40}тривог|"
+    r"уважн\w*\s+до\s+тривог|"
+    r"коли лунає[^.!?]{0,20}тривог",
+    re.IGNORECASE,
+)
 
 # The forms the channels use to state the event itself, never to forecast it.
 CANONICAL_SIREN = ("відбій тривоги", "відбій повітряної тривоги",
@@ -1444,6 +1462,36 @@ _FORECAST = re.compile(
     # planned -- and not on "збирають інформацію", which would read the same on a
     # message about tonight. One match in 45911.
     r"планування (майбутн|наступн)\w*\s+удар|"
+    # A warning for the night, which the intelligence people issue and the
+    # channels relay: «На ніч надійшло попередження по балістиці», «Надійшло
+    # попередження по балістиці на найближчі 2 доби», «Кота сьогодні не буде,
+    # дали попередження по балістиці». 24 in 45975 and 19 of them were reading
+    # as live; every one is about a night that has not happened yet, and several
+    # say outright that it is quiet now. Keyed on «попередження» governing a
+    # class, not on the word alone -- «Загроза пуску» is also a warning and it
+    # is about this minute.
+    r"попередженн\w*\s+(по|на|щодо|про)\s+(балістиц|балістик|циркон|ракет)|"
+    # The same night, told as advice. All four in the corpus name an hour --
+    # «Ближче до 03 ночі уважно по балістиці», «уважно по балістиці з цього
+    # моменту до 3:30» -- which is what a forecast has and a report does not.
+    r"уважн\w*\s+(по|до)\s+(балістиц|загроз)|"
+    # Where to stand during a raid that has not begun. Two in the corpus, and
+    # the family already has «особлива увага» above.
+    r"наступн\w*\s+(балістичн\w*\s+)?атак|"
+    # A denial of flight, which is the opposite of the message it was read as.
+    # «На Київ нічого не летіло», «Обстріл. Ракет на Київ - немає», «Підготовчих
+    # дій до запуску балістики з Брянска — НЕ СПОСТЕРІГАЮ», «Сподіваємось
+    # балістики Київ не буде» -- each names a class and a place, which is the
+    # shape of a report, and says the thing is not there.
+    #
+    # «нічого не лет» matches 42 and moves 12; the rest already read as calm.
+    # «не спостерігається» is deliberately absent, though it looks like a sibling:
+    # «локаційно не спостерігається, ймовірно збиття» means we have lost track of
+    # something that was flying, which is `lost` and part of the live picture.
+    r"нічого не лет|"
+    r"(ракет|цілей|загроз)\w*[^.!?]{0,25}[-—–]\s*нема|"
+    r"підготовч\w*\s+дій[^.!?]{0,40}не\s+спостеріга|"
+    r"(балістик|шахед|ракет)\w*[^.!?]{0,20}не\s+буде|"
     r"попередження про (ймовірн|можлив)|"
     # A standing risk level is a state, not an event. `mon1tor_ua` publishes one
     # every evening — "🔴❗Загроза балістики для столиці стабільно залишається на
@@ -1509,8 +1557,65 @@ _FORECAST = re.compile(
     # message on other nights. 13 of 43228 match and 9 change; every one of the
     # nine is an inventory, and none of them reports anything in the air.
     r"[ву]\s+готовності|"
+    # A news item, which the channels mark the way newsrooms do: the claim, then
+    # who made it. «росія може щомісяця запускати по Україні 100 балістичних
+    # ракет, — Флеш», «Сьогодні над Києвом вдалося знищити 60% балістичних ракет,
+    # — Зеленський», «Британія передасть Україні далекобійні засоби ураження...».
+    # 146 messages end a line that way and 47 were reading as live; every one of
+    # the 47 is a news item -- ministers, mayors, the KMDA, intelligence
+    # briefings -- and not one is a report of anything in the air.
+    r"[,.]\s*[—–]\s*[А-ЯІЇЄҐ][\w'’ ]{2,40}$|"
+    r"за словами|за інформацією від|"
+    # The morning-after summary, in the past tense and usually with a map.
+    # «Ворог масовано атакував Київ та інші міста України! Було застосовано
+    # більше 40 ракет» rang the ballistic tone hours after the raid it counts.
+    # «було застосовано» matches 25 and moves 18, all of them tallies.
+    r"було застосовано|масован\w*\s+атакува|досягли цілей|"
+    r"(мапу|мапа|карта|карту)[^.!?]{0,60}(удар|атак|руху)|"
+    r"(минул|вчорашн|позавчорашн)\w*\s+атак|"
+    # A night that has not happened yet, told as a period rather than an event.
+    # «найближчі дні підвищена загроза», «Протягом наступних ночей»,
+    # «сьогодні-завтра уважно», «Цієї ночі можливе застосування Ту-22м3».
+    r"найближч\w+\s+(дні|доби|ночі|днями)|"
+    r"сьогодні-завтра|протягом наступних|можлив\w*\s+застосуванн|"
+    # Counted or moved, not fired. «У Брянській області знову збільшили кількість
+    # пускових установок», «ворог здійснює підвіз балістичного озброєння» --
+    # 14 in the corpus, 9 reading as live, and every one is about the arsenal
+    # where it stands. Same family as «у готовності» above.
+    r"пускових установок|підвіз\w*\s+балістичн|"
+    # Done, not coming. «~2 північнокорейські Kn-23 та ~4 Циркони кинули по
+    # Києву», «балістикою на 1100 км вдарили по гаражах».
+    r"були застосован|кинули по|вдарили по|"
+    # Ours, or on its way to us from an ally -- the enemy is not the subject.
+    r"(Україна|українські сили|ЗСУ)[^.!?]{0,35}(отрима|урази|почне|зірвал)|"
+    # An advertisement with the link still in it. `_CHANNEL_PROMO` reads the
+    # sales pitch; this reads the shape -- a call to follow, then a t.me URL.
+    # 14 more, including the holiday-tour ads the channels run between raids.
+    r"(підпис|слідку|рекомендую|скидаю вам|створили для вас|нагадаю про|підключити)[^.!?]{0,80}t\.me/|"
+    # The all-clear that rang as the thing it lifts: «Загрозу балістики знято».
+    r"загроз\w*[^.!?]{0,20}знято|"
+    r"руки геть|"
+    # Squeezed out rather than fixed, and caught by replaying the corpus again:
+    # taking the siren away from «Цієї ночі максимально уважно до тривоги! Коли
+    # лунає тривога...» left it ringing the ballistic tone instead. A message is
+    # advice about the night in whichever field reads it, so the modality has to
+    # say so too -- the same words, in the other place.
+    r"уважн\w*\s+до\s+тривог|коли лунає[^.!?]{0,20}тривог|"
+    r"максимальн\w*\s+уважн\w*\s*(до\s+тривог|під час)|"
+    r"запас\w*\s+ракет|"
+    # The last few, each its own shape and each measured. «Північнокорейські
+    # ракети можуть відхилятися... заявив директор Defense Express» -- a quote,
+    # like the attributions above but with the source in front. «Загроза
+    # підвищена по балістиці» with a period attached is a forecast; without one
+    # it can be a live report, which is why the class has to be named.
+    r"\bзаявив\b|йдеться, зокрема|"
+    r"підвищен\w*\s+загроз\w*\s+(по|для)\s+(балістиц|балістик|столиц)|"
+    r"карт\w*\s+польоту|"
+    r"обстановка\s+(доволі\s+)?спокійна|"
+    r"якщо[^.!?]{0,30}відбудеться|як буде[^.!?]{0,25}побачимо|"
+    r"збільшенн\w*[^.!?]{0,25}удар|цієї ночі[^.!?]{0,40}мож(уть|е)\s|"
     r"готові до застосування",
-    re.IGNORECASE,
+    re.IGNORECASE | re.MULTILINE,
 )
 
 
