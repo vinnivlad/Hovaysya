@@ -225,6 +225,15 @@ LIVE_SHAPES: tuple[tuple[str, str], ...] = (
 )
 _LIVE = tuple((name, re.compile(pat, re.IGNORECASE)) for name, pat in LIVE_SHAPES)
 
+# The launch word under a denial. "По балістиці поки тихо. Без пусків 😇" rang
+# the ballistic tone at 01:12 and again at 01:45 on 2026-09-24 -- it matched
+# `launch` and `phase-word` on the one word in it that says the opposite of what
+# the message says. Fifteen messages in the corpus carry it ("Наразі без
+# пусків", "Поки без пусків, слідкуємо") and every one is a denial, so the
+# phrase is blanked before the shapes are read rather than vetoed after: it is
+# the word that is wrong, and the rest of the sentence still counts.
+_NEGATED_LAUNCH = re.compile(r"\bбез\s+пуск\w*", re.IGNORECASE)
+
 _THREAT_BESIDE_PLACE = re.compile(_THREAT_WORD, re.IGNORECASE)
 
 # Consequence-management vocabulary. Measured 20-56 min from the nearest live
@@ -1178,7 +1187,8 @@ _LOUD = re.compile(r"гучн", re.IGNORECASE)
 
 def live_shapes(text: str) -> list[str]:
     """Which structural live-threat templates the text matches, if any."""
-    found = [name for name, rx in _LIVE if rx.search(text or "")]
+    shaped = _NEGATED_LAUNCH.sub(" ", text or "")
+    found = [name for name, rx in _LIVE if rx.search(shaped)]
     # `place-with-threat` means what its name says, and the pattern never
     # checked for the place: `\b(на|над)\b` followed by a class matches
     # "реагуємо на балістичні удари", where the preposition governs the threat
@@ -1416,6 +1426,15 @@ _FORECAST = re.compile(
     # 4 misses.
     r"особлива увага|"
     r"ворог (планує|готує|може завдати)|"
+    # Reconnaissance for a strike that has not been planned yet, let alone
+    # flown. "⚠️ Росіяни активно збирають інформацію про об'єкти в Києві та
+    # області — для планування майбутніх ударів ... великі торговельні об'єкти
+    # на Оболоні, район Жулян" rang the jet-drone tone for Zhuliany at 12:01 on
+    # 2026-09-23: his own district named beside "реактивним БпЛА" is the shape of
+    # a position report. Keyed on what dates the message -- a strike being
+    # planned -- and not on "збирають інформацію", which would read the same on a
+    # message about tonight. One match in 45911.
+    r"планування (майбутн|наступн)\w*\s+удар|"
     r"попередження про (ймовірн|можлив)|"
     # A standing risk level is a state, not an event. `mon1tor_ua` publishes one
     # every evening — "🔴❗Загроза балістики для столиці стабільно залишається на

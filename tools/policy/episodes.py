@@ -554,12 +554,25 @@ def observe(ts: int, text: str, is_reply: bool = False,
     return observe_for(read(ts, text, is_reply, channel), config)
 
 
+# "ще" marks another object -- "ще 2 бандеролі", "ще пуски" -- but the channels
+# also use it for how much longer something will last, and that is not an
+# announcement. "🚀Наче всі на Житомирщину йдуть, ще хвилин 15 спостерігаємо за
+# ними" stamped `last_launch` at 01:21 on 2026-09-24, and the real new wave from
+# Bryansk 2m44s later was silenced as the same one: no sound for "Пуски
+# балістичних ракет з Брянської області", none for "ГРУПОВА БАЛІСТИКА НА КИЇВ!".
+# Sixteen messages in the corpus say "ще" about a duration -- "ще 30 хвилин
+# точно буду онлайн", "Тривогу можуть потримати ще 15 хвилин" -- and none of them
+# announces anything. Blanked rather than vetoed: "Зачекайте ще 10 хвилин" sits
+# in the same message as "Можуть ще пустити", which does announce.
+_DURATION_MORE = re.compile(r"\bще\s+(?:~?\d+\s*)?(?:хвилин|хв\b|годин|год\b|доб)\w*", re.IGNORECASE)
+
+
 def _says_new(text: str) -> bool:
     """Whether the message announces something rather than restating it."""
     text = text or ""
     if _ORDINAL.search(text):
         return False
-    if _NOVELTY.search(text):
+    if _NOVELTY.search(_DURATION_MORE.sub(" ", text)):
         return True
     if _LAUNCH.search(text):
         # A launch counts only with an origin. Russian regions and airfields are

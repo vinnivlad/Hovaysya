@@ -779,6 +779,31 @@ def test_the_admins_own_guess_is_not_a_report():
         assert hints.modality_hint(t) == "summary-news", t
 
 
+def test_reconnaissance_for_a_future_strike_is_not_a_strike():
+    """It rang the jet-drone tone for Zhuliany at 12:01 on 2026-09-23 with nothing in
+    the air. The shape is a briefing: what the enemy has been looking at, so that
+    it names his own district beside a drone word and reads as a position report.
+    The message dates itself -- planning for future strikes -- and the corpus has
+    one of them."""
+    t = ("""⚠️ Росіяни активно збирають інформацію про об'єкти в Києві та області — для планування майбутніх ударів.
+За наявною інформацією, останнім часом їхню увагу привертали об'єкти енергетичної та залізничної інфраструктури столиці, великі торговельні об'єкти на Оболоні, район Жулян.
+На Київщині — об'єкти енергетики та залізниці в різних районах області, а також локації в районах Бучі, Ірпеня, Бородянки, Білої Церкви та Василькова.
+Водночас триває робота над посиленням протидії реактивним БпЛА. Терміни та ефективність нових рішень наразі оцінювати зарано.""")
+    assert hints.modality_hint(t) == "summary-news"
+
+
+def test_no_launches_is_not_a_launch():
+    """The opposite of the message it was read as. "По балістиці поки тихо. Без
+    пусків 😇" rang the ballistic tone twice in one night, at 01:12 and again at
+    01:45 on 2026-09-24, because "пусків" is the launch word and nothing read the
+    "без" in front of it. Fifteen messages in the corpus say it and every one is
+    a denial."""
+    for t in ("""По балістиці поки тихо. Без пусків 😇""",
+              """Наразі без пусків балістики!""",
+              """Поки без пусків, слідкуємо."""):
+        assert "launch" not in hints.live_shapes(t), t
+
+
 def test_a_launch_the_same_night_still_rings():
     """The guard for the two tests above, taken from the same night: between the
     admin's guess and the arsenal count sat a real one, and it must keep its

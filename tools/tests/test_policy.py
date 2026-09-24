@@ -410,6 +410,34 @@ def test_a_launch_from_a_russian_region_announces_something_new():
     assert o.says_new
 
 
+def test_minutes_left_to_watch_is_not_a_new_launch():
+    """"ще" marks a new object -- "ще одна ракета", "ще пуски" -- but the channels
+    also use it for time, and "🚀Наче всі на Житомирщину йдуть, ще хвилин 15
+    спостерігаємо за ними" counted as an announcement at 01:21 on 2026-09-24.
+    It stamped `last_launch`, and the real new wave from Bryansk two minutes
+    and forty-four seconds later was silenced as the same one -- no sound for
+    "Пуски балістичних ракет з Брянської області" or for "ГРУПОВА БАЛІСТИКА НА
+    КИЇВ!" that followed it. Sixteen messages in the corpus say "ще" about a
+    duration and not one of them announces anything."""
+    o = observe(T0, "🚀Наче всі на Житомирщину йдуть, ще хвилин 15 спостерігаємо за ними")
+    assert not o.says_new
+    # ...and the marker still works for what it is for.
+    assert observe(T0, "Ще 2 бандеролі на Бровари.").says_new
+
+
+def test_a_new_wave_rings_after_a_lull_that_mentioned_minutes():
+    """The behaviour the test above is about, end to end: a launch, a lull in
+    which somebody says how long they will keep watching, and then a fresh
+    launch from a Russian region. The last one has to be audible."""
+    out = _play([
+        (0, "alarm_kyiv", "🔴 Київ\nПовітряна тривога · червоний рівень\nРакетна загроза"),
+        (30, "war_monitor", "‼️ Київ — спуск балістики!"),
+        (1300, "monitoring_kyiv", "🚀Наче всі на Житомирщину йдуть, ще хвилин 15 спостерігаємо за ними"),
+        (1464, "mon1tor_ua", "❗️❗️❗️Пуски балістичних ракет з Брянської області."),
+    ])
+    assert out[-1][1], out[-1]
+
+
 # --- a ballistic launch already has him up --------------------------------
 
 
