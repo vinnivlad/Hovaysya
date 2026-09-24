@@ -34,7 +34,15 @@ THREAT_RULES: tuple[tuple[str, str], ...] = (
     # of them reading as nothing flying at all -- "Швидкісна ціль! В укриття!",
     # "❗️ 3х швидкісні цілі на Дніпро. Увага." A fast target is what the channels
     # call a ballistic one before they know which missile it is.
+    # «Орєшнік», «Кедр» and «РС-26» are the intermediate-range ones, and they
+    # were missing: «Загроза Орєшніка по Україні» read as `unknown` and rang the
+    # *drone* tone, «Пуск ракети Кедр» read as cruise. In the corpus they always
+    # arrive beside the word «балістичн», which is why it never showed; his
+    # question found it -- «там може навіть новий клас (якщо це нема, БРСД)».
+    # Same rung as the rest of the ballistic family, so no new class: what was
+    # missing is the names.
     ("ballistic", r"балісти|іскандер|кн-?23|брсд|кинжал|кинджал|циркон|онікс|"
+                  r"ор[еє]шн|\bкедр|рс-?26|"
                   r"\bбр\b|швидкісн\w*\s+ціл"),
     # Between the drones and the cruise missiles, and it exists because of what
     # the channels call it: "крилаті ракети Бандероль", "мгКР Бандероль". Read
@@ -357,6 +365,10 @@ _WEATHER = re.compile(r"\bрозкати грому|\bгрім\b|\bгрозов|
 _RETRACTED = re.compile(
     r"(пуск\w*|виліт|вильот|вихід|інформаці\w+)[^.!?]{0,40}не\s+підтвердж\w*|"
     r"(пуск\w*|виліт|вильот|вихід|інформаці\w+)[^.!?]{0,40}не\s+підтвердил\w*|"
+    # The channel taking it back in the same message: «Балістика на Київ/
+    # передмістя. ЮПД: Вибачте, це тригер на тривогу.» -- it declared a raid and
+    # explained in the next line that it had not.
+    r"це тригер на тривогу|(юпд|upd)[^.!?]{0,25}вибач|"
     r"фальш-старт",
     re.IGNORECASE,
 )
@@ -390,7 +402,12 @@ SOCIAL_TERMS = (
 # destruction announced as a threat, over his own place. Of the 106 messages
 # containing it, 70 are news or aftermath about warehouses and are vetoed by
 # modality long before certainty is asked.
-RESOLUTION_CLOSING = ("чисто", "збит", "збили", "мінус", "відбій", "знищ")
+# «припинили існування» is how two of the channels say «збито», and without it
+# «Припинили існування. Можете відпочивати! Проте нагадую: знову був червоний
+# сигнал щодо балістики» rang the ballistic tone on its second sentence. His
+# reading: «це схоже на частковий відбій».
+RESOLUTION_CLOSING = ("чисто", "збит", "збили", "мінус", "відбій", "знищ",
+                      "припинили існування")
 RESOLUTION_UNKNOWN = ("локаційно втрачено", "без фіксації", "дорозвідка",
                       "втрачено", "втрата фіксац", "зник")
 
@@ -1107,6 +1124,12 @@ def alert_state(text: str) -> str | None:
     # not to ignore the signals is still a declaration.
     if _SIREN_AS_ADVICE.search(text or "") and not _hits(text, CANONICAL_SIREN):
         return None
+    # Withdrawn in its own message. "Балістика на Київ/передмістя. ЮПД:
+    # Вибачте, це тригер на тривогу." declared a raid and took it back one line
+    # later; the modality already read the retraction, and rule 2 declares
+    # before rule 3 can veto, so it has to be answered here as well.
+    if _RETRACTED.search(text or "") and not _hits(text, CANONICAL_SIREN):
+        return None
     # The red level being lifted is not the raid being lifted. His 20:06 on
     # 2026-09-15: "✅Відбій ракетної небезпеки." arrived while the alert was still
     # running -- the official all-clear came four minutes later -- and it came
@@ -1585,7 +1608,7 @@ _FORECAST = re.compile(
     r"пускових установок|підвіз\w*\s+балістичн|"
     # Done, not coming. «~2 північнокорейські Kn-23 та ~4 Циркони кинули по
     # Києву», «балістикою на 1100 км вдарили по гаражах».
-    r"були застосован|кинули по|вдарили по|"
+    r"були застосован|кинули по|"
     # Ours, or on its way to us from an ally -- the enemy is not the subject.
     r"(Україна|українські сили|ЗСУ)[^.!?]{0,35}(отрима|урази|почне|зірвал)|"
     # An advertisement with the link still in it. `_CHANNEL_PROMO` reads the
@@ -1595,6 +1618,22 @@ _FORECAST = re.compile(
     # The all-clear that rang as the thing it lifts: «Загрозу балістики знято».
     r"загроз\w*[^.!?]{0,20}знято|"
     r"руки геть|"
+    # A launch that may happen is not one that did. His ruling on «Знову
+    # можливий вихід іскандерів»: «там же Можливий, всілякі можливі треба
+    # фільтрувати». 24 in the corpus use this shape and three still read as live,
+    # among them «Є інформація про можливий пуск балістичної ракети, очікуємо».
+    r"можлив\w*\s+(вихід|пуск|запуск|старт|виліт|залп|застосуванн)|"
+    # What the enemy is firing with, which is a briefing: «Працюють як с400 так
+    # і Іскандерами/КН-23. Декілька пускових.» His call: «інформаційне, в ідеалі
+    # фільтрувати». One message in the corpus.
+    r"декілька пускових|"
+    # Two more of the same family, and both arrived only once the ballistic
+    # names above were added: «Стосовно Орєшніка — інформацію про час пуску
+    # ніхто дасти не зможе» is commentary, «Вдарили «Орєшніком» по «сараю»» is
+    # last week. The existing «стосовно загроз» and «вдарили по» missed both by a
+    # word.
+    r"стосовно\s+(ор[еє]шн|балістик|циркон|шахед|кинджал|іскандер)|"
+    r"вдарил\w*[^.!?]{0,25}\bпо\b|"
     # Squeezed out rather than fixed, and caught by replaying the corpus again:
     # taking the siren away from «Цієї ночі максимально уважно до тривоги! Коли
     # лунає тривога...» left it ringing the ballistic tone instead. A message is

@@ -56,3 +56,8 @@
 {"anchor": "nebo_raketa/43232", "category": "arsenal", "expect": "not-live", "text": "❕Увага, ворог здійснює підвіз балістичного озброєння до прикордонних з Україною областях рф."}
 {"anchor": "nebo_raketa/37244", "category": "all-clear-read-as-threat", "expect": "not-live", "text": "💚 Загрозу балістики знято. Які у вас плани далі?\n\nНехай решта ночі мине спокійно. Тихої ночі!🫶"}
 {"anchor": "mon1tor_ua/69082", "category": "social", "expect": "not-live", "text": "Київ! 🇺🇦🫡 \n\nРуки геть від Федорова!\n\nПідписатись 👉 🚀ППО | РАДАР\n"}
+{"anchor": "nebo_raketa/35407", "category": "conditional", "expect": "not-live", "text": "❗️Знову можливий вихід іскандерів."}
+{"anchor": "war_monitor/41705", "category": "briefing", "expect": "not-live", "text": "Працюють як с400 так і Іскандерами/КН-23. Декілька пускових."}
+{"anchor": "rocketskyiv/688", "category": "retraction", "expect": "no-alert", "text": "Балістика на Київ/передмістя.\n\nЮПД: Вибачте, це тригер на тривогу."}
+{"anchor": "rocketskyiv/688", "category": "retraction", "expect": "not-live", "text": "Балістика на Київ/передмістя.\n\nЮПД: Вибачте, це тригер на тривогу."}
+{"anchor": "nebo_raketa/43546", "category": "partial-clear", "expect": "clear", "text": "Припинили існування. Можете відпочивати! 😇\n\nПроте нагадую: знову був червоний сигнал щодо балістики. Це лише попередження, не підтверджена загроза❗️"}

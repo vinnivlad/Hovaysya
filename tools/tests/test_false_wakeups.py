@@ -10,15 +10,22 @@ words: "полатаємо регулярками що знайшли в яко�
 The fixture is the quick fix's definition of done, and it outlives it: whatever
 replaces the regexes one day has to pass this too.
 
-Two expectations, because two different things went wrong:
+Three expectations, because three different things went wrong:
 
   not-live   the text is not a report of something in the air, so `modality_hint`
              must not call it `live-threat`
   no-alert   the text does not declare a siren, whatever else it says, so
              `alert_state` must not return one
+  clear      the text says the thing is over, so `certainty_hint` must say so
 
-These are my labels, not his -- the eight cases where the call was genuinely his
-to make are deliberately absent, and `labels/` stays his alone.
+The first 58 are my labels. The five after them are his, from the eight I could
+not call myself: a conditional launch ("Знову можливий вихід іскандерів" -- "там
+же Можливий, всілякі можливі треба фільтрувати"), a briefing on what the enemy
+is firing with, a retraction the channel wrote into its own message, and an
+all-clear he reads as a partial one. The three he ruled the other way are not
+here and still ring: a channel's own "малоймовірна" ("не можуть канали такого
+знати напевне"), a country-wide BRSD warning, and ballistic over any part of
+Kyiv ("дзвони на весь київ по балістиці"). `labels/` stays his alone.
 """
 
 import json
@@ -44,5 +51,7 @@ def cases():
 def test_a_message_about_a_threat_does_not_ring(case):
     if case["expect"] == "no-alert":
         assert hints.alert_state(case["text"]) is None, case["text"]
+    elif case["expect"] == "clear":
+        assert hints.certainty_hint(case["text"]) == "clear", case["text"]
     else:
         assert hints.modality_hint(case["text"]) != "live-threat", case["text"]
