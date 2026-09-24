@@ -348,7 +348,7 @@ def test_a_donation_round_up_is_not_a_threat():
 def test_the_episode_remembers_which_classes_were_lifted():
     """The user asked to know "що нема загрози балістики чи мігів" — the
     persistent status is where that lives, so the state has to be kept."""
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()
@@ -363,7 +363,7 @@ def test_the_episode_remembers_which_classes_were_lifted():
 
 
 def test_a_class_named_flying_again_is_no_longer_lifted():
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()
@@ -378,7 +378,7 @@ def test_a_class_named_flying_again_is_no_longer_lifted():
 
 
 def test_a_full_all_clear_ends_the_episode_and_its_state():
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()
@@ -448,7 +448,7 @@ def test_a_ring_name_after_a_ballistic_alert_stays_quiet():
     It also settled what no threshold could. Fitted to the dense night a ring
     re-arm wanted to ring 78 s after the last alert; fitted to the sparse one it
     had to stay quiet at 155 s — both his own rulings on the same shape."""
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()
@@ -470,7 +470,7 @@ def test_a_ring_name_after_a_ballistic_alert_stays_quiet():
 def test_a_new_class_still_breaks_through_a_ballistic_wave():
     """The rule is about repeats of the same class, not about going quiet for
     the rest of the night."""
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()
@@ -497,7 +497,7 @@ def test_a_city_wide_drone_report_is_not_enough():
 
 
 def test_one_mig_takeoff_is_one_event_however_many_channels_report_it():
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()
@@ -610,7 +610,7 @@ def test_falling_on_zhuliany_always_rings():
     Found live: `⚠️Реактивний шахед падає на Жуляни` stayed silent five and a
     half minutes after the same drone had already woken him. Defensible as a
     repeat, and also the most consequential sentence of the night."""
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()
@@ -683,7 +683,7 @@ def test_a_drone_has_to_name_my_own_place():
     it: "реально — я собі спав, поки воно там щось намотувало." One drone
     looping Nyvky → Sviatoshyn → Borshchahivka → Vyshneve rang five times in
     fifty minutes and he slept through all of it."""
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()
@@ -703,7 +703,7 @@ def test_a_drone_has_to_name_my_own_place():
 
 def test_ballistic_keeps_the_whole_ring():
     """Minutes of flight leave no time to find out whose street."""
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()
@@ -718,7 +718,7 @@ def test_ballistic_keeps_the_whole_ring():
 def test_a_carried_class_does_not_carry_the_geography_exemption():
     """"Княжичі✈️" said nothing about ballistic — the episode did — and the
     shelter tone rang for an oblast village with nothing to say."""
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()
@@ -900,7 +900,7 @@ def test_the_tone_follows_the_class_the_decision_was_made_on():
 def test_the_effective_class_is_stamped_on_the_observation():
     """Everything downstream wants the class the policy decided on, not the
     message's own: the notification, the log and the report all name it."""
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()
@@ -968,7 +968,7 @@ def test_a_silent_official_channel_is_still_the_official_channel():
 
 def test_without_the_official_channel_the_chats_still_close_the_alert():
     """The labelled nights predate it, and they have to keep working."""
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()                     # official_source stays False
@@ -1470,6 +1470,91 @@ def test_a_ballistic_warning_in_the_moment_still_climbs():
         (200, "mon1tor_ua", "❗️❗Загроза пуску балістичних ракет Іскандер-М."),
     ])
     assert out[2][1] and out[2][2] == "threat level rose", out
+
+
+def test_lifting_a_rung_leaves_the_rungs_that_are_still_flying():
+    """A single number cannot say what is in the air, only how high it got, so
+    lifting a class had to guess what remained: one rung below the lifted one.
+    That rung was never observed. Ballistic lifted while drones are still
+    flying left the ladder at cruise, and the next warning about a KAB -- the
+    cruise rung -- read as no climb at all and stayed silent, though nothing on
+    that rung had ever been reported.
+    
+    His design: «якщо є загроза 3 і загроза 1, то відбій по 1 не значить, що
+    тепер загроза=2, це значить що залишилась тільки одна загроза, яка =3»."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (60, "mon1tor_ua", "❗️❗Загроза пуску балістичних ракет Іскандер-М."),
+        (120, "mon1tor_ua", "⚠️Реактивний шахед на Жуляни."),
+        (600, "war_monitor", "⚪️ Відбій загрози балістики."),
+        (900, "mon1tor_ua", "⚠️Загроза застосування КАБ по Києву."),
+    ])
+    assert out[4][1] and out[4][2] == "threat level rose", out
+
+
+def test_lifting_a_low_rung_does_not_drop_the_ladder_from_a_high_one():
+    """A partial all-clear lowers the ladder to the rung below what it lifts --
+    and it was doing that from wherever the ladder happened to be. On the
+    morning of 2026-09-24 the night had reached the ballistic rung, and
+    «Реактив мінус» -- an all-clear for jet drones, the lowest rung there is --
+    took the ladder from 3 to 0. Only a lift of what is holding the ladder up
+    may lower it."""
+    from tools.policy.episodes import Tracker, observe, peak_level
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (60, "mon1tor_ua", "❗️❗Загроза пуску балістичних ракет Іскандер-М."),
+            (600, "mon1tor_ua", "Реактив мінус. Столиці можна відбій дати 🫶"),
+    ):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+    assert peak_level(tr.episode.flying) == 3, tr.episode.flying
+
+
+def test_a_partial_all_clear_leaves_the_rung_that_is_still_flying():
+    """His finding, in his words: «залишалася загроза дрон-ракета». Twenty
+    seconds before «Реактив мінус» the channels reported Banderol launches, and
+    a Banderol sits on the same rung as a jet drone -- so lifting jet drones
+    emptied a rung that still had something on it, and the next mention of any
+    drone read as a climb."""
+    from tools.policy.episodes import Tracker, observe, peak_level
+    from tools.policy.rules import decide
+
+    tr = Tracker()
+    for off, channel, text in (
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (60, "mon1tor_ua", "⚠️Реактивний шахед на Жуляни."),
+            (600, "mon1tor_ua", "❗️❗️Пуски крилатих ракет Бандероль з Курської області."),
+            (620, "mon1tor_ua", "Реактив мінус. Столиці можна відбій дати 🫶"),
+    ):
+        o = observe(T0 + off, text, False, channel)
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+    assert peak_level(tr.episode.flying) == 1, tr.episode.flying
+
+
+def test_a_national_roll_call_does_not_climb_the_ladder():
+    """The rung asks what is flying and never asked where. A country-wide
+    roll-call names the worst class in it by definition, so after a partial
+    all-clear lowered the ladder at 10:42 the next roll-call put it back up and
+    rang at 10:56 on 2026-09-24 -- nine lines, nine regions, the nearest of them
+    Vyshhorod, and nothing of his own in any of them. His words: «чому задзвонило
+    повідомлення-зведення? Нічого про Жуляни».
+    
+    Every other climb in the live logs is either nationwide -- a ballistic
+    warning, a MiG taking off, which name no destination at all -- or near him.
+    This one is neither."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (60, "mon1tor_ua", "⚠️Реактивний шахед на Жуляни."),
+        (110, "mon1tor_ua", "❗️❗️Пуски крилатих ракет Бандероль з Курської області."),
+        (120, "mon1tor_ua", "Реактив мінус. Столиці можна відбій дати 🫶"),
+        (200, "mon1tor_ua", "📡⚠️⚠️Шахеди:\n⚠️1 реактивний шахед з Житомирщини на Хмельниччину, Шепетівський район;\n⚠️5 шахедів з Чернігівщини на Київщину, Вишгородський район;\n⚠️4 шахеди з Київщини на Житомирщину, Коростенський район;\n⚠️1 шахед на межі Полтавщини та Сумщини західним курсом."),
+    ])
+    assert out[4][2] != "threat level rose", out
 
 
 def test_a_drone_rocket_does_not_climb_to_the_cruise_rung():
@@ -2518,7 +2603,7 @@ def test_ballistic_says_nothing_while_kyiv_has_no_alert():
 def test_the_alert_requirement_does_not_silence_a_stream_without_the_official_channel():
     """`official_alert` is only ever set by the channel that declares. Watching
     the chats alone, requiring it would silence every ballistic there is."""
-    from tools.policy.episodes import Tracker, observe
+    from tools.policy.episodes import Tracker, observe, peak_level
     from tools.policy.rules import decide
 
     tr = Tracker()
@@ -3081,7 +3166,7 @@ def test_chatter_about_an_all_clear_does_not_end_the_alert():
     correctly, and `Tracker.record` closed the episode anyway, while the siren
     declared at 08:12 ran until 09:32. For forty-six minutes the watcher
     believed nothing was running: every recheck was dropped as "recheck: no
-    alert running", and `threat_peak`, `launched` and `ring_seen` had been
+    alert running", and `flying`, `launched` and `ring_seen` had been
     thrown away mid-raid so a second rise could ring for the same wave.
 
     Across the corpus a chat channel closed an episode the rules refused to

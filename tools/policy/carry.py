@@ -126,6 +126,13 @@ def decode(data: dict | None) -> Episode | None:
             setattr(episode, spec.name, [Sent(**item) for item in raw])
         else:
             setattr(episode, spec.name, raw)
+    # The one field that may not default quietly. `flying` replaced a rung
+    # number on 2026-09-24, so the first restart after that deploy reads a file
+    # written without it. An empty sky during a raid makes the next message
+    # about the class already up there read as a climb and ring; the class is in
+    # the file, and it is what was in the air.
+    if "flying" not in data and episode.threat:
+        episode.flying = {episode.threat}
     return episode
 
 

@@ -37,7 +37,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .announce import CLASS_WORD
-from .episodes import THREAT_LEVEL
+from .episodes import THREAT_LEVEL, peak_level
 
 # `тихо` | `стежу` | `ТРИВОГА` in the watcher's own words, and the distinction
 # matters on a screen more than in a log. An episode opens on any live threat --
@@ -192,9 +192,10 @@ def snapshot(recipient, said=(), now: int | None = None) -> dict:
         "recon": _named(recon),
         "cleared": _named(shown_cleared),
         "launched": _named(ep.launched),
-        # The rung reached since the siren. A partial all-clear moves it down by
-        # one, which is the only thing that lowers it -- his exception.
-        "peak": ep.threat_peak,
+        # The highest rung anything still in the air stands on. A partial
+        # all-clear takes its class out of the sky, so this falls to whatever
+        # remains -- the phone's contract is still one number.
+        "peak": peak_level(ep.flying),
         "said": lines,
         # Cleared once a fresh alert is declared: during a raid the question is
         # not how long the last one lasted. An episode being open is not enough

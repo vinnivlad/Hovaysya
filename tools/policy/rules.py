@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 from ..nlp import hints
 from .episodes import (GEO_STEP, REFRACTORY_NEAR_S, SILENT_DEDUP_S,
-                       THREAT_LEVEL, Observation, recheck_key, Tracker,
+                       THREAT_LEVEL, Observation, peak_level, recheck_key, Tracker,
                        silent_signature, stale_official_fallback)
 
 LEVELS = ("info", "alert")
@@ -407,7 +407,7 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             and obs.strength != "none"
             and obs.certainty not in ("clear", "lost")):
         climbed = THREAT_LEVEL.get(threat, 0)
-        if climbed > ep.threat_peak:
+        if climbed > peak_level(ep.flying):
             return _notify("alert", alarm, "threat level rose")
 
     # 8. Anticipation is not an event. "Загроза пуску" updates the picture; the

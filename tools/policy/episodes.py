@@ -146,6 +146,11 @@ THREAT_LEVEL = {
 }
 
 
+def peak_level(flying) -> int:
+    """The highest rung anything in the air stands on, 0 for an empty sky."""
+    return max((THREAT_LEVEL.get(c, 0) for c in flying), default=0)
+
+
 @dataclass
 class Sent:
     """A notification the policy has already issued in this episode."""
@@ -187,11 +192,21 @@ class Episode:
     # spoken the chat channels stop being evidence about the siren and go back
     # to being evidence about what is flying.
     official_alert: bool = False
-    # The highest rung reached since the siren. A rise rings; a fall does not
-    # lower it, so the same rise cannot ring twice — "якщо в середині тривоги
-    # рівень знизився, то повторно правило не застосовувати". Only a partial
-    # all-clear moves it down, which is the one exception he made.
-    threat_peak: int = 0
+    # What is in the air, by class. A rise above everything here rings; naming
+    # a class already in it does not, so the same rise cannot ring twice —
+    # "якщо в середині тривоги рівень знизився, то повторно правило не
+    # застосовувати". Only a partial all-clear takes a class out.
+    #
+    # A set and not the highest rung, which is what this was until 2026-09-24.
+    # One number cannot say what is still flying, so lifting a class had to
+    # guess the remainder — one rung below the lifted one — and that rung was
+    # never observed. His words: «якщо є загроза 3 і загроза 1, то відбій по 1
+    # не значить, що тепер загроза=2, це значить що залишилась тільки одна
+    # загроза, яка =3».
+    #
+    # Nothing ages out of it: only an all-clear removes a class, which is the
+    # same lifetime the number had.
+    flying: set[str] = field(default_factory=set)
     # Classes for which a *confirmed launch* has already been announced, as
     # opposed to a warning about one. Without the distinction the escalation
     # rule spent the ballistic tone on "Загроза пуску" and the actual launch two
@@ -799,7 +814,7 @@ class Tracker:
         # while the siren declared at 08:12 ran until 09:32. For those
         # forty-six minutes the watcher believed nothing was running: every
         # "дорозвідка" was dropped as "recheck: no alert running", which is how
-        # he noticed, and `threat_peak`, `launched` and `ring_seen` had all been
+        # he noticed, and `flying`, `launched` and `ring_seen` had all been
         # thrown away mid-raid so a second rise could ring for the same wave.
         #
         # When no official source is in the stream the chat channels still close
@@ -914,17 +929,23 @@ class Tracker:
                 # Once, not on every message: recomputing it each time pushed the
                 # ladder straight back up after a partial all-clear had lowered
                 # it, which is the same self-cancelling shape as before.
-                ep.threat_peak = max(ep.threat_peak, 1,
-                                     THREAT_LEVEL.get(ep.threat or "", 0))
+                ep.flying.add("shahed")
+                if ep.threat:
+                    ep.flying.add(ep.threat)
         if obs.cleared_class:
             ep.cleared.add(obs.cleared_class)
             ep.cleared_at[obs.cleared_class] = obs.ts
             # "Тоді знижуємо поточний рівень і в разі підняття знову
-            # застосовуємо правило." A lift of the ballistic threat puts the
-            # ladder back at cruise, and a fresh ballistic warning rings again.
-            lifted = THREAT_LEVEL.get(obs.cleared_class, 0)
-            if lifted:
-                ep.threat_peak = min(ep.threat_peak, lifted - 1)
+            # застосовуємо правило." One class leaves the sky; whatever else was
+            # in it stays, and a fresh warning about this one rings again.
+            #
+            # What this replaced took the ladder to `lifted - 1` from wherever
+            # it stood. On the morning of 2026-09-24 the night had reached the
+            # ballistic rung and «Реактив мінус» lifts jet drones, the lowest
+            # rung there is -- so the ladder went from 3 to 0 with nobody having
+            # called off the ballistic, and a roll-call ten minutes later named
+            # a jet drone over three other regions and rang as a climb.
+            ep.flying.discard(obs.cleared_class)
         # A declared siren already stands for a drone: it is what the alert is
         # for. Starting the ladder at zero made the first drone report after the
         # siren ring again, saying what "Тривога" had just said. The rungs worth
@@ -935,8 +956,9 @@ class Tracker:
         # episode, so "По балістиці відбій" climbed the ladder straight back to
         # ballistic and undid the very thing it announced.
         if ep.alert_announced and obs.live and not obs.partial_clear:
-            climbed = THREAT_LEVEL.get(obs.effective_threat or obs.threat, 0)
-            ep.threat_peak = max(ep.threat_peak, climbed)
+            named = obs.effective_threat or obs.threat
+            if named in THREAT_LEVEL:
+                ep.flying.add(named)
 
         # ...but not from a message the policy threw out as not an event. Seen
         # live: "❗️А тепер до поганого, балістика: цієї ночі висока

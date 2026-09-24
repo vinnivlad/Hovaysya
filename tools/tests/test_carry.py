@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from tools.policy import carry
-from tools.policy.episodes import Episode, Sent, Tracker
+from tools.policy.episodes import Episode, Sent, Tracker, peak_level
 
 
 class Person:
@@ -24,7 +24,7 @@ def a_raid(now: int) -> Episode:
         threat_at=now - 600,
         alert_announced=True,
         official_alert=True,
-        threat_peak=3,
+        flying={"ballistic", "shahed"},
         launched={"ballistic", "cruise"},
         kinds_seen={"кинжал"},
         rechecked={"drone"},
@@ -79,13 +79,29 @@ def test_a_field_the_file_has_never_heard_of_keeps_its_default(tmp_path):
     is the ordinary case after adding a field."""
     now = 1_760_000_000
     data = carry.encode(a_raid(now))
-    del data["threat_peak"]
+    del data["launched"]
     data["a_field_from_the_future"] = 7
 
     back = carry.decode(data)
     assert back is not None
-    assert back.threat_peak == 0
+    assert back.launched == set()
     assert back.threat == "ballistic"
+
+
+def test_a_file_from_before_the_sky_was_a_set_keeps_its_class(tmp_path):
+    """The one field that may not default quietly. It replaced a number on
+    2026-09-24, and the file is written by the version that stops and read by
+    the version that starts -- so the first restart after the deploy reads a
+    file that has no sky in it. Defaulting to an empty one during a raid makes
+    the next message about the class already flying read as a climb, and rings.
+    The class itself is in the file, and it is what was in the air."""
+    now = 1_760_000_000
+    data = carry.encode(a_raid(now))
+    del data["flying"]
+
+    back = carry.decode(data)
+    assert back is not None
+    assert back.flying == {"ballistic"}
 
 
 def test_a_file_left_behind_yesterday_is_not_believed(tmp_path):
@@ -607,11 +623,11 @@ def test_a_correct_episode_is_not_disturbed():
     session, who = _one_person_session()
     who.tracker.episode = Episode(
         opened_at=now - 3 * 3600, last_live=now - 60, threat="ballistic",
-        threat_peak=3, official_alert=True)
+        flying={"ballistic", "shahed"}, official_alert=True)
 
     confirm_with_official(session.recipients, conn, now)
 
-    assert who.tracker.episode.threat_peak == 3
+    assert peak_level(who.tracker.episode.flying) == 3
     assert who.tracker.episode.opened_at == now - 3 * 3600
 
 
