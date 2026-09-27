@@ -17,7 +17,8 @@ from dataclasses import dataclass
 
 from ..nlp import hints
 from .episodes import (GEO_STEP, REFRACTORY_NEAR_S, SILENT_DEDUP_S,
-                       THREAT_LEVEL, Observation, peak_level, recheck_key, Tracker,
+                       THREAT_LEVEL, UNPLACED, Observation, peak_level,
+                       recheck_key, Tracker,
                        silent_signature, stale_official_fallback)
 
 LEVELS = ("info", "alert")
@@ -817,7 +818,29 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     if obs.live and obs.scope == "oblast":
         return _silent("too-far: oblast, not the city")
 
-    return _silent("nothing to act on")
+    # 12. A launch site is not another region. His design, on the night of
+    #     2026-09-27: «тут можна може виділити місця пусків в окремий список
+    #     (брянськ Курськ і тп) і його обробляти якось по іншому? а не too far».
+    #
+    #     Bryansk, Kursk, Voronezh, Taganrog, Crimea and the Russian airfields
+    #     are where the thing that will be over Kyiv in minutes leaves from, so
+    #     a message naming only those is a report of a launch. Before this it
+    #     fell through every rule to the line below and was never shown at all:
+    #     249 such messages in the corpus, «Балістика з Брянська!!!» and
+    #     «В повітря підняті МіГ-31К» among them.
+    #
+    #     Quiet, and only for the fast classes -- his call: «Тільки балістика й
+    #     МіГ». A drone leaving Bryansk flies for hours and its launch decides
+    #     nothing for him; 336 of the 1007 origin-only messages are drones and
+    #     stay out.
+    #
+    #     It earns its place twice over: being in the feed is what now lets the
+    #     class it carries reach the episode at all. See `Tracker.record`.
+    if (obs.from_launch_site and obs.live and threat in ("ballistic", "mig")
+            and obs.modality not in ("aftermath", "summary-news", "non-threat")):
+        return _notify("info", "none", "launch site reported")
+
+    return _silent(UNPLACED)
 
 
 def run(observations: list[Observation], tracker: Tracker | None = None

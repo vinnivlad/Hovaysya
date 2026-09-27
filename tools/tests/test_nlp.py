@@ -763,6 +763,16 @@ def test_an_arsenal_ready_to_fire_is_not_a_launch():
     assert hints.modality_hint(t) == "summary-news"
 
 
+def test_a_launch_whose_hour_nobody_knows_is_not_a_launch():
+    """The same sentence as the test above, in the wording the channels used on
+    2026-09-27: «Ворог підготував близько 20 ракет. Коли саме буде пуск -- наразі
+    невідомо.» It wrote `cruise` onto the episode two minutes before a bare
+    «Відрадний, Шулявка», which then rang as a cruise missile on a night when
+    the only things flying were jet drones."""
+    t = "❗️Ворог підготував близько 20 ракет. Коли саме буде пуск — наразі невідомо."
+    assert hints.modality_hint(t) == "summary-news"
+
+
 def test_an_arsenal_counted_is_not_an_arsenal_fired():
     """Same family as the test above, and the shape the corpus actually uses:
     the launchers are counted where they stand. "❗️За попередніми даними, у
@@ -1555,6 +1565,18 @@ def test_every_place_appears_once():
 
     dupes = {n: c for n, c in Counter(p.name for p in PLACES).items() if c > 1}
     assert not dupes, dupes
+
+
+def test_a_launch_site_spelled_in_russian_is_still_a_launch_site():
+    """`rocketskyiv` writes «Брянск», not «Брянськ», and the gazetteer knew only
+    the Ukrainian spelling -- so «Балістика Брянск.» resolved to no place at all
+    and read as a message about nowhere. 31 messages in the corpus."""
+    from tools.nlp.gazetteer import find_places
+
+    for text in ("Балістика Брянск.", "Балістика Брянск!!",
+                 "Вихід балістики з Брянска"):
+        assert [pl.name for pl in find_places(text)] == ["Брянщина"], text
+        assert hints.nationwide(text), text
 
 
 def test_kursk_and_bryansk_are_launch_origins_in_every_form():

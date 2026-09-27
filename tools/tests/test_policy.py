@@ -438,6 +438,54 @@ def test_a_new_wave_rings_after_a_lull_that_mentioned_minutes():
     assert out[-1][1], out[-1]
 
 
+def test_a_message_the_policy_threw_out_does_not_set_the_class():
+    """His finding on the night of 2026-09-27, and the third time this shape has
+    turned up in this file: state taking what the decision threw out.
+
+    «Балістикою будуть цілити по тих місцях, куди не змогли дістатися дронами»
+    fell through every rule to «nothing to act on» -- the policy could not place
+    it at all -- and still wrote `ballistic` onto the episode. Twenty-three
+    seconds later a bare «Оболонь/ Мінський масив» inherited that class and rang
+    the ballistic tone, on a night whose only launches were jet drones. His
+    words: «чому повідомлення, яке Ховайся відкинув взагалі, змінило клас
+    загрози»."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (60, "mon1tor_ua", "⚠️Реактивний шахед на Жуляни."),
+        (600, "nebo_raketa", "Балістикою будуть цілити по тих місцях, куди не змогли дістатися дронами."),
+        (623, "monitoring_kyiv", "Оболонь/ Мінський масив"),
+    ])
+    assert out[3][1] is False, out[3]
+
+
+def test_a_launch_site_is_not_another_region():
+    """His design: «тут можна може виділити місця пусків в окремий список
+    (брянськ Курськ і тп) і його обробляти якось по іншому? а не too far».
+
+    Bryansk is not somebody else's district -- it is where the thing that is
+    about to be over Kyiv leaves from. Such a message gets a quiet line, which
+    is also what makes the class it carries something the policy accepted
+    rather than something it threw away."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (60, "rocketskyiv", "‼️ Вихід балістики з Брянська. Уважно"),
+        (400, "rocketskyiv", "Балістика Брянск."),
+    ])
+    assert out[1][1], out[1]                      # the first one is the climb, and rings
+    assert out[2][3] is not None, out[2]          # the repeat still reaches the feed
+    assert out[2][1] is False, out[2]             # ...quietly
+
+
+def test_a_drone_launch_site_stays_out_of_the_feed():
+    """The guard on the branch above, and his call: only the fast ones. A drone
+    leaving Bryansk flies for hours, and its launch decides nothing for him."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (600, "rocketskyiv", "Шахеди з Брянщини."),
+    ])
+    assert out[1][3] is None, out[1]
+
+
 # --- a ballistic launch already has him up --------------------------------
 
 
@@ -535,7 +583,8 @@ def _speak(texts, spacing=200):
     for i, text in enumerate(texts):
         o = observe(T0 + i * spacing, text)
         d = decide(o, tr)
-        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
         u = ann.announce(o, d)
         out.append((d.audible, u.text if u else None))
     return out
@@ -666,7 +715,8 @@ def test_a_wake_up_always_says_something():
                       (1200, "⚠️Реактивний шахед падає на Жуляни.")):
         o = observe(T0 + off, text)
         d = decide(o, tr)
-        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
         u = ann.announce(o, d)
         said.append((d.audible, u.text if u else None))
     assert all(a for a, _t in said), said
@@ -760,7 +810,8 @@ def _play(seq):
     for off, channel, text in seq:
         o = observe(T0 + off, text, False, channel)
         d = decide(o, tr)
-        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
         u = ann.announce(o, d)
         out.append((text[:26], d.audible, d.reason, u.text if u else None))
     return out
@@ -889,7 +940,8 @@ def test_the_tone_follows_the_class_the_decision_was_made_on():
                                (900, "kievinform_ua1", "Жуляни ✈️")):
         o = observe(T0 + off, text, False, channel)
         d = decide(o, tr)
-        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
         u = ann.announce(o, d)
         if u:
             lead = u.lead
@@ -959,7 +1011,8 @@ def test_a_silent_official_channel_is_still_the_official_channel():
                                (9004, "alarm_kyiv", "🟢 м. Київ\nВідбій повітряної тривоги")):
         o = observe(T0 + off, text, False, channel)
         d = decide(o, tr)
-        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
         u = ann.announce(o, d)
         out.append((d.audible, d.reason, u.text if u else None))
     assert not out[1][0], out          # the chat all-clear stays quiet
@@ -1729,7 +1782,8 @@ def test_a_recheck_says_what_it_is_rather_than_naming_a_threat():
             (300, "mon1tor_ua", "📡Дорозвідка по ракетах.")):
         o = observe(T0 + off, text, False, channel)
         d = decide(o, tr)
-        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
         u = ann.announce(o, d)
     assert u is not None and "Дорозвідка" in u.text
     assert "Тривога" not in u.text
@@ -1857,7 +1911,8 @@ def test_the_explanation_may_name_a_town_outside_the_city():
             (60, "kievinform_ua1", "Знову рБПЛА на Вишгород ⚠️✈️")):
         o = observe(T0 + off, text, False, channel)
         d = decide(o, tr)
-        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
         u = ann.announce(o, d)
     assert d.reason == "what the siren was about"
     assert d.notify and not d.audible
@@ -1893,7 +1948,8 @@ def test_the_siren_does_not_count_as_its_own_explanation():
             (22, "kievinform_ua1", "⚠️Реактивний шахед на Вишгород.")):
         o = observe(T0 + off, text, False, channel)
         d = decide(o, tr)
-        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
         u = ann.announce(o, d)
         out.append((d, u))
     assert out[0][0].audible                      # the siren still rings
@@ -1979,7 +2035,8 @@ def test_the_siren_names_one_town_not_a_travelogue():
             (300, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога")):
         o = observe(T0 + off, text, False, channel)
         d = decide(o, tr)
-        tr.record(o, d.level if d.notify else None, d.alarm if d.notify else None)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
         u = ann.announce(o, d)
     assert u.text.count(",") == 0, u.text
     assert "Славутич" not in u.text

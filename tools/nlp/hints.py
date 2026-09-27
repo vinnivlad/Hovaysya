@@ -1206,6 +1206,29 @@ def nationwide(text: str) -> bool:
 # second list here went stale the moment Voronezh and Oryol were added as
 # places: a real ballistic launch from Voronezh read as "a target in another
 # region" and was silenced as too far.
+def from_launch_site_only(text: str) -> bool:
+    """Whether every place named is a launch site and nothing else.
+
+    His design, on the night of 2026-09-27: «тут можна може виділити місця
+    пусків в окремий список (брянськ Курськ і тп) і його обробляти якось по
+    іншому? а не too far». Bryansk is not somebody else's district -- it is
+    where the thing that will be over Kyiv in minutes leaves from, and a
+    message naming it is a report of a launch rather than of another region.
+
+    Measured before it was used: of the messages that name only launch sites,
+    not one of the commentary this project keeps tripping over qualifies --
+    «Пережили ще одну балістичку атаку», «По балістиці поки тиша» and the rest
+    name no place at all, so they cannot reach this branch.
+    """
+    from .gazetteer import find_places
+
+    places = find_places(text)
+    if not places:
+        return False
+    origins = _launch_origins()
+    return all(p.tier == "elsewhere" and p.name in origins for p in places)
+
+
 def _launch_origins() -> frozenset[str]:
     from .gazetteer import launch_origins
 
@@ -1653,6 +1676,12 @@ _FORECAST = re.compile(
     r"обстановка\s+(доволі\s+)?спокійна|"
     r"якщо[^.!?]{0,30}відбудеться|як буде[^.!?]{0,25}побачимо|"
     r"збільшенн\w*[^.!?]{0,25}удар|цієї ночі[^.!?]{0,40}мож(уть|е)\s|"
+    # The same sentence in the wording of 2026-09-27: «Ворог підготував близько
+    # 20 ракет. Коли саме буде пуск — наразі невідомо.» The arsenal line above
+    # catches the other half of the pair; this catches the hour nobody knows.
+    # Two in the corpus, and it wrote `cruise` onto an episode whose only
+    # launches were jet drones.
+    r"коли саме буде пуск|"
     r"готові до застосування",
     re.IGNORECASE | re.MULTILINE,
 )

@@ -475,7 +475,11 @@ ELSEWHERE = [
     _p("Кривий Ріг", "elsewhere", "кривий ріг", "кривого рог", "кривим рог",
        "кривом", "криворіж", "криворізьк"),
     _p("Ізмаїл", "elsewhere", "ізмаїл"),
-    _p("Брянщина", "elsewhere", "брянськ", "брянсько", "брянщин", origin=True),
+    # "брянск" without the soft sign is how `rocketskyiv` writes it, and 31
+    # messages -- "Балістика Брянск.", "Вихід балістики з Брянска" -- resolved to
+    # no place at all, so a launch report read as being about nowhere.
+    _p("Брянщина", "elsewhere", "брянськ", "брянсько", "брянщин", "брянск",
+       origin=True),
     _p("Курщина", "elsewhere", "курськ", "курсько", "курщин", origin=True),
     _p("Крим", "elsewhere", "крим", "криму", origin=True),
     # Russian airfields, named in launch-origin and takeoff reports. Listed so

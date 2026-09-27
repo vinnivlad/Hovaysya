@@ -136,6 +136,12 @@ NEAR_TIERS = ("my-area", "my-district")
 # His ladder, in his words: "дрон (будь-який) -> крилата ракета -> балістика".
 # A rung is not about danger in the abstract but about how little time it leaves,
 # which is why a MiG-31K sits with ballistic: it is the thing that launches one.
+# The reason the policy gives when no rule could place a message at all. Named
+# rather than repeated, because `rules` produces it and `record` has to
+# recognise it -- and a typo in either would be silent.
+UNPLACED = "nothing to act on"
+
+
 THREAT_LEVEL = {
     # `drone-rocket` is a rung with the drones rather than with the cruise
     # missiles, which is the whole reason the class exists. The rung measures
@@ -300,6 +306,11 @@ class Observation:
     says_new: bool
     # Whether the text says something launched, wherever it is aimed. Distinct
     # from `says_new`, which asks whether that launch is a *new* event.
+    # Every place named is a launch site in Russia or Crimea, and nothing else.
+    # Kept apart from `nationwide`, which asks a different question -- whether
+    # the message concerns the whole country -- and answers `True` for a bare
+    # «ЗАГРОЗА БАЛІСТИКИ» that names nowhere at all.
+    from_launch_site: bool = False
     says_launch: bool = False
     # ...and without the descent, which is an arrival rather than a departure.
     says_launch_proper: bool = False
@@ -482,6 +493,7 @@ def read(ts: int, text: str, is_reply: bool = False,
         strength=str(guess["strength"]),
         alert_state=hints.alert_state(text),
         nationwide=hints.nationwide(text),
+        from_launch_site=hints.from_launch_site_only(text),
         ring_places=tuple(n for n, tier in places if tier in NEAR_TIERS),
         says_new=_says_new(text),
         says_launch=bool(_LAUNCH.search(text or "")),
@@ -973,7 +985,26 @@ class Tracker:
         # bare "2 ракети Київ." during a ballistic wave is decided as ballistic
         # and used to be *stored* as cruise -- so the next bare place name
         # inherited cruise, and the whole wave turned into one.
-        if (obs.threat not in ("none", "unknown") and obs.live
+        # ...and never from a message no rule could place. His rule, on the
+        # night of 2026-09-27: «повідомлення може змінювати клас тільки якщо
+        # воно прийняте ховайся». The full form -- anything that reached the
+        # feed -- was measured first and takes too much: «2 реактивні шахеди
+        # на Київ/Бровари» is silenced as city-wide, and without the class it
+        # carries the «Жуляни» a minute later rings as a plain shahed and the
+        # screen loses its headline. So the narrow form: the fallback branch,
+        # where the policy says outright it could not place the message.
+        #
+        # «Балістикою будуть цілити по тих місцях, куди не змогли дістатися
+        # дронами» fell through every rule to «nothing to act on» and wrote
+        # `ballistic` onto the episode anyway; twenty-three seconds later a bare
+        # «Оболонь/ Мінський масив» inherited it and rang, on a night whose only
+        # launches were jet drones. His words: «чому повідомлення, яке Ховайся
+        # відкинув взагалі, змінило клас загрози».
+        #
+        # The third time this file has had the same shape: state taking what the
+        # decision threw out. The rule above it reads the message; this one asks
+        # whether the policy did anything with it.
+        if (reason != UNPLACED and obs.threat not in ("none", "unknown") and obs.live
                 and obs.modality not in ("aftermath", "summary-news",
                                          "non-threat")):
             ep.threat = obs.effective_threat or obs.threat
