@@ -1031,8 +1031,17 @@ class Tracker:
         # dismissed as non-threat and still stamped Zhuliany as seen, so the
         # real warning five seconds later -- "Борщагівки, Жуляни - в укриття!"
         # -- read as the same target already notified, and he got no sound.
-        if obs.live and obs.modality not in ("aftermath", "summary-news",
-                                             "non-threat"):
+        # ...and not from a decision that is itself «already notified». That one
+        # says nothing new, and letting it restamp the place makes silence feed
+        # silence: on 2026-09-28 a ring at 17:08 opened the five-minute near
+        # window, «Жуляни» at 17:11 fell inside it and went out quiet -- and
+        # stamped Zhuliany, whose ten-minute memory then swallowed
+        # «Жуляни/Вишневе» at 17:19. One ring bought fifteen minutes of silence
+        # over his own street. His report: «17:19 Жуляни/Вишневе не продзвонило
+        # взагалі».
+        if (obs.live and obs.modality not in ("aftermath", "summary-news",
+                                              "non-threat")
+                and not (reason or "").startswith("already-notified")):
             for place in obs.ring_places:
                 ep.ring_seen[place] = obs.ts
         ep.ring_peak = max(ep.ring_peak, obs.ring_count)

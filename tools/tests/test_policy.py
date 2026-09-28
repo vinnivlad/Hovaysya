@@ -438,6 +438,30 @@ def test_a_new_wave_rings_after_a_lull_that_mentioned_minutes():
     assert out[-1][1], out[-1]
 
 
+def test_silence_does_not_extend_itself_over_the_ring():
+    """His report, 2026-09-28: «17:19 Жуляни/Вишневе не продзвонило взагалі».
+
+    A ring at 17:08 opened the five-minute near window. «Жуляни» at 17:11 fell
+    inside it and went out as a quiet line -- and stamped Zhuliany as seen,
+    which starts a ten-minute memory of its own. So «Жуляни/Вишневе» at 17:19,
+    long past the window, read as the same target already notified. One ring
+    bought fifteen minutes of silence over his own street.
+
+    The fourth time this repo has had this shape, and the narrowest yet: a
+    decision that says «already notified» must not be what makes the next one
+    say it too."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (60, "mon1tor_ua", "⚠️Реактивний шахед на Жуляни."),
+        (240, "nebo_raketa", "Жуляни"),
+        (699, "kievinform_ua1", "Вишневе"),
+        (700, "nebo_raketa", "Жуляни/Вишневе"),
+    ])
+    assert out[1][1], out[1]                   # the first one rings
+    assert out[2][1] is False, out[2]          # the one inside the window does not
+    assert out[4][1], out[4]                   # ...and the one after it is heard again
+
+
 def test_a_message_the_policy_threw_out_does_not_set_the_class():
     """His finding on the night of 2026-09-27, and the third time this shape has
     turned up in this file: state taking what the decision threw out.
