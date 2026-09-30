@@ -438,6 +438,38 @@ def test_a_new_wave_rings_after_a_lull_that_mentioned_minutes():
     assert out[-1][1], out[-1]
 
 
+def test_a_ballistic_launch_onto_a_named_oblast_town_does_not_ring():
+    """His report, 2026-09-30: «вночі дзвонило «Бородянка - спуск балістики!»» --
+    at 02:49, for a town fifty kilometres from his own.
+
+    The rule exempting ballistic from geography is right and stays: minutes of
+    flight leave no time to ask whose district, so a launch with no place named
+    rings. But the exemption was reading «we do not know where» and «we know, and
+    it is not here» as the same thing. Borodyanka is named, and it is the second.
+
+    Seven such rings in 805 days of corpus -- Vasylkiv, Bila Tserkva, Brovary,
+    the Obukhiv district -- and not one of them over Kyiv."""
+    out = _play([
+        (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+        (60, "war_monitor", "‼️ Бородянка — спуск балістики!"),
+    ])
+    assert out[1][1] is False, out[1]        # not a bell
+    assert out[1][3] is not None, out[1]     # ...but still on the screen
+
+
+def test_a_ballistic_launch_with_no_place_still_rings():
+    """The guard, and the whole reason the exemption exists: when nobody has
+    said where it is going, there is no time to find out."""
+    for text in ("‼️ Київ — спуск балістики!",
+                 "🚀 Пуск балістики!",
+                 "‼️ Вихід балістики з Брянська. Уважно"):
+        out = _play([
+            (0, "alarm_kyiv", "🚨 м. Київ" + chr(10) + "Повітряна тривога"),
+            (60, "war_monitor", text),
+        ])
+        assert out[1][1], (text, out[1])
+
+
 def test_silence_does_not_extend_itself_over_the_ring():
     """His report, 2026-09-28: «17:19 Жуляни/Вишневе не продзвонило взагалі».
 

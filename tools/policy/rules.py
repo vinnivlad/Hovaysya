@@ -381,6 +381,26 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             return _notify("info", "none", "impact: it has already landed")
         return _silent("impact: elsewhere, and already over")
 
+    # A ballistic launch onto a named town of the oblast. The exemption further
+    # down -- ballistic rings wherever it is, because minutes of flight leave no
+    # time to ask whose district -- is right when nobody has said where it is
+    # going. It was reading «we know where, and it is not here» the same way.
+    # «‼️ Бородянка — спуск балістики!» woke him at 02:49 on 2026-09-30 for a
+    # town fifty kilometres from his own.
+    #
+    # Only when the oblast is the *only* thing named: «пуск балістики» with no
+    # place still rings, and so does anything naming the city or his ring. Seven
+    # rings in 805 days of corpus qualify -- Vasylkiv, Bila Tserkva, Brovary,
+    # the Obukhiv district -- and not one of them is over Kyiv.
+    #
+    # Shown rather than silenced: ballistic working the oblast is worth a line
+    # on the screen, it is just not worth the bell. And placed above the rung
+    # rule, because a first ballistic report is also a climb, and rule 7 asks
+    # what is flying without asking where.
+    if (threat == "ballistic" and obs.scope == "oblast" and not obs.near
+            and not obs.at_home):
+        return _notify("info", "none", "ballistic over the oblast")
+
     # 7. The threat has climbed a rung since the siren started. His rule: an
     #    alert for a drone followed by a ballistic warning is a different
     #    situation, and that warning was arriving silently, because
