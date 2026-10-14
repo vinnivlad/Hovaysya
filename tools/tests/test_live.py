@@ -231,10 +231,14 @@ def test_the_bell_marks_what_made_a_sound(tmp_path):
 
     assert said[0].startswith("🔔 ")
     assert not said[1].startswith("🔔 ")
-    # ...and every label the policy assigned, in the schema's own words, so a
-    # post can be compared against labels/*.jsonl directly.
-    assert "shahed-jet" in said[1] and "my-area" in said[1]
-    assert "a drone near me, but not my street" in said[1]
+    # ...and nothing but the threat and the post. His ask of 2026-10-14: "щоб в
+    # телеграм канал не пилися більше мітки і правило. Тільки яка загроза і
+    # саме повідомлення."
+    lines = said[1].splitlines()
+    assert len(lines) == 2, said[1]
+    assert lines[1] == "— ⚠️2 реактивні шахеди на Вишневе."
+    assert "мітки" not in said[1] and "правило" not in said[1]
+    assert "shahed-jet" not in said[1] and "my-area" not in said[1]
 
 
 # --- keeping what is not in git -------------------------------------------

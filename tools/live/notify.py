@@ -142,21 +142,14 @@ class Notifier:
         return delivered
 
 
-# Every label the policy assigned, in the schema's own words rather than
-# translated: these are the values the labels use, so a post can be compared
-# against `labels/*.jsonl` directly. His reason for wanting them — "так легше
-# потім аналізувати".
-# `летить` and `де` are named because they are the two he reads first, and
-# because dropping an empty one shifted everything left — with `threat` unknown
-# the first value became the scope, and he read the rule name as the class. The
-# rest keep the schema's bare values, which is what makes a post comparable to
-# `labels/*.jsonl` by eye.
-NAMED_FIELDS = (("летить", "threat"), ("де", "scope"))
-TAG_FIELDS = ("modality", "certainty", "heading", "alarm")
-
-
 def format_message(utterance, obs, decision) -> str:
-    """What goes to the channel: the sentence, the labels, and the source.
+    """What goes to the channel: the sentence and the source, nothing else.
+
+    The labels and the rule name rode along for analysis -- "так легше потім
+    аналізувати" -- and came off on his word of 2026-10-14: "щоб в телеграм
+    канал не пилися більше мітки і правило. Тільки яка загроза і саме
+    повідомлення." Both are still in the night log beside every decision,
+    which is where the analysis is done anyway.
 
     The bell marks a message that made a sound. In a Telegram channel every post
     looks alike afterwards, and telling a wake-up from a status line by scrolling
@@ -181,20 +174,6 @@ def format_message(utterance, obs, decision) -> str:
     else:
         head = frame + utterance.text
 
-    tags = []
-    for label, field in NAMED_FIELDS:
-        value = getattr(obs, field, None)
-        if field == "threat":
-            value = obs.effective_threat or value
-        tags.append(f"{label}={value or '?'}")
-    for field in TAG_FIELDS:
-        value = decision.alarm if field == "alarm" else getattr(obs, field, None)
-        if value and value not in ("none", "unknown", "position"):
-            tags.append(str(value))
-    if getattr(obs, "official", False):
-        tags.append("official")
-    line = " · ".join(tags)
-
     # The whole post, and its own line breaks. It used to be folded onto one
     # line and cut at 220 characters, which sounded modest and was not: the
     # median post is 33 characters, but 1249 of 28116 run past 220, so 4.4% of
@@ -207,13 +186,7 @@ def format_message(utterance, obs, decision) -> str:
     # one sentence about one thing.
     source = obs.text or ""
 
-    # Both lines are labelled. Unlabelled, they read as one list, and he took
-    # the rule name for the threat class — "це в тексті drone near me but not my
-    # street?" The order inside `мітки` is fixed and the class is always first.
     parts = [head]
-    if line:
-        parts.append("мітки: " + line)
-    parts.append("правило: " + decision.reason)
     if source and source not in utterance.text:
         parts.append("— " + source)
         return _within_limit(parts)
