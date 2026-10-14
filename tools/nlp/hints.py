@@ -282,6 +282,8 @@ AFTERMATH_TERMS = (
     # 2х людей балістичними ракетами". Seven messages in the corpus and the
     # live logs, all of them after the fact.
     "був під обстріл", "була під обстріл", "були під обстріл", "уламок", "вбито",
+    # "1 ракета впала в ліс в районі сел Миколаївка" -- where one came down.
+    "впала в ліс", "впали в ліс", "впав в ліс",
 )
 
 # Coming down, right now. Narrow on purpose: only this one word, and only over
@@ -370,6 +372,10 @@ SUMMARY_TERMS = (
     # at 00:56 on 2026-08-04, twenty minutes after the last of them. Seventeen
     # messages in the corpus read as live, all after the fact.
     "застосовано",
+    # "Щодо балістики на ніч — попереджень немає" rang as a ballistic threat
+    # rising: the class is named in order to say it is absent tonight. Three
+    # messages, all a briefing for the night ahead.
+    "попереджень немає", "попереджень нема",
     "найближчої доби", "найближчу добу", "наступної доби", "наступні 2 дні",
 )
 
@@ -1047,7 +1053,26 @@ def _nothing_tracked(text: str) -> bool:
 
 
 def recheck(text: str) -> bool:
-    return _hits(text, RECHECK_TERMS) or _nothing_tracked(text)
+    return (_hits(text, RECHECK_TERMS) or _nothing_tracked(text)
+            or _clear_opinion(text))
+
+
+# What the all-clear should be, not the all-clear. `kyiv_monitor1` says it
+# outright: "Києву вже можна дати відбій", "90 хвилин тому можна було дати
+# відбій, але не дали", "Повинен бути відбій". Five of them rang the partial
+# all-clear tone in the replay that weighed the channel, and "Микоська, можна
+# дати відбій, якщо хочеш" is the same thing from another one. His call: "можна
+# трактувати як дорозвідка" -- nothing is coming, and nobody has lifted
+# anything. Ten messages in the corpus and the candidate, none of them real.
+_CLEAR_OPINION = re.compile(
+    r"можна(?:\s+було)?\s+(?:вже\s+)?дати\s+відбій|можна\s+було\s+дати|"
+    r"відбій\s+(?:\w+\s+)?не\s+дали|не\s+дали\s+відбій|"
+    r"повин\w*\s+бути\s+відбій",
+    re.IGNORECASE)
+
+
+def _clear_opinion(text: str) -> bool:
+    return bool(_CLEAR_OPINION.search(text or "")) and not _hits(text, CANONICAL_SIREN)
 
 
 def partial_clear(text: str) -> bool:
@@ -1056,6 +1081,8 @@ def partial_clear(text: str) -> bool:
     # lowered the escalation ladder, and the next ballistic warning rang as a
     # fresh climb.
     if _hits(text, AWAITING_TERMS) and not _hits(text, CANONICAL_SIREN):
+        return False
+    if _clear_opinion(text):
         return False
     """An all-clear for one threat class while the alert itself continues.
 
@@ -1154,6 +1181,9 @@ def alert_state(text: str) -> str | None:
     # all-clear. It has not occurred in 4.5 months; it costs one line to make
     # sure it never matters.
     if _hits(text, AWAITING_TERMS) and not _hits(text, CANONICAL_SIREN):
+        return None
+    # ...and saying what it should be is not having one either.
+    if _clear_opinion(text):
         return None
     # Advice about sirens, not a siren. Same escape hatch as above and for the
     # same reason: a real "🚨 м. Київ / Повітряна тривога" that also tells him

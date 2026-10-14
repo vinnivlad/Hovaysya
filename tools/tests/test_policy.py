@@ -2124,6 +2124,22 @@ def test_clean_and_no_contact_are_rechecks_too():
         assert d.reason.startswith("recheck"), (text, d.reason)
 
 
+def test_an_opinion_about_the_all_clear_is_a_recheck():
+    """`kyiv_monitor1` says what the all-clear should be: "Києву вже можна дати
+    відбій", "Повинен бути відбій". Each rang the partial all-clear tone in the
+    replay that weighed the channel. His call: "можна трактувати як
+    дорозвідка" -- it is the channel saying nothing is coming, not anybody
+    lifting anything."""
+    for text in ("Транзитні шахеди на півночі області, Києву вже можна дати відбій.",
+                 "Повинен бути відбій, над територією України жодного реактивного "
+                 "тому поки що відпочиваємо."):
+        tr = _alerted()
+        o = observe(T0 + 300, text, False, "kyiv_monitor1")
+        d = decide(o, tr)
+        assert not d.audible, (text, d.reason)
+        assert d.reason.startswith("recheck"), (text, d.reason)
+
+
 def test_a_recheck_needs_an_alert_not_merely_an_episode():
     """"Дорозвідка по БпЛА по областях" arrived at 06:19, forty-six minutes
     after the all-clear, into an episode passing traffic had reopened — and

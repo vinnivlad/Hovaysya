@@ -74,3 +74,10 @@
 {"anchor": "monitoring_kyiv/33621", "category": "partial-clear", "expect": "clear", "text": "Балістику знято."}
 {"anchor": "nebo_raketa/52229", "category": "no-launch-info", "expect": "not-live", "text": "🤕 Партнери знову не попередили про удари балістичними ракетами по Києву."}
 {"anchor": "rocketskyiv/670", "category": "summary", "expect": "not-live", "text": "Застосовано близько 20 балістичних ракет. \n\nПопередження про атаку публікували в центральному-основному каналі."}
+{"anchor": "kyiv_monitor1/471", "category": "clear-opinion", "expect": "no-alert", "text": "Транзитні шахеди на півночі області, Києву вже можна дати відбій.\n\n@kyiv_monitor1"}
+{"anchor": "kyiv_monitor1/473", "category": "clear-opinion", "expect": "no-alert", "text": "90 хвилин тому можна було дати відбій, але не дали. Немає слів, просто довбойоби. А зараз дочекались новий шахед який продовжить тривогу на щонайменше 30 хвилин.\n\n@kyiv_monitor1"}
+{"anchor": "kyiv_monitor1/795", "category": "clear-opinion", "expect": "no-alert", "text": "Відбій чогось не дали, хоча в області можна було дати на 20 хвилин а у столиці на 35 хвилин.\n\nТепер в нас буде ще година тривоги. Бо на Чернігівщині нові 3 реактивні та 1 реактивний на Черкащині.\n\n@kyiv_monitor1"}
+{"anchor": "kyiv_monitor1/4228", "category": "clear-opinion", "expect": "no-alert", "text": "Повинен бути відбій, над територією України жодного реактивного тому поки що відпочиваємо.\n\n@kyiv_monitor1"}
+{"anchor": "kyiv_monitor1/3467", "category": "clear-opinion", "expect": "no-alert", "text": "В нас дорозвідка.\n\nЩе 7 реактивних в сусідніх областях, Києву спокійно можна дати відбій на 20+ хвилин.\n\n@kyiv_monitor1"}
+{"anchor": "kyiv_monitor1/4050", "category": "forecast", "expect": "not-live", "text": "Щодо балістики на ніч — попереджень немає.\n\n@kyiv_monitor1"}
+{"anchor": "kyiv_monitor1/2947", "category": "aftermath", "expect": "not-live", "text": "1 ракета впала в ліс в районі сел Миколаївка, Колонщина;\n\n1 ракета 12 км від Макарова.\n\n@kyiv_monitor1"}
