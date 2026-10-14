@@ -2524,6 +2524,61 @@ def test_any_ballistic_launch_after_a_recheck_rings():
     assert not wave("🔴Можливий повторний пуск 2-4х балістичних ракет по Києву.").audible
 
 
+def _after_recheck(*tail):
+    """A launch that rang, a recheck that closed it, then `tail` as (offset, text)."""
+    tr = _alerted()
+    out = []
+    for off, text in ((60, "Пуски Цирконів з Курська."),
+                      (120, "4 Циркони на Київ, Вишгород!!"),
+                      (600, "По балістиці на зараз чисто✈️")) + tail:
+        o = observe(T0 + off, text, False, "kievinform_ua1")
+        d = decide(o, tr)
+        tr.record(o, d.level if d.notify else None,
+                  d.alarm if d.notify else None, d.reason)
+        out.append(d)
+    assert out[0].audible and out[2].reason.startswith("recheck")
+    return out[3:]
+
+
+def test_a_wave_after_a_recheck_rings_without_a_launch_verb():
+    """From the night of 2026-10-14: three waves after a recheck, every one
+    silent, because the channels named where it came from or where it went and
+    never wrote пуск. "Пішли Іскандери з Брянска", "Балістика Курськ",
+    "Балістика на Київ/передмістя" -- his rule is any launch after a recheck,
+    and the verb was only ever how we recognised one."""
+    for text in ("Пішли Іскандери з Брянска !!!",
+                 "‼️ Балістика Курськ. Уважно",
+                 "Балістика на Київ/передмістя.",
+                 "Циркони на Київ."):
+        assert _after_recheck((1700, text))[0].audible, text
+    # ...but a possibility is still not a wave: "всілякі можливі треба
+    # фільтрувати". It rang on 2026-08-04 once the verb stopped being required.
+    assert not _after_recheck(
+        (1700, "Можливий повторний залп балістичних ракет по Києву протягом 40 хвилин."))[0].audible
+
+
+def test_no_contact_right_after_a_launch_does_not_close_it():
+    """"На зараз без фіксації цілей" came 39 seconds after "Балістика Курськ"
+    rang: the missiles were not on radar yet, not gone. Reading it as a recheck
+    reopened the wave and "Циркони на Київ" rang a second time six minutes
+    later. A time threshold cannot tell this from 2026-09-01, where the recheck
+    came 170 s after a ring and the wave after it was new; what differs is that
+    nobody had placed this one yet."""
+    out = _after_recheck((1700, "‼️ Балістика Курськ. Уважно"),
+                         (1739, "На зараз без фіксації цілей"),
+                         (2128, "Циркони на Київ."))
+    assert out[0].audible
+    assert not out[2].audible, out[2].reason
+
+
+def test_a_count_off_past_the_sixth_is_still_a_count_off():
+    """"спуск балістики! Восьма" and "14та" rang once the verb stopped being
+    required: the ordinal veto stopped at the sixth."""
+    for text in ("‼️ Київ — спуск балістики! Восьма",
+                 "‼️ Київ — спуск балістики! 14та"):
+        assert not _after_recheck((1700, text))[0].audible, text
+
+
 def test_the_wave_says_where_it_is_without_ringing_again():
     """His ask after the ballistic night: "кожен «Київ спуск балістики» під час
     балістичної тривоги можна б писати хоча б тихим... під час балістики краще

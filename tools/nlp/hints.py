@@ -120,6 +120,8 @@ _THREAT = tuple((kind, re.compile(pat, re.IGNORECASE)) for kind, pat in THREAT_R
 # or used, or a forecast covering the next hours or days. The user's note on
 # one of these: "Здавалося б що загроза балістики, але ні! Попередження на
 # наступні 2 дні просто."
+_POSSIBLE = re.compile(r"\bможлив(?:ий|а|е|і)\b", re.IGNORECASE)
+
 _ANTICIPATED = re.compile(
     # Words may sit between: "підвищена загроза масованого ракетного удару" is
     # a risk level, not an event, and read as a confirmed cruise report over
@@ -242,6 +244,15 @@ _LIVE = tuple((name, re.compile(pat, re.IGNORECASE)) for name, pat in LIVE_SHAPE
 # the word that is wrong, and the rest of the sentence still counts.
 _NEGATED_LAUNCH = re.compile(r"\bбез\s+пуск\w*", re.IGNORECASE)
 
+# The Air Force's statement after a strike nobody saw launched: "Інформації
+# щодо пусків з території противника не поступало. Причини встановлюються".
+# Twice in two nights, 2026-10-12 and 10-13, it rang the ballistic tone half an
+# hour after the strike -- the word пусків is right there, and so are the
+# missiles and Kyiv. Four messages in the corpus and the live logs, every one
+# this same statement.
+_NO_LAUNCH_INFO = re.compile(
+    r"щодо\s+пуск\w*[^.]{0,40}\bне\s+(?:надход|поступ)\w*", re.IGNORECASE)
+
 _THREAT_BESIDE_PLACE = re.compile(_THREAT_WORD, re.IGNORECASE)
 
 # Consequence-management vocabulary. Measured 20-56 min from the nearest live
@@ -265,6 +276,12 @@ AFTERMATH_TERMS = (
     # "сапери" and not "сапер": the gazetteer has a Kyiv landmark called
     # саперне поле, and "1х Олімпійський, саперне поле" is a live drone report.
     "сапери", "місці падіння", "місця падіння",
+    # Each rang the ballistic tone once a wave after a recheck stopped needing
+    # the word пуск (2026-10-14): "Київ був під обстрілом балістичних ракет",
+    # "Уламок від балістики на парковці в Києві", "В Дарницькому районі вбито
+    # 2х людей балістичними ракетами". Seven messages in the corpus and the
+    # live logs, all of them after the fact.
+    "був під обстріл", "була під обстріл", "були під обстріл", "уламок", "вбито",
 )
 
 # Coming down, right now. Narrow on purpose: only this one word, and only over
@@ -338,6 +355,21 @@ SUMMARY_TERMS = (
     # line into the status: a two-day forecast must not sit there saying
     # "Загроза: балістика" all night.
     "48 годин", "годин", "може атакувати", "можуть атакувати",
+    # What the enemy has left, not what is flying: "у ворога залишаються готові
+    # Іскандери", "лишається лише орієнтовно 12 Іскандерів у запасі". And a
+    # reminder of what may yet come: "Кияни, може ще бути балістика з Брянська".
+    # All rang the ballistic tone; seven messages, none of them a launch.
+    "у запасі", "в запасі", "залишаються готов", "лишаються готов",
+    "може ще бути",
+    # The same night's complaint after the fact, ten minutes behind the Air
+    # Force statement it echoes: "Партнери знову не попередили про удари
+    # балістичними ракетами по Києву". Once in the corpus, and not "партнер"
+    # alone -- "Партнери повідомляють про масові пуски" is a live report.
+    "не попередил",
+    # A tally of what was used: "Застосовано близько 20 балістичних ракет" rang
+    # at 00:56 on 2026-08-04, twenty minutes after the last of them. Seventeen
+    # messages in the corpus read as live, all after the fact.
+    "застосовано",
     "найближчої доби", "найближчу добу", "наступної доби", "наступні 2 дні",
 )
 
@@ -407,7 +439,11 @@ SOCIAL_TERMS = (
 # сигнал щодо балістики» rang the ballistic tone on its second sentence. His
 # reading: «це схоже на частковий відбій».
 RESOLUTION_CLOSING = ("чисто", "збит", "збили", "мінус", "відбій", "знищ",
-                      "припинили існування")
+                      "припинили існування",
+                      # "✅ Балістична загроза знята." rang the ballistic tone
+                      # on 2026-09-30. Six such messages in the corpus, every
+                      # one a lifted class. Whole forms: "зняти" is a request.
+                      "знята", "знято")
 RESOLUTION_UNKNOWN = ("локаційно втрачено", "без фіксації", "дорозвідка",
                       "втрачено", "втрата фіксац", "зник")
 
@@ -1694,7 +1730,8 @@ def modality_hint(text: str) -> str:
     also contains threat words; impact terms are checked before aftermath so an
     explosion report is never demoted to retrospective.
     """
-    if _hits(text, SUMMARY_TERMS) or _FORECAST.search(text or ""):
+    if (_hits(text, SUMMARY_TERMS) or _FORECAST.search(text or "")
+            or _NO_LAUNCH_INFO.search(text or "")):
         return "summary-news"
     # Before the impact rule: the message says "Вибухи" and that would
     # answer first. "⚡️ Вибухи, які ви чуєте — це розкати грому!" read as a
@@ -1767,6 +1804,13 @@ def certainty_hint(text: str) -> str:
     # something is in the air — and the difference decides whether a new sound
     # fires at all, so it cannot be blurred.
     if _ANTICIPATED.search(text or ""):
+        return "probable"
+    # "Можливий повторний залп балістичних ракет по Києву протягом 40 хвилин"
+    # rang on 2026-08-04 as a confirmed wave. His rule: "всілякі можливі треба
+    # фільтрувати". Eleven confirmed ballistic messages in the corpus carry one
+    # of these forms, every one a possibility. Not "можливо" ("Крим балістика,
+    # можливо Циркон" is a launch unsure of its type) nor "можливих".
+    if _POSSIBLE.search(text or ""):
         return "probable"
     # A takeoff is a possibility, not a fact: the corpus has
     # "Борти МіГ-31К розвернулись на аеродром базування" as often as it has a

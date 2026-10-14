@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 from ..nlp import hints
 from .episodes import (GEO_STEP, REFRACTORY_NEAR_S, SILENT_DEDUP_S,
-                       THREAT_LEVEL, UNPLACED, Observation, peak_level,
+                       THREAT_LEVEL, UNPLACED, _ORDINAL, Observation, peak_level,
                        recheck_key, Tracker,
                        silent_signature, stale_official_fallback)
 
@@ -327,8 +327,13 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             #     ...and not another report of the launch itself. Two channels
             #     announce the same one about 39 seconds apart, and "Пуски
             #     балістичних ракет з Брянської області" repeats the origin
-            #     rather than naming a destination.
-            and not obs.says_launch):
+            #     rather than naming a destination. So, after a recheck, does
+            #     "Балістика Курськ", which has no verb at all -- and is the
+            #     next wave. Mid-wave it stays here: measured, the wider version
+            #     let "лишається 12 Іскандерів у запасі" ring.
+            and not obs.says_launch
+            and not (obs.from_launch_site and ep.recheck_at
+                     and obs.ts > ep.recheck_at)):
         if not cfg.show_ballistic_destination:
             return _silent("ballistic destination: shown off by config")
         return _notify("info", "none", "where the ballistic is going")
@@ -532,7 +537,8 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
     # still rings, because `says_launch` is what makes it ours.
     if (threat == "ballistic" and obs.certainty == "confirmed"
             and obs.strength != "none"
-            and (obs.says_launch or obs.scope != "elsewhere")):
+            and (obs.says_launch or obs.scope != "elsewhere"
+                 or obs.from_launch_site)):
         # Novelty is a launch, not a position — and once a ballistic alert has
         # sounded, a place name over his own area adds nothing. His ruling, and
         # the reason is the point: "якщо був пуск балістики, то на моє коло
@@ -568,6 +574,19 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             #
             # Once only: `recheck_at` is cleared as soon as this rings, or every
             # later "ще" and "спуск" rang too, ten times in five minutes.
+            first_launch = True
+        # ...and the verb was only ever how we recognised a launch. On
+        # 2026-10-14 three waves after a recheck went silent because nobody
+        # wrote пуск: "Пішли Іскандери з Брянска", "Балістика Курськ",
+        # "Балістика на Київ/передмістя". Ballistic stated outright -- not
+        # carried -- from a launch site or over the city is the next wave.
+        #
+        # Measured over every live log: 16 new waves caught, and 8 new false
+        # bells, all of them news read as live (fixtures/false_wakeups.jsonl).
+        if (ep is not None and ep.recheck_at and obs.ts > ep.recheck_at
+                and not inherited and obs.threat == "ballistic"
+                and not _ORDINAL.search(obs.text or "")
+                and (obs.from_launch_site or obs.scope in CITY_OR_NEARER)):
             first_launch = True
         # A type nobody has named yet is a new event, whatever the wording. His
         # point: "може ще на сам факт іншого виду балістичної ракети реагувати
@@ -620,6 +639,10 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
             if (cfg.show_ballistic_detail
                     and (obs.scope in CITY_OR_NEARER or obs.near)):
                 return _notify("info", "none", "ballistic wave: where it is now")
+            # A launch site with no verb used to reach rule 12 and its quiet
+            # line, and keeps it. One with the verb was always silent here.
+            if obs.from_launch_site and not obs.says_launch:
+                return _notify("info", "none", "launch site reported")
             return _silent("already-notified: same ballistic wave")
         # Audible, with the ballistic tone. The tone is what says "now" —
         # a separate loudness level said it twice.

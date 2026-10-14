@@ -94,7 +94,9 @@ _LAUNCH_PROPER = re.compile(
 # has to be explicit because the launch verb is right there in the text.
 _ORDINAL = re.compile(
     r"\bдруг[аийе]\w*|\bтрет[яійе]\w*|\bчетверт\w*|\bп.ят[аийе]\w*|"
-    r"\bшост\w*",
+    r"\bшост\w*|\bсьом\w*|\bвосьм\w*|\bдев.ят[аийе]\w*|\bдесят[аийе]\w*|"
+    # "спуск балістики! 14та" -- past ten the channels switch to digits.
+    r"\b\d+\s*-?та\b",
     re.IGNORECASE,
 )
 
@@ -116,6 +118,11 @@ REFRACTORY_S = 20 * 60
 # nights: the same four false wake-ups, the same five misses, one extra ring on
 # one night out of three.
 REFRACTORY_NEAR_S = 5 * 60
+
+# Faster than any ballistic missile launched from Russia reaches Kyiv. A
+# "без фіксації" inside it, after a launch nobody has placed, is a missile not
+# yet on radar rather than a wave that is over.
+UNPLACED_LAUNCH_S = 2 * 60
 
 # Two silent lines saying exactly the same thing, seconds apart, are one line.
 # From the night of 2026-08-29: "Вишневе - увага." at 04:55:28 and "Вишневе!" at
@@ -234,6 +241,9 @@ class Episode:
     kinds_seen: set = field(default_factory=set)
     # Whether a ballistic launch in this episode has been given a destination.
     ballistic_located: bool = False
+    # When the last ballistic bell rang for a launch nobody has placed yet, or
+    # 0. Inside the flight time "без фіксації" means not on radar yet, not gone.
+    unplaced_launch_at: int = 0
     # signature of a silent line -> when it was last sent
     last_silent: dict = field(default_factory=dict)
     # Classes already reported as "дорозвідка" in this episode. The channels
@@ -894,7 +904,18 @@ class Tracker:
             # made every descent report ring. The channel says which is which --
             # a real new launch has `says_new`, a count-off does not -- so the
             # reopening keys on that instead, from `recheck_at`.
-            ep.recheck_at = obs.ts
+            #
+            # ...except over a launch that nobody has placed yet. On 2026-10-14
+            # "На зараз без фіксації цілей" came 39 s after "Балістика Курськ"
+            # rang -- the missiles were not on radar yet -- and reading it as a
+            # close made "Циркони на Київ" ring a second time. Only for a launch
+            # with no position yet, and only inside the time nothing launched
+            # from Russia can reach Kyiv: on 2026-09-01 a recheck 170 s after a
+            # bell over the city was real, and so is "чисто" four minutes after
+            # a launch that never showed up.
+            if not (ep.unplaced_launch_at
+                    and obs.ts - ep.unplaced_launch_at < UNPLACED_LAUNCH_S):
+                ep.recheck_at = obs.ts
             ep.ballistic_located = False
         elif ((level is not None and obs.live
                and stated not in ("none", "unknown"))
@@ -1015,6 +1036,12 @@ class Tracker:
             # Named again as flying: whatever was lifted is back.
             ep.cleared.discard(ep.threat)
             ep.cleared_at.pop(ep.threat, None)
+        if level == "alert" and alarm == "ballistic":
+            ep.unplaced_launch_at = (obs.ts if obs.scope in ("elsewhere", "unknown")
+                                     else 0)
+        elif ((obs.effective_threat or obs.threat) == "ballistic" and obs.live
+              and obs.scope not in ("elsewhere", "unknown")):
+            ep.unplaced_launch_at = 0
         if obs.says_new:
             ep.last_launch = obs.ts
         if (level is not None and level != "info" and obs.says_launch
