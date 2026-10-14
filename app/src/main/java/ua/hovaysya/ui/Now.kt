@@ -79,7 +79,9 @@ fun Now(store: Store, onSettings: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            // 20 on top, as on the feeds. It was 24 here, and the header
+            // jumped by the difference every time he switched tabs.
+            .padding(start = 24.dp, top = 20.dp, end = 24.dp, bottom = 24.dp),
     ) {
         // The name, and what it is for. Nowhere inside the app said either --
         // his observation, and the second half of it is the sharper one: the

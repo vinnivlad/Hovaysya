@@ -1,11 +1,17 @@
 package ua.hovaysya.ui
 
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -84,5 +90,28 @@ class HeaderTest {
         show { opened = true }
         rule.onNodeWithText("⚙").performClick()
         assertTrue(opened)
+    }
+
+    @Test
+    fun `the header sits at the same height on every screen`() {
+        // His report: on `Зараз` the header sat a little lower than on the
+        // feeds, so it jumped up and down as he switched tabs. `Зараз` padded
+        // its top by 24 dp and the feeds by 20.
+        var tab by mutableIntStateOf(0)
+        rule.setContent {
+            HovaysyaTheme {
+                when (tab) {
+                    0 -> Now(store) {}
+                    1 -> HovaysyaFeed(store) {}
+                    else -> ChannelFeed(store) {}
+                }
+            }
+        }
+        val tops = (0..2).map { i ->
+            rule.runOnIdle { tab = i }
+            rule.onNodeWithText("⚙").getBoundsInRoot().top
+        }
+        assertEquals(tops[1], tops[0])
+        assertEquals(tops[1], tops[2])
     }
 }

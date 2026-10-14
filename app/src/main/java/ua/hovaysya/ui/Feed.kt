@@ -6,6 +6,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -118,16 +129,23 @@ fun HovaysyaFeed(store: Store, every: Long = SAID_EVERY_MS,
     val rows = Held.said
     val problem = Held.saidProblem
 
+    // One request, asked from two places: the loop below and his pull. Two
+    // copies would drift, and the pull would then show something the loop
+    // does not.
+    val load: suspend () -> Unit = {
+        runCatching { store.api().verdicts() }
+            // The server filters now, and it has to: filtering after a
+            // limit is not a filter. The check stays as a belt, since a
+            // row with nothing said has nothing to draw.
+            .onSuccess { Held.said = it.filter { row -> row.said != null }
+                         Held.saidProblem = null }
+            .onFailure { Held.saidProblem = saidPlainly(it) }
+    }
+
     LaunchedEffect(Unit) {
         while (true) {
             val was = Held.pulse.value
-            runCatching { store.api().verdicts() }
-                // The server filters now, and it has to: filtering after a
-                // limit is not a filter. The check stays as a belt, since a
-                // row with nothing said has nothing to draw.
-                .onSuccess { Held.said = it.filter { row -> row.said != null }
-                             Held.saidProblem = null }
-                .onFailure { Held.saidProblem = saidPlainly(it) }
+            load()
             awaitRing(was, every)
         }
     }
@@ -145,6 +163,7 @@ fun HovaysyaFeed(store: Store, every: Long = SAID_EVERY_MS,
         empty = "За останні дні Ховайся нічого не казав.",
         problem = problem,
         keys = rows.map(keyOf),
+        refresh = load,
     ) {
         items(rows, key = keyOf) { row ->
             Column(
@@ -267,14 +286,18 @@ fun ChannelFeed(store: Store, every: Long = POSTS_EVERY_MS,
     val rows = Held.posts
     val problem = Held.postsProblem
 
+    val load: suspend () -> Unit = {
+        // Thirty minutes, which is his number: "коли я відкриваю скрін, я
+        // хочу бачити останні повідомлення за 30хв".
+        runCatching { store.api().posts(minutes = 30) }
+            .onSuccess { Held.posts = it; Held.postsProblem = null }
+            .onFailure { Held.postsProblem = saidPlainly(it) }
+    }
+
     LaunchedEffect(Unit) {
         while (true) {
             val was = Held.pulse.value
-            // Thirty minutes, which is his number: "коли я відкриваю скрін, я
-            // хочу бачити останні повідомлення за 30хв".
-            runCatching { store.api().posts(minutes = 30) }
-                .onSuccess { Held.posts = it; Held.postsProblem = null }
-                .onFailure { Held.postsProblem = saidPlainly(it) }
+            load()
             awaitRing(was, every)
         }
     }
@@ -289,6 +312,7 @@ fun ChannelFeed(store: Store, every: Long = POSTS_EVERY_MS,
         empty = "За останні 30 хвилин тихо.",
         problem = problem,
         keys = rows.map(keyOf),
+        refresh = load,
     ) {
         items(rows, key = keyOf) { post ->
             Column(
@@ -463,6 +487,87 @@ private fun Photo(post: Post) {
  * collector, so anything captured from the composition would go stale on the
  * next poll while the layout never does.
  */
+/** How far up past the newest line he has to pull before it asks. */
+private val PULL_THRESHOLD = 72.dp
+
+/**
+ * The pull past the newest line, which asks the server now instead of at the
+ * next poll. His ask: "примусового оновлення чату змахуванням по чату вгору".
+ *
+ * Up, and that is why this is not Material's pull-to-refresh: that one pulls
+ * down from the top, and here the top is the oldest line. The newest is at the
+ * bottom, so the pull carries on the way he was already reading.
+ *
+ * Only what the list could not take counts, and only at the newest line. A
+ * scroll through the middle of the feed is reading, not asking.
+ */
+internal class PullUp(
+    private val threshold: Float,
+    private val onPull: () -> Unit,
+) : NestedScrollConnection {
+    var atEnd: () -> Boolean = { true }
+    var pulled by mutableFloatStateOf(0f)
+        private set
+
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        // Back down while pulled: the pull gives way before the list moves.
+        if (source == NestedScrollSource.UserInput && pulled > 0f && available.y > 0f) {
+            val back = minOf(available.y, pulled)
+            pulled -= back
+            return Offset(0f, back)
+        }
+        return Offset.Zero
+    }
+
+    override fun onPostScroll(consumed: Offset, available: Offset,
+                              source: NestedScrollSource): Offset {
+        if (source == NestedScrollSource.UserInput && available.y < 0f && atEnd()) {
+            // Half the finger's travel, so it feels like pulling against
+            // something and a flick through the end of the feed does not count.
+            pulled = (pulled - available.y / 2f).coerceAtMost(threshold * 1.5f)
+            return Offset(0f, available.y)
+        }
+        return Offset.Zero
+    }
+
+    override suspend fun onPreFling(available: Velocity): Velocity {
+        val fire = pulled >= threshold
+        val held = pulled > 0f
+        pulled = 0f
+        if (fire) onPull()
+        // A released pull ends there; it is not a fling for the list.
+        return if (held) available else Velocity.Zero
+    }
+}
+
+/** The ring under the newest line: filling while pulled, spinning while asked. */
+@Composable
+private fun PullIndicator(progress: Float, refreshing: Boolean,
+                          modifier: Modifier = Modifier) {
+    if (!refreshing && progress <= 0f) return
+    val ink = colourFor(Screen.WATCHING)
+    Box(
+        modifier
+            .padding(bottom = 16.dp)
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (refreshing) {
+            CircularProgressIndicator(Modifier.size(20.dp), color = ink,
+                                      strokeWidth = 2.dp)
+        } else {
+            CircularProgressIndicator(
+                progress = { progress.coerceAtMost(1f) },
+                modifier = Modifier.size(20.dp),
+                color = ink,
+                strokeWidth = 2.dp,
+            )
+        }
+    }
+}
+
 private fun LazyListState.atNewest(): Boolean = with(layoutInfo) {
     totalItemsCount == 0 || visibleItemsInfo.lastOrNull()?.index == totalItemsCount - 1
 }
@@ -476,10 +581,25 @@ internal fun Feed(
     empty: String,
     problem: String?,
     keys: List<String>,
+    refresh: suspend () -> Unit,
     rows: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+
+    // Pulled up past the newest line, it asks now -- see `PullUp`.
+    var refreshing by remember { mutableStateOf(false) }
+    val threshold = with(LocalDensity.current) { PULL_THRESHOLD.toPx() }
+    val pull = remember(threshold) {
+        PullUp(threshold) {
+            if (!refreshing) scope.launch {
+                refreshing = true
+                try { refresh() } finally { refreshing = false }
+            }
+        }
+    }
+    // Read every gesture rather than captured once: the list grows under it.
+    pull.atEnd = { keys.isEmpty() || listState.atNewest() }
 
     val newest = keys.lastOrNull()
     var opened by remember { mutableStateOf(false) }
@@ -548,24 +668,36 @@ internal fun Feed(
             }
         }
         if (keys.isEmpty() && problem == null) {
-            Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    empty,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            // Scrollable although it never scrolls: an empty feed is exactly
+            // the one he most wants to pull, and a pull is a scroll the list
+            // could not take.
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val tall = maxHeight
+                Column(Modifier.nestedScroll(pull).verticalScroll(rememberScrollState())) {
+                    Box(
+                        Modifier.fillMaxWidth().height(tall),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            empty,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                PullIndicator(pull.pulled / threshold, refreshing,
+                              Modifier.align(Alignment.BottomCenter))
             }
         } else {
             Box(Modifier.fillMaxSize()) {
                 LazyColumn(
-                    Modifier.fillMaxSize(),
+                    Modifier.fillMaxSize().nestedScroll(pull),
                     state = listState,
                     verticalArrangement = Arrangement.Top,
                     content = rows,
                 )
+                PullIndicator(pull.pulled / threshold, refreshing,
+                              Modifier.align(Alignment.BottomCenter))
                 if (unseen > 0) {
                     ToNewest(
                         count = unseen,

@@ -70,6 +70,7 @@ class FeedFollowTest {
                         empty = "нічого",
                         problem = null,
                         keys = keys,
+                        refresh = {},
                     ) {
                         items(keys, key = { it }) { key ->
                             Text(key, Modifier.height(60.dp))
