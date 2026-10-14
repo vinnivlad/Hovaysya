@@ -62,6 +62,21 @@ CHANNELS = (
     # момент прилета «Шахеда»" -- which the policy vetoes by design, and it would
     # have cost a second language in the gazetteer for it.
     "rocketskyiv",
+    # Added 2026-10-14, his find, weighed by `tools/bench/channel.py` over the
+    # 27 days it has existed (from 2026-09-17). An observer, not a relay: 16 of
+    # 5220 posts copy `mon1tor_ua`, the rest are its own.
+    #
+    # The strongest about his ring of anything measured: 922 mentions, 313 of
+    # them first and 223 that nothing of ours said at all. Replayed through the
+    # policy it moves 64 bells earlier, 28 of them by more than a minute, and
+    # adds 42 -- 1.6 a night, most of them over Жуляни, which by his rule is
+    # coverage. Where it is chatty is cruise over the city.
+    #
+    # Its talk about the all-clear ("Києву вже можна дати відбій") read as a
+    # partial all-clear until it was taught to read as a recheck -- his call.
+    # And it costs 11% more requests: 1.27 a second at an alert's peak, against
+    # a ceiling of 2.0 and no 429 in the server's journal since 2026-09-28.
+    "kyiv_monitor1",
 )
 
 DB_PATH = REPO_ROOT / "data" / "messages.db"
