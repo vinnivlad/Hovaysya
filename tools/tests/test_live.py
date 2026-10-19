@@ -763,3 +763,62 @@ def test_the_rename_waits_out_a_reader_holding_the_file(tmp_path, monkeypatch):
     assert refusals["left"] == 0, "the rename was not retried"
     assert len(path.read_text(encoding="utf-8").splitlines()) == 2
     assert not list(tmp_path.glob("*.tmp")), "the temporary file was left behind"
+
+
+# --- asking t.me ------------------------------------------------------------
+
+
+class _Recording:
+    """A client that remembers what it was asked and has one channel's feed."""
+
+    def __init__(self, ids):
+        self.ids = ids
+        self.asked = []
+
+    def page(self, channel, before=None, after=None):
+        from tools.export.store import Msg
+        from tools.export.tme import Page
+
+        self.asked.append(after)
+        return Page(messages=[Msg(channel, i, T0 + i, f"пост {i}")
+                              for i in self.ids if after is None or i > after][:20])
+
+
+def test_the_same_question_is_never_asked_twice_in_a_row(tmp_path):
+    """t.me/s answers a repeated URL from a cache for up to a minute. From
+    2026-10-14 23:15 that put a median 34 s between a post and our seeing it,
+    against 4 s before, on every channel and from any address. Asking for
+    `after=last-k` with k moving on each poll gets a fresh page: measured
+    side by side over 16 posts, 3 s median against 21 s for the repeated URL."""
+    from tools.export import store
+    from tools.live.run import Watcher, poll_once
+
+    conn = store.connect(tmp_path / "m.db")
+    client = _Recording(list(range(1, 101)))
+    w = Watcher("mon1tor_ua", last_id=100)
+    for _ in range(20):
+        poll_once(client, conn, [w], Session())
+    pairs = list(zip(client.asked, client.asked[1:]))
+    assert all(a != b for a, b in pairs)
+    # Each URL comes back no sooner than sixteen polls later, which at the
+    # quickest interval is still longer than the cache holds one.
+    assert len(set(client.asked[:16])) == 16
+    assert all(a < 100 for a in client.asked)
+
+
+def test_what_was_already_seen_is_not_seen_again(tmp_path):
+    """Asking from a little way back brings old posts onto the page; they must
+    not reach the policy a second time."""
+    from tools.export import store
+    from tools.live.run import Watcher, poll_once
+
+    conn = store.connect(tmp_path / "m.db")
+    client = _Recording(list(range(1, 101)))
+    w = Watcher("mon1tor_ua", last_id=100)
+    session = Session()
+    assert poll_once(client, conn, [w], session) == 0
+    client.ids.append(101)
+    assert poll_once(client, conn, [w], session) == 1
+    assert poll_once(client, conn, [w], session) == 0
+    assert w.last_id == 101
+    assert session.decisions == 1

@@ -11,7 +11,10 @@ channels):
   nothing is new, versus 9 KB gzipped for a full page. Cheap polling.
 - No ETag or Last-Modified is offered, so conditional GET / 304 is impossible;
   `?after=` is the better mechanism anyway.
-- A new post appears here roughly 2 s after being published.
+- A new post appears here roughly 2 s after being published -- on a URL not
+  asked in the last minute. Since 2026-10-14 a repeated URL is answered from a
+  cache for up to a minute, which is why the live watcher varies its cursor
+  (`tools.live.run.CURSOR_STEPS`).
 
 Parsing notes that are easy to get wrong:
 

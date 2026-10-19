@@ -103,6 +103,17 @@ RENAME_WAIT_S = 0.1
 BACKOFF_START_S = 5.0
 BACKOFF_MAX_S = 300.0
 
+# t.me/s answers a URL it has just answered from a cache, for up to a minute.
+# Until 2026-10-14 it did not; from 23:15 that night the same `?after=<last>`,
+# asked until something new arrives, put a median 34 s between a post and our
+# seeing it, on every channel and from any address. So the cursor is asked from
+# a little way back, a different distance each poll: side by side over 16 posts
+# that saw them in 3 s median against 21 s. Sixteen steps so that a URL comes
+# round again no sooner than 160 s even at the official interval, well past the
+# minute the cache holds; the posts it brings back are below `last_id` and
+# dropped like any other already seen.
+CURSOR_STEPS = 16
+
 # How often to print a still-here line while nothing is happening.
 HEARTBEAT_S = 900.0
 
@@ -168,6 +179,7 @@ class Watcher:
     due_at: float = 0.0
     errors: int = 0
     seen: int = 0
+    polls: int = 0
 
 
 @dataclass
@@ -345,8 +357,12 @@ def poll_once(client: Client, conn: sqlite3.Connection, watchers: list[Watcher],
             continue
         if args is not None:
             w.due_at = time.time() + interval_for(w.channel, session.tracker, args)
+        w.polls += 1
+        after = None
+        if w.last_id:
+            after = max(1, w.last_id - 1 - w.polls % CURSOR_STEPS)
         try:
-            page = client.page(w.channel, after=w.last_id or None)
+            page = client.page(w.channel, after=after)
         except FetchError as exc:
             w.errors += 1
             wait = min(BACKOFF_START_S * (2 ** min(w.errors, 6)), BACKOFF_MAX_S)
