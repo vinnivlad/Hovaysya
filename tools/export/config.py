@@ -5,7 +5,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Telegram monitoring channels, by username (no @).
-# Adding one? Put it above `alarm_kyiv`, or anywhere except after it.
+# Adding one? Put it above `UkraineAlarmSignal`, or anywhere except after it.
 #
 # **The official channel must stay last.** The page timestamps carry seconds and
 # nothing finer, and three messages sharing a second is ordinary, so at equal
@@ -18,16 +18,16 @@ CHANNELS = (
     "kievinform_ua1",
     "war_monitor",
     "mon1tor_ua",
-    # The official siren state for the city, and nothing else: this channel
-    # relays the "Повітряна тривога" app's bot and posts exactly two forms,
-    # "🚨 м. Київ / Повітряна тривога" and "🟢 м. Київ / Відбій повітряної
-    # тривоги". He found it, and it closes the one gap the chat channels could
-    # never fill — they report sirens, they do not declare them.
+    # The official siren state for the city, read out of a channel that covers
+    # the whole country -- `tools/export/uas.py` keeps the city's posts and
+    # rewrites them into the form the policy reads; nothing else gets in.
     #
-    # Checked against the official app on 2026-08-28: the app declared Kyiv at
-    # 08:04 and this channel posted at 08:04:15, while `kievinform_ua1` had
-    # already said a bare "🛑 ТРИВОГА" at 07:50 for a district.
-    "alarm_kyiv",
+    # In place of `alarm_kyiv` since 2026-10-19. That one relayed the
+    # "Повітряна тривога" app's bot, and from 2026-10-18 the bot itself fell
+    # one to ten minutes behind; this one carried 223 of 223 city sirens and
+    # all-clears over the month before, +12 s, nothing false. `alarm_kyiv` is
+    # still official for the replays of everything recorded before.
+    "UkraineAlarmSignal",
     # A live tracker in conversational Ukrainian, and the only channel measured
     # to be *first* about his own ring: 26 times in three days, against 41 live
     # ring mentions total. One of those firsts put a ballistic warning five

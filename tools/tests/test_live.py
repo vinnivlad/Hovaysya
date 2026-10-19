@@ -822,3 +822,47 @@ def test_what_was_already_seen_is_not_seen_again(tmp_path):
     assert poll_once(client, conn, [w], session) == 0
     assert w.last_id == 101
     assert session.decisions == 1
+
+
+def test_the_official_channel_is_filtered_to_the_city_at_the_door(tmp_path):
+    """`UkraineAlarmSignal` covers the country, ~1200 posts a day, ~16 about
+    the city. The rest must not reach the database, the policy or the log --
+    but the cursor still moves past them, or every poll would read them again."""
+    from tools.export import store
+    from tools.export.store import Msg
+    from tools.export.tme import Page
+    from tools.export.uas import CHANNEL, YELLOW
+    from tools.live.run import Watcher, poll_once
+
+    class Country:
+        def page(self, channel, before=None, after=None):
+            return Page(messages=[
+                Msg(CHANNEL, 11, T0, "🟡 Полтавський район (Полтавська обл.)\n"
+                                     "Жовтий рівень тривоги. Прямуйте в укриття!"),
+                Msg(CHANNEL, 12, T0 + 1, "🟡 Жовтий рівень тривоги\n• Київ\n"
+                                         "• Бучанський район (Київська обл.)"),
+                Msg(CHANNEL, 13, T0 + 2, "🛸 Харків (Харківська обл.)\n"
+                                         "Загроза застосування БПЛА."),
+            ])
+
+    conn = store.connect(tmp_path / "m.db")
+    w = Watcher(CHANNEL, last_id=10)
+    session = Session()
+    assert poll_once(Country(), conn, [w], session) == 1
+    assert w.last_id == 13
+    rows = conn.execute("SELECT message_id, text_raw FROM messages").fetchall()
+    assert [(r["message_id"], r["text_raw"]) for r in rows] == [(12, YELLOW)]
+    assert session.tracker.episode is not None
+
+
+def test_the_new_official_channel_declares():
+    from tools.export.config import CHANNELS
+    from tools.export.uas import CHANNEL
+    from tools.policy.episodes import OFFICIAL_CHANNELS
+
+    assert CHANNEL in OFFICIAL_CHANNELS
+    assert CHANNEL in CHANNELS
+    # Not asked any more, but still official: old logs and the corpus replay
+    # with it.
+    assert "alarm_kyiv" not in CHANNELS
+    assert "alarm_kyiv" in OFFICIAL_CHANNELS

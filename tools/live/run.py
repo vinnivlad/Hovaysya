@@ -48,6 +48,7 @@ from pathlib import Path
 from ..export import store
 from ..export.config import CHANNELS, DB_PATH
 from ..export.tme import Client, FetchError
+from ..export import uas
 from ..labeler.build import kyiv_dt
 from ..policy import carry
 from ..policy.announce import Announcer
@@ -123,6 +124,11 @@ HEARTBEAT_S = 900.0
 # prints as if it were live, and lands in the lag statistics as a single
 # forty-minute delay — destroying the one number this stage exists to produce.
 SLEEP_GAP_S = 120.0
+
+# The replay's tie-break, the same rule as the poll's: at equal seconds the
+# declaring channel goes last.
+OFFICIAL_LAST = "channel IN ({})".format(
+    ", ".join(f"'{c}'" for c in sorted(OFFICIAL_CHANNELS)))
 
 # How much recent history to replay through the tracker at startup. Polling
 # starts from the last message this run has seen, so the window is only about
@@ -374,6 +380,8 @@ def poll_once(client: Client, conn: sqlite3.Connection, watchers: list[Watcher],
         new = [m for m in page.messages if m.message_id > w.last_id]
         if new:
             w.last_id = max(m.message_id for m in new)
+            # The cursor has moved past all of them; only the city goes on.
+            new = uas.adapt(new)
             w.seen += len(new)
             fresh.extend(new)
 
@@ -437,7 +445,7 @@ def interval_for(channel: str, tracker: Tracker, args) -> float:
 def interval_hint(args, session: Session) -> float:
     """The shortest interval in play — channels are on separate clocks now, so
     "the loop is late" means late for whichever comes due first."""
-    return min(interval_for("alarm_kyiv", session.tracker, args),
+    return min(interval_for(uas.CHANNEL, session.tracker, args),
                interval_for("mon1tor_ua", session.tracker, args))
 
 
@@ -688,7 +696,7 @@ def warm_one(who, conn, now: float) -> tuple[int, list]:
     for row in conn.execute(
             "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
             "WHERE ts >= ? AND ts <= ? AND text_norm <> '' "
-            "ORDER BY ts, channel IN ('alarm_kyiv')",
+            f"ORDER BY ts, {OFFICIAL_LAST}",
             (int(now) - WARM_WINDOW_S, int(now))):
         handle(solo, row["channel"], row["message_id"], row["ts"],
                row["text_norm"], row["reply_to"] is not None, now, warm=True)
@@ -1064,7 +1072,7 @@ def main(argv: list[str] | None = None) -> int:
     for row in conn.execute(
             "SELECT channel, message_id, ts, text_norm, reply_to FROM messages "
             "WHERE ts >= ? AND text_norm <> '' "
-            "ORDER BY ts, channel IN ('alarm_kyiv')", (warm_from,)):
+            f"ORDER BY ts, {OFFICIAL_LAST}", (warm_from,)):
         anchor = f"{row['channel']}/{row['message_id']}"
         quiet = row["ts"] < fresh_from or anchor in said
         handle(session, row["channel"], row["message_id"], row["ts"],

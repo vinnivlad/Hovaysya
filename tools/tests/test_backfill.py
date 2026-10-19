@@ -221,3 +221,22 @@ def test_a_done_top_block_is_reopened_when_the_channel_grows(tmp_path):
     assert top["hi"] == 12_400
     assert top["cursor"] == 12_401
     assert top["done"] == 0
+
+
+def test_the_country_wide_channel_keeps_only_the_city(tmp_path):
+    """The corpus would otherwise take ~1200 posts a day of other regions."""
+    from tools.export.uas import CHANNEL, CLEAR
+
+    class Country(FakeClient):
+        def page(self, channel, before=None, after=None):
+            page = super().page(channel, before, after)
+            texts = {3: "🟢 Відбій тривоги\n• Київ"}
+            return Page(messages=[Msg(m.channel, m.message_id, m.ts,
+                                      texts.get(m.message_id, "🟡 Харків"))
+                                  for m in page.messages], before=page.before)
+
+    conn = db(tmp_path)
+    walk_block(Country(range(1, 6)), conn, threading.Lock(), CHANNEL, 0, 9,
+               None, Progress())
+    rows = conn.execute("SELECT message_id, text_raw FROM messages").fetchall()
+    assert [(r["message_id"], r["text_raw"]) for r in rows] == [(3, CLEAR)]

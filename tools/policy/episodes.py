@@ -365,7 +365,10 @@ class Observation:
 
 
 # The channels that declare rather than report.
-OFFICIAL_CHANNELS = frozenset({"alarm_kyiv"})
+# `UkraineAlarmSignal` is the one asked since 2026-10-19 (see
+# `tools/export/uas.py`); `alarm_kyiv` stays so that what it said before then
+# still replays as a declaration.
+OFFICIAL_CHANNELS = frozenset({"alarm_kyiv", "UkraineAlarmSignal"})
 
 # ---------------------------------------------------------------------------
 # WORKAROUND, 2026-09-08. Delete this constant and the single condition in

@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from . import store
+from . import store, uas
 from .tme import Client, FetchError
 
 DEFAULT_BLOCK_SIZE = 5000
@@ -72,7 +72,9 @@ def walk_block(
             break
 
         with db_lock:
-            added += store.insert_messages(conn, page.messages)
+            # A country-wide channel keeps only the city; the cursor below
+            # still walks the whole page.
+            added += store.insert_messages(conn, uas.adapt(page.messages))
 
         # Telegram's own cursor is authoritative; min(ids) is the fallback when
         # the page carries no "load more" link (happens at the very beginning).
