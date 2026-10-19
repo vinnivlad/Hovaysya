@@ -324,3 +324,39 @@ def test_find_id_at_date_respects_the_iteration_cap():
     c = Pathological(BASE_TS, 100, budget=20)
     c.find_id_at_date("ch", _cutoff(BASE_TS + 5000), 100, max_iters=10)
     assert c.calls <= 10
+
+
+def test_a_429_is_counted_and_its_wait_remembered(monkeypatch):
+    """The watcher says a 429 out loud from these two fields."""
+    import email.message
+    import io
+    import urllib.error
+    import urllib.request
+
+    from tools.export import tme
+
+    calls = []
+
+    class Ok(io.BytesIO):
+        headers = email.message.Message()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def urlopen(req, timeout=None):
+        calls.append(req.full_url)
+        if len(calls) == 1:
+            headers = email.message.Message()
+            headers["Retry-After"] = "7"
+            raise urllib.error.HTTPError(req.full_url, 429, "Too Many", headers, None)
+        return Ok(b"<html></html>")
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    client = tme.Client(rps=0)       # no limiter, so the penalty sleeps nobody
+    client.get("c", after=1)
+    assert client.throttled == 1
+    assert client.last_delay == 7.0
+    assert len(calls) == 2

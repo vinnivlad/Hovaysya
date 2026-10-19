@@ -367,14 +367,17 @@ def poll_once(client: Client, conn: sqlite3.Connection, watchers: list[Watcher],
         after = None
         if w.last_id:
             after = max(1, w.last_id - 1 - w.polls % CURSOR_STEPS)
+        throttled = getattr(client, "throttled", 0)
         try:
             page = client.page(w.channel, after=after)
         except FetchError as exc:
+            say_429(client, w.channel, throttled)
             w.errors += 1
             wait = min(BACKOFF_START_S * (2 ** min(w.errors, 6)), BACKOFF_MAX_S)
             w.backoff_until = time.time() + wait
             print(f"  ! {w.channel}: {exc} — пауза {wait:.0f}s", flush=True)
             continue
+        say_429(client, w.channel, throttled)
         w.errors = 0
         w.backoff_until = 0.0
         new = [m for m in page.messages if m.message_id > w.last_id]
@@ -413,6 +416,25 @@ def poll_once(client: Client, conn: sqlite3.Connection, watchers: list[Watcher],
             quiet = f"{channel}/{message_id}" in (said or ())
         handle(session, channel, message_id, ts, text, is_reply, now, warm=quiet)
     return len(fresh)
+
+
+def say_429(client, channel: str, before: int) -> None:
+    """Say a 429 out loud. The client waits it out by itself and would say
+    nothing, and the first one is the news: it is where the limit is."""
+    if getattr(client, "throttled", 0) > before:
+        print(f"  ! {channel}: t.me 429 — чекаю "
+              f"{getattr(client, 'last_delay', 0):.0f}s", flush=True)
+
+
+def traffic_note(client, since: tuple[int, int]) -> str:
+    """Requests and 429s since `since`, a (requests, throttled) pair."""
+    requests = getattr(client, "requests", 0) - since[0]
+    throttled = getattr(client, "throttled", 0) - since[1]
+    return f"запитів {requests}, 429: {throttled}"
+
+
+def traffic_mark(client) -> tuple[int, int]:
+    return getattr(client, "requests", 0), getattr(client, "throttled", 0)
 
 
 def state_word(tracker: Tracker) -> str:
@@ -1149,6 +1171,7 @@ def main(argv: list[str] | None = None) -> int:
     print()
 
     last_beat = time.time()
+    beat_traffic = traffic_mark(client)
     last_poll = time.time()
     # Already taken on at start-up, so the first pass through the loop has
     # nothing to do unless somebody registered in the meantime.
@@ -1177,9 +1200,13 @@ def main(argv: list[str] | None = None) -> int:
         if time.time() - last_beat > HEARTBEAT_S:
             last_beat = time.time()
             state = state_word(session.tracker)
+            # How close to the limit, every beat, rather than found out by
+            # hitting it.
             print(f"  · {kyiv_dt(int(time.time())):%H:%M} {state}, "
-                  f"{session.decisions} повідомлень, {session.audible} побудок",
+                  f"{session.decisions} повідомлень, {session.audible} побудок, "
+                  f"{traffic_note(client, beat_traffic)}",
                   flush=True)
+            beat_traffic = traffic_mark(client)
 
         # Until whichever channel comes due first, not a single global tick.
         deadline = min(max(w.due_at, w.backoff_until) for w in watchers)
@@ -1189,6 +1216,7 @@ def main(argv: list[str] | None = None) -> int:
     write_log(session, log_path)
     write_state(session, STATE_DIR, time.time())
     summarise(session, started)
+    print(f"  t.me: {traffic_note(client, (0, 0))}")
     if session.notifier and session.notifier.enabled:
         print(f"  на телефон надіслано: {session.notifier.sent}"
               f"   помилок: {session.notifier.failures}")

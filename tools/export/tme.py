@@ -275,6 +275,8 @@ class Client:
         self.requests = 0
         self.bytes = 0
         self.throttled = 0
+        # How long the last 429 told us to wait, for whoever wants to say so.
+        self.last_delay = 0.0
         self._lock = Lock()
 
     def url(self, channel: str, before: int | None = None, after: int | None = None) -> str:
@@ -313,6 +315,7 @@ class Client:
                     delay = float(exc.headers.get("Retry-After") or 2 ** (attempt + 2))
                     with self._lock:
                         self.throttled += 1
+                        self.last_delay = delay
                     self.limiter.penalize(delay)
                     continue
                 if 500 <= exc.code < 600:

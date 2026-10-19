@@ -866,3 +866,58 @@ def test_the_new_official_channel_declares():
     # with it.
     assert "alarm_kyiv" not in CHANNELS
     assert "alarm_kyiv" in OFFICIAL_CHANNELS
+
+
+# --- seeing a 429 -------------------------------------------------------------
+
+
+def test_a_429_is_said_out_loud(tmp_path, capsys):
+    """The client waits a 429 out by itself and says nothing, so on 2026-10-19
+    throttling had to be ruled out by a separate measurement before anyone could
+    say the lag was not it. Now the first one shows in the journal."""
+    from tools.export import store
+    from tools.export.tme import Page
+    from tools.live.run import Watcher, poll_once
+
+    class Throttled:
+        throttled = 0
+        last_delay = 0.0
+
+        def page(self, channel, before=None, after=None):
+            self.throttled += 1
+            self.last_delay = 8.0
+            return Page()
+
+    conn = store.connect(tmp_path / "m.db")
+    poll_once(Throttled(), conn, [Watcher("mon1tor_ua", last_id=5)], Session())
+    out = capsys.readouterr().out
+    assert "429" in out and "mon1tor_ua" in out and "8s" in out
+
+
+def test_no_429_says_nothing(tmp_path, capsys):
+    from tools.export import store
+    from tools.export.tme import Page
+    from tools.live.run import Watcher, poll_once
+
+    class Fine:
+        throttled = 0
+
+        def page(self, channel, before=None, after=None):
+            return Page()
+
+    conn = store.connect(tmp_path / "m.db")
+    poll_once(Fine(), conn, [Watcher("mon1tor_ua", last_id=5)], Session())
+    assert capsys.readouterr().out == ""
+
+
+def test_the_heartbeat_says_how_close_we_are():
+    """Requests and 429s since the last beat: the distance to the limit, read
+    off every fifteen minutes instead of found out once we hit it."""
+    from tools.live.run import traffic_note
+
+    class Counted:
+        requests = 130
+        throttled = 2
+
+    assert traffic_note(Counted(), (100, 1)) == "запитів 30, 429: 1"
+    assert traffic_note(object(), (0, 0)) == "запитів 0, 429: 0"
