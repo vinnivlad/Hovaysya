@@ -873,6 +873,10 @@ class Tracker:
             ep.cruise_geo = max(ep.cruise_geo, GEO_STEP.get(obs.scope, 0))
         if reason == "where the ballistic is going":
             ep.ballistic_located = True
+        # A ballistic launch has been announced, with or without the verb --
+        # what makes the next line of the same wave a position, not a launch.
+        if level == "alert" and reason == "confirmed ballistic":
+            ep.launched.add("ballistic")
         if level == "info" and reason:
             ep.last_silent[silent_signature(obs, reason)] = obs.ts
 

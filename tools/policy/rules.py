@@ -13,6 +13,7 @@ wake-up; then proximity, which refines it.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from ..nlp import hints
@@ -55,6 +56,11 @@ class Decision:
     def audible(self) -> bool:
         return self.notify and self.level in ("alert", "shelter")
 
+
+
+# The words a warning carries and a launch report does not. "Небезпека" since
+# "🔴 Додалась балістична небезпека з Брянська" (2026-10-15) rang as a launch.
+_WARNING = re.compile(r"загроз|небезпек", re.IGNORECASE)
 
 def _kyiv_hour(ts: int) -> int:
     from datetime import datetime, timedelta, timezone
@@ -586,6 +592,23 @@ def _decide(obs: Observation, tracker: Tracker) -> Decision:
         if (ep is not None and ep.recheck_at and obs.ts > ep.recheck_at
                 and not inherited and obs.threat == "ballistic"
                 and not _ORDINAL.search(obs.text or "")
+                and (obs.from_launch_site or obs.scope in CITY_OR_NEARER)):
+            first_launch = True
+        # ...and the same reading for the first launch of the raid, recheck or
+        # not. On 2026-10-22, at 02:55 and again at 12:35, "Загроза балістики"
+        # rang as a climb and spent the ballistic tone; "Балістика на
+        # Київ/передмістя" two minutes later had no verb, so it went out quiet as
+        # the wave, and the bell came only with "спуск" or "Вихід" 41-50 s on --
+        # on 2026-10-17, never. The warning was not a launch, and the first
+        # launch rings even when the tone has sounded for a warning about it.
+        #
+        # A launch line never says "загроза" or "небезпека"; a warning always
+        # does, in either word order -- "🔴 Балістична загроза" slips past the
+        # anticipation pattern and reached this rule the same day.
+        if (ep is not None and "ballistic" not in ep.launched
+                and not inherited and obs.threat == "ballistic"
+                and not _ORDINAL.search(obs.text or "")
+                and not _WARNING.search(obs.text or "")
                 and (obs.from_launch_site or obs.scope in CITY_OR_NEARER)):
             first_launch = True
         # A type nobody has named yet is a new event, whatever the wording. His

@@ -3425,3 +3425,59 @@ def test_without_an_official_source_the_chat_channels_still_close():
     tracker.record(obs, d.level if d.notify else None,
                    d.alarm if d.notify else None, d.reason)
     assert tracker.episode is None, "a chat all-clear must still close one here"
+
+
+# --- the first launch after a warning ----------------------------------------
+
+
+def _raid(*script):
+    """A red siren from the official channel, then (offset, channel, text)."""
+    from tools.export.uas import RED
+    from tools.policy.episodes import Tracker, observe
+    from tools.policy.rules import decide
+
+    tracker = Tracker()
+    tracker.official_source = True
+    out = []
+    for offset, channel, text in ((0, "UkraineAlarmSignal", RED), *script):
+        obs = observe(T0 + offset, text, False, channel)
+        d = decide(obs, tracker)
+        tracker.record(obs, d.level if d.notify else None,
+                       d.alarm if d.notify else None, d.reason)
+        out.append(d)
+    assert out[0].audible
+    return out[1:]
+
+
+def test_the_first_launch_rings_after_the_warning_did():
+    """2026-10-22, 02:55 and again at 12:35: "Загроза балістики" rang as a
+    climb, and the launch two minutes later -- "Балістика на Київ/передмістя",
+    no verb -- went out quiet as "the wave, where it is now". The bell came
+    only with "спуск" or "Вихід", 41-50 s on, and on 2026-10-17 never.
+    A warning is not a launch, and the first launch always rings."""
+    out = _raid((33, "monitoring_kyiv", "Загроза балістики 😨"),
+                (44, "war_monitor", "🟣 Загроза балістики з Брянська. Увага.\n"
+                                    "Імовірний пуск балістичних ракет"),
+                (197, "rocketskyiv", "Балістика на Київ/передмістя."),
+                (200, "kievinform_ua1", "❗️ БАЛІСТИКА НА КИЇВ🚀в укриття!"),
+                (247, "war_monitor", "‼️ Київ — спуск балістики!"),
+                (261, "war_monitor", "☄ Вихід на Київ"))
+    warning, again, launch, *same_wave = out
+    assert warning.audible and warning.reason == "threat level rose"
+    assert not again.audible, again.reason
+    assert launch.audible and launch.alarm == "ballistic", launch.reason
+    for d in same_wave:
+        assert not d.audible, d.reason
+
+
+def test_a_warning_after_a_warning_is_still_not_a_launch():
+    """12:35:47 the same day: "🔴 Балістична загроза" -- the adjective first,
+    which the anticipation pattern does not cover -- must not pass for one."""
+    out = _raid((28, "kievinform_ua1", "⚠️ Загроза балістики 🚀 через активність ОТРК 💥 ворога"),
+                (47, "nebo_raketa", "🔴 Балістична загроза"),
+                (64, "monitoring_kyiv", "‼️Загроза балістики з Брянська"),
+                # 2026-10-15 21:45: the same warning, written as a danger.
+                (80, "nebo_raketa", "🔴 Додалась балістична небезпека з Брянська"))
+    assert out[0].audible
+    for d in out[1:]:
+        assert not d.audible, d.reason
