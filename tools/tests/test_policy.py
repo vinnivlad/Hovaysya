@@ -3481,3 +3481,51 @@ def test_a_warning_after_a_warning_is_still_not_a_launch():
     assert out[0].audible
     for d in out[1:]:
         assert not d.audible, d.reason
+
+
+# --- a ballistic word buried in prose does not ring --------------------------
+
+_SIREN = (0, "alarm_kyiv", "🚨 м. Київ\nПовітряна тривога")
+
+
+def test_a_ballistic_word_buried_in_prose_does_not_ring():
+    """A channel promotion that rang the ballistic tone at 09:55 on 2026-09-08:
+    long, and the word «балістики» sits in its second line. Every ballistic
+    bell in the live logs that was longer than 140 characters and did not name
+    the class in a short first line was one of these -- five of five before
+    b740623 -- and the real report that follows still rings."""
+    out = _play([
+        _SIREN,
+        (60, "nebo_raketa",
+         "❗️Хто ще досі не підписаний на Київ Головне?\nХто не знав – це той самий "
+         "канал, що на 2-3 хв швидше за інших пише про вильоти балістики та рух "
+         "дронів, слідкуйте: @kyiv_golovne"),
+        (90, "rocketskyiv", "Балістика на Київ/передмістя."),
+    ])
+    assert not out[1][1], out
+    assert out[2][1], out
+
+
+def test_a_long_warning_that_leads_with_the_class_still_rings():
+    """war_monitor's template is as long as the prose above, and says what it is
+    in its first line."""
+    out = _play([
+        _SIREN,
+        (60, "war_monitor",
+         "🟣 Загроза балістики з Таганрога/Ростова. Увага.\nІмовірний пуск "
+         "балістичних ракет комплексів «Іскандер» / С-400.\nабо робота ворожої "
+         "ППО С-300.\nНе знаходьтесь під відкритим небом — це небезпечно!"),
+    ])
+    assert out[1][1], out
+
+
+def test_no_word_of_a_launch_is_not_a_launch():
+    """«Не було інформації про вихід балістичних ракет ворога.» rang as
+    «Пуск: балістика.» at 01:32 on 2026-09-25 -- the Air Force's
+    statement after a strike, in the words of another channel."""
+    out = _play([
+        _SIREN,
+        (60, "kievinform_ua1",
+         "Не було інформації про вихід балістичних ракет ворога."),
+    ])
+    assert not out[1][1], out

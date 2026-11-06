@@ -86,6 +86,16 @@ def decide(obs: Observation, tracker: Tracker) -> Decision:
     """
     decision = _decide(obs, tracker)
     cfg = tracker.config
+    # The ballistic tone is for a report, and a report leads with what is flying.
+    # Silent rather than a quiet line: «Противник планує ... атаки» on the status
+    # as «Загроза: балістика.» is the complaint itself. Nothing is lost when one
+    # of these is real -- the other channels say it in a line, and that line
+    # rings, because this one did not spend the tone. Measured on every live log
+    # from 2026-08-29: five bells go, all five briefings, none is even delayed.
+    if (decision.audible and decision.alarm == "ballistic"
+            and hints.ballistic_buried_in_prose(obs.text)):
+        return Decision(False, None, None,
+                        "prose: ballistic is not what it leads with")
     # The quiet hours, applied once for every rule rather than inside each. Only
     # the classes that leave minutes keep their sound; the rest becomes a status
     # line. Off by default, and it exists because the app's vibration alphabet

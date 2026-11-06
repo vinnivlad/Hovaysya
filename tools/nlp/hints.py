@@ -250,8 +250,14 @@ _NEGATED_LAUNCH = re.compile(r"\bбез\s+пуск\w*", re.IGNORECASE)
 # hour after the strike -- the word пусків is right there, and so are the
 # missiles and Kyiv. Four messages in the corpus and the live logs, every one
 # this same statement.
+# The same statement retold by a channel: «Не було інформації про вихід
+# балістичних ракет ворога.» rang «Пуск: балістика.» at 01:32 on 2026-09-25.
+# Past tense only -- «Знову немає інформації про пуски цілей. Ракети фіксують
+# уже лише на Сумщині» is the present, and a live report. Two in the corpus.
 _NO_LAUNCH_INFO = re.compile(
-    r"щодо\s+пуск\w*[^.]{0,40}\bне\s+(?:надход|поступ)\w*", re.IGNORECASE)
+    r"щодо\s+пуск\w*[^.]{0,40}\bне\s+(?:надход|поступ)\w*|"
+    r"не\s+було\s+інформаці\w*\s+(?:про|щодо)\s+(?:вихід|пуск|запуск)",
+    re.IGNORECASE)
 
 _THREAT_BESIDE_PLACE = re.compile(_THREAT_WORD, re.IGNORECASE)
 
@@ -1319,6 +1325,26 @@ PROSE_ALONE = frozenset({"emoji-with-place", "phase-word"})
 def _squeezed(text: str) -> str:
     """Length as a reader sees it, with runs of whitespace collapsed."""
     return " ".join((text or "").split())
+
+
+# A report of ballistic says so first; an article mentions it on the way. Every
+# ballistic bell in the live logs (2026-08-29 to 11-06) that was longer than
+# this and did not name the class in a short first line was a briefing, a promo
+# or a news item -- five of five before b740623 -- while war_monitor's
+# 180-character templates open with «🟣 Загроза балістики з ...» and are untouched.
+# Matched on the shape rather than the words, so it catches the next wording too.
+BURIED_CHARS = 140
+HEADLINE_CHARS = 70
+
+
+def ballistic_buried_in_prose(text: str) -> bool:
+    """Long, and ballistic is not what its first line is about."""
+    text = text or ""
+    if len(text) <= BURIED_CHARS:
+        return False
+    first = next((line for line in text.splitlines() if line.strip()), "")
+    return not (len(first) <= HEADLINE_CHARS
+                and active_threat(first) == "ballistic")
 
 
 # Not in `STRONG_SHAPES`: a hedge about noise is weak evidence, the same call
