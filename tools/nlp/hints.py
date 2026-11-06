@@ -505,7 +505,10 @@ _DENIED_GAP = (r"(?:\s+(?:в\s+повітрі|у\s+повітрі|над\s+мі�
 # "фіксують" instead of "фіксуються" -- and the lookahead then sees "ся та
 # летять", which starts with no conjunction, so the guard is stepped around by
 # ordinary backtracking.
-_DENIED_TAIL = (r"(?:нема\w*|не\s+має|відсутн\w*|чисто|не\s+фіксу\w*)\b"
+# «тиша» is the third recheck word: «По балістиці тиша. 🚀Реактивний на Трою»
+# rang the ballistic tone at 20:18 on 2026-10-26 for a jet Shahed. Three in the
+# corpus, all «По балістиці (поки|наразі) тиша».
+_DENIED_TAIL = (r"(?:нема\w*|не\s+має|відсутн\w*|чисто|тиш[аі]|не\s+фіксу\w*)\b"
                 r"(?!\s*(?:та|і|й|,)\s*(?:лет|йдут|рухаю|курс))")
 
 _DENIED = re.compile(
@@ -1564,7 +1567,11 @@ _FORECAST = re.compile(
     # of anything in the air, and the eval is unchanged: 2 false wake-ups, 47 hits,
     # 4 misses.
     r"особлива увага|"
-    r"ворог (планує|готує|може завдати)|"
+    # «противник» is the same subject in the General Staff's register, and the
+    # one word kept «Противник планує чергові комбіновані масовані атаки» -- a
+    # warning that ends «Нічого нового ви не прочитали» -- ringing the ballistic
+    # tone at 14:18 on 2026-11-06.
+    r"(ворог|противник) (планує|готує|може завдати)|"
     # Reconnaissance for a strike that has not been planned yet, let alone
     # flown. "⚠️ Росіяни активно збирають інформацію про об'єкти в Києві та
     # області — для планування майбутніх ударів ... великі торговельні об'єкти
@@ -1748,7 +1755,35 @@ _FORECAST = re.compile(
     # Two in the corpus, and it wrote `cruise` onto an episode whose only
     # launches were jet drones.
     r"коли саме буде пуск|"
-    r"готові до застосування",
+    # Any case of «готовий», not only the plural: «Загальна кількість готового
+    # до застосування озброєння: до 70 крилатих ракет, близько 30 балістичних»
+    # closed a list of likely targets that named Жуляни among the airfields, and
+    # it rang «Загроза: балістика. Жуляни.» at 16:30 on 2026-11-02. Four in the
+    # corpus; the one that moves is a tally of the night.
+    r"готов\w+\s+до\s+застосуванн|"
+    # A launch that may come, in the plural. «По балістиці ще уважно. Можуть
+    # бути нові пуски» rang as a launch at 23:58 on 2026-10-18 -- the sibling of
+    # «можливий пуск» above, and his ruling on that one covers it. Seven in the
+    # corpus and six were reading as live; every one is advice to stay in the
+    # shelter.
+    r"мож(уть|е)\s+бути\s+(ще\s+)?(нов\w+\s+|повторн\w+\s+)?(пуск|вихід|запуск)|"
+    # A strike told in the past tense. «💥Тепер під ударом був правий берег,
+    # було близько 4х цирконів» rang at 23:04 on 2026-10-21, after the wave.
+    # Three in the corpus; the other that moves is «Було близько 25х ракет, до
+    # Києва долетіли 3».
+    r"під ударом (був|була|були)|було близько\s+\d|"
+    # A promotion for another channel by handle rather than by link. «Хлопці з
+    # ППО ... повідомляють завчасно про вихід балістики ... @kyiv_truvoga_radar
+    # ... негайно підпишіться» rang as a launch at 19:08 on 2026-10-20. 13 in
+    # the corpus, 7 reading as live, every one «підпишіться на @...».
+    r"(підпиш|підпис)\w*[^.!?]{0,80}@\w|@\w+[^.!?]{0,80}підпиш|"
+    # The General Staff reporting our strike. «уражено російську пускову
+    # установку «Іскандер-М», — Генштаб.» rang as a launch at 10:21 on
+    # 2026-10-30. The attribution rule above wants the name at the end of the
+    # line, and this one has a full stop after it; letting a full stop through
+    # there was measured and reaches 29 live messages, Klitschko's impact
+    # reports among them, so only this source and this event are named.
+    r"[—–]\s*генштаб|уражен\w*[^.!?]{0,40}пусков\w*\s+установк",
     re.IGNORECASE | re.MULTILINE,
 )
 

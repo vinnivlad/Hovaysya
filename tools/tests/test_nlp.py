@@ -2116,6 +2116,16 @@ def test_a_denial_about_something_else_leaves_the_class_alone():
     assert threat_hint("❗️Балістика на Київ.") == "ballistic"
 
 
+def test_quiet_on_ballistics_is_a_denial_too():
+    """«По балістиці тиша. 🚀Реактивний на Трою» rang the ballistic tone at 20:18
+    on 2026-10-26: «тиша» was not among the denial words, so the class it denies
+    became the class of a message about a jet Shahed."""
+    from tools.nlp.hints import threat_hint
+
+    assert threat_hint("По балістиці тиша.\n🚀Реактивний на Трою") == "shahed-jet"
+    assert threat_hint("По балістиці поки тиша.") == "none"
+
+
 def test_only_the_class_reads_the_trimmed_text():
     """Places, modality and certainty read the whole message. A denial is still a
     live report of the sky, and "шахедів в повітрі немає, по балістиці бажано
